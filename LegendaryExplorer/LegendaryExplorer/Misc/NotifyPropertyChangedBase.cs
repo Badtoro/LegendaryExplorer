@@ -15,7 +15,7 @@ namespace LegendaryExplorer.Misc
         /// Notifies listeners when given property is updated.
         /// </summary>
         /// <param name="propertyname">Name of property to give notification for. If called in property, argument can be ignored as it will be default.</param>
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyname = null)
+        public virtual void OnPropertyChanged([CallerMemberName] string propertyname = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyname));
         }
