@@ -169,6 +169,7 @@
         <MenuItem Header="Replace all wems" Click="ReplaceAllWems_Click"/>
     </MenuItem>
     <MenuItem Header="Squid's new and exciting ways to break stuff">
+        <MenuItem Header="Convert BioMorphFace to a unique mesh" Click="MorphFaceToMesh_Click" ToolTip="Converts a BioMoprhFace to a new mesh with the vertices and materials applied, which can then be edited in external programs"/>
         <MenuItem Header="Get Mesh Material paths" Click="GetMeshMaterials_Click" ToolTip="Copies all the material memory paths to clipboard"/>
         <MenuItem Header="Make Custom Morph Target Set" Click="MakeCustomMorphTargetSet_Click" ToolTip="Makes a new CustomMorphTargetSet and BioMorphFace for use in mods that dynamically change appearance from MorphTargetSet or SkeletalMesh"/>
         <MenuItem Header="Convert Head Mesh to Have Separate Eye Materials" Click="MakeHeterochromia_Click" ToolTip="Converts a head mesh to have separate eye materials. This will affect all LODs. Make sure the materials are properly mapped and show up correctly in preview."/>

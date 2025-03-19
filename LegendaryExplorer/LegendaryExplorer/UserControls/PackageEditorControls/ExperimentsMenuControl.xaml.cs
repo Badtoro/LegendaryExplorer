@@ -1340,6 +1340,11 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.SplitTeethFromScalp(GetPEWindow());
         }
 
+        private void MorphFaceToMesh_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.BioMorphFaceToMesh(GetPEWindow());
+        }
+
         //private void CompareMeshes_Click(object sender, RoutedEventArgs e)
         //{
         //    PackageEditorExperimentsSquid.CompareMeshes(GetPEWindow());
