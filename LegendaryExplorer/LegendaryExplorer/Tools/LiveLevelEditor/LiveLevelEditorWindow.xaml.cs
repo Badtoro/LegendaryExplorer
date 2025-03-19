@@ -81,7 +81,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                 throw new Exception($"{game} does not support Live Level Editor!");
             }
 
-            GameTarget.GameReceiveMessage += GameControllerOnRecieveMessage;
+            GameTarget.GameReceiveMessage += GameControllerOnReceiveMessage;
 
             if (Instance(game) is not null)
             {
@@ -109,11 +109,6 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                     gameInstalledReq.UnFullfilledText = "Can't find Mass Effect 2 installation!";
                     gameInstalledReq.ButtonText = "Set ME2 path";
                     break;
-                case MEGame.LE1:
-                    gameInstalledReq.FullfilledText = "Legendary Edition is installed";
-                    gameInstalledReq.UnFullfilledText = "Can't find Legendary Edition installation!";
-                    gameInstalledReq.ButtonText = "Set LE1 path";
-                    break;
             }
         }
 
@@ -121,7 +116,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
         {
             DisposeCamPath();
             DataContext = null;
-            GameTarget.GameReceiveMessage -= GameControllerOnRecieveMessage;
+            GameTarget.GameReceiveMessage -= GameControllerOnReceiveMessage;
             Instances.Remove(Game);
         }
 
@@ -258,7 +253,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
         }
         #endregion
 
-        private void GameControllerOnRecieveMessage(string msg)
+        private void GameControllerOnReceiveMessage(string msg)
         {
             if (msg == LiveEditHelper.LoaderLoadedMessage)
             {
@@ -749,7 +744,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             camPathPackage.GetUExport(CamPath_InterpDataIDX).WriteProperty(new FloatProperty(Math.Max(Move_CurveEditor.Time, FOV_CurveEditor.Time), "InterpLength"));
             camPathPackage.GetUExport(CamPath_LoopGateIDX).WriteProperty(new BoolProperty(ShouldLoop, "bOpen"));
             camPathPackage.Save();
-            LiveEditHelper.PadCamPathFile(Game);
+            LiveEditHelper.PadME3CamPathFile();
             GameTarget.ME3ExecuteConsoleCommands("ce stopcam", "ce LoadCamPath");
             playbackState = PlaybackState.Stopped;
             PlayPauseIcon = EFontAwesomeIcon.Solid_Play;
@@ -761,7 +756,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             {
                 return;
             }
-            camPathPackage = MEPackageHandler.OpenMEPackage(LiveEditHelper.CamPathFilePath(Game));
+            camPathPackage = MEPackageHandler.OpenMEPackage(LiveEditHelper.ME3CamPathPccInstallPath);
             interpTrackMove = camPathPackage.GetUExport(CamPath_InterpTrackMoveIDX);
             fovTrackExport = camPathPackage.GetUExport(CamPath_FOVTrackIDX);
             ReloadCurveEdExports();
@@ -785,7 +780,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             Dispatcher.BeginInvoke(new Action(ReloadCams));
         }
 
-        private void ReloadCams() => SavedCams.ReplaceAll(LiveEditHelper.ReadSavedCamsFile());
+        private void ReloadCams() => SavedCams.ReplaceAll(LiveEditHelper.ReadSavedCamsFile(Game));
 
         private void DisposeCamPath()
         {

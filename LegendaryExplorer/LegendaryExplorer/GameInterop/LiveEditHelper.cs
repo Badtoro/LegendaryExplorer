@@ -1,27 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Threading;
 using System.Numerics;
-using LegendaryExplorer.Misc;
-using LegendaryExplorer.Tools.Sequence_Editor;
 using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Helpers;
-using LegendaryExplorerCore.Kismet;
 using LegendaryExplorerCore.Packages;
-using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
 using LegendaryExplorerCore.Unreal;
 using LegendaryExplorerCore.Unreal.BinaryConverters;
-using Microsoft.VisualBasic.FileIO;
-using Newtonsoft.Json;
 
 namespace LegendaryExplorer.GameInterop
 {
     public static class LiveEditHelper
     {
-        private const string camPathFileName = "ME3LiveEditorCamPath.pcc";
         public const string LoaderLoadedMessage = "BioP_Global";
 
         private static string InteropModName(MEGame game) =>
@@ -29,16 +18,18 @@ namespace LegendaryExplorer.GameInterop
             ?? throw new ArgumentOutOfRangeException(nameof(game), game, @"No interop mod for game");
 
         private static string InteropModInstallPath(MEGame game) => Path.Combine(MEDirectories.GetDLCPath(game), InteropModName(game));
-        public static string CamPathFilePath(MEGame game) => Path.Combine(InteropModInstallPath(game), game.CookedDirName(), camPathFileName);
 
-        private static string SavedCamFilePath => Path.Combine(ME3Directory.ExecutableFolder, "savedCams");
-        public static POV[] ReadSavedCamsFile()
+        public static string ME3CamPathPccInstallPath => Path.Combine(InteropModInstallPath(MEGame.ME3), MEGame.ME3.CookedDirName(), "ME3LiveEditorCamPath.pcc");
+
+        private static string GetSavedCamFilePath(MEGame game) => Path.Combine(MEDirectories.GetExecutableFolderPath(game), "savedCams");
+
+        public static POV[] ReadSavedCamsFile(MEGame game)
         {
             var povs = new POV[10];
 
-            if (File.Exists(SavedCamFilePath))
+            if (File.Exists(GetSavedCamFilePath(game)))
             {
-                using var fs = new FileStream(SavedCamFilePath, FileMode.Open);
+                using var fs = new FileStream(GetSavedCamFilePath(game), FileMode.Open);
 
                 for (int i = 0; i < 10; i++)
                 {
@@ -69,7 +60,7 @@ namespace LegendaryExplorer.GameInterop
 
         public static void CreateCurveFromSavedCams(ExportEntry export)
         {
-            POV[] cams = ReadSavedCamsFile();
+            POV[] cams = ReadSavedCamsFile(export.Game);
 
             var props = export.GetProperties();
             var posTrack = props.GetProp<StructProperty>("PosTrack").GetProp<ArrayProperty<StructProperty>>("Points");
@@ -104,9 +95,9 @@ namespace LegendaryExplorer.GameInterop
             export.WriteProperties(props);
         }
 
-        public static void PadCamPathFile(MEGame game)
+        public static void PadME3CamPathFile()
         {
-            InteropHelper.TryPadFile(CamPathFilePath(game), 10_485_760);
+            InteropHelper.TryPadFile(ME3CamPathPccInstallPath, 10_485_760);
         }
     }
 

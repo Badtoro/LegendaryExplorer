@@ -45,6 +45,8 @@ namespace LegendaryExplorer.Misc
             if (files.TryGetValue(otherVerName, out var matchingVersion))
             {
                 otherGenPackage = MEPackageHandler.OpenMEPackage(matchingVersion);
+                otherGenPackage.Dispose(); // Do not increment the ref count, as we want to pull shared package but not register it for use
+                                           // Should probably have some sort of method for this
                 return null;
             }
 

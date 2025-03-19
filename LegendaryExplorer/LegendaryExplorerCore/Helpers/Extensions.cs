@@ -216,7 +216,7 @@ namespace LegendaryExplorerCore.Helpers
             return -1;
         }
 
-        public static bool IsEmpty<T>(this ICollection<T> list) => list.Count == 0;
+        public static bool IsEmpty<T>(this ICollection<T> collection) => collection.Count == 0;
 
         public static bool IsEmpty<T>(this IEnumerable<T> enumerable) => !enumerable.Any();
         public static bool Any<T>(this ICollection<T> collection) => collection.Count > 0;
@@ -333,6 +333,39 @@ namespace LegendaryExplorerCore.Helpers
 
         //This allows a partially enumerated IEnumerator to be further enumerated in a foreach
         public static IEnumerator<T> GetEnumerator<T>(this IEnumerator<T> enumerator) => enumerator;
+
+        public static ChunkSpanEnumerator<T> ChunkBySpan<T>(this IEnumerable<T> enumerable, int size)
+        {
+            if (size < 0)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
+
+            return new ChunkSpanEnumerator<T>(enumerable.GetEnumerator(), size);
+        }
+
+        public class ChunkSpanEnumerator<T>(IEnumerator<T> enumerator, int size)
+        {
+            private readonly T[] buffer = new T[size];
+            private int usedBufferSize;
+
+            public bool MoveNext()
+            {
+                for (usedBufferSize = 0; usedBufferSize < buffer.Length; usedBufferSize++)
+                {
+                    if (!enumerator.MoveNext())
+                    {
+                        return false;
+                    }
+                    buffer[usedBufferSize] = enumerator.Current;
+                }
+                return true;
+            }
+
+            public ReadOnlySpan<T> Current => buffer.AsSpan(0, usedBufferSize);
+
+            public ChunkSpanEnumerator<T> GetEnumerator() => this;
+        }
     }
 
     public static class DictionaryExtensions
@@ -359,14 +392,13 @@ namespace LegendaryExplorerCore.Helpers
             list.Add(value);
         }
 
-        public static bool TryAdd<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key, TValue value)
+        public static void DisposeValuesAndClear<TKey, TValue>(this IDictionary<TKey, TValue> dict) where TValue : IDisposable
         {
-            if (dict.ContainsKey(key))
+            foreach (TValue disposable in dict.Values)
             {
-                return false;
+                disposable?.Dispose();
             }
-            dict.Add(key, value);
-            return true;
+            dict.Clear();
         }
     }
 

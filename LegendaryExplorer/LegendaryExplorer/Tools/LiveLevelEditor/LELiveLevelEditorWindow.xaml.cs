@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -8,6 +9,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Numerics;
+using System.Threading;
 using FontAwesome5;
 using LegendaryExplorer.Dialogs;
 using LegendaryExplorer.SharedUI;
@@ -30,7 +32,7 @@ using LegendaryExplorer.Misc;
 using LegendaryExplorerCore.Unreal.ObjectInfo;
 using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
 using Newtonsoft.Json;
-using SharpDX.Direct2D1.Effects;
+using System.Threading.Tasks;
 
 namespace LegendaryExplorer.Tools.LiveLevelEditor
 {
@@ -47,7 +49,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             if (!game.IsLEGame() || !(GameController.GetInteropTargetForGame(game)?.CanUseLLE ?? false))
                 throw new ArgumentException(@"LE Live Level Editor does not support this game!", nameof(game));
 
-            return Instances.TryGetValue(game, out LELiveLevelEditorWindow lle) ? lle : null;
+            return Instances.GetValueOrDefault(game);
         }
 
         private bool _readyToView;
@@ -63,10 +65,28 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             }
         }
 
-        public bool CamPathReadyToView => _readyToView && Game is MEGame.ME3;
+        /// <summary>
+        /// This is a weak check. But we don't have way to access class
+        /// </summary>
+        private bool _staticMeshComponentSelected;
+
+        public bool StaticMeshComponentSelected
+        {
+            get => _readyToView;
+            set
+            {
+                if (SetProperty(ref _staticMeshComponentSelected, value))
+                {
+                    // OnPropertyChanged(nameof(StaticMeshComponentSelected));
+                }
+            }
+        }
+
+        public bool CamPathReadyToView => _readyToView && App.IsDebug; //not ready for use yet
 
         public MEGame Game { get; }
         public InteropTarget GameTarget { get; }
+
 
         public LELiveLevelEditorWindow(MEGame game) : base("LE Live Level Editor", true)
         {
@@ -88,7 +108,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             DataContext = this;
             LoadCommands();
             InitializeComponent();
-
+            MatEdLLE.Initialize(this);
             ActorEditorPanel.DataContext = this;
             //LightEditorPanel.DataContext = this;
 
@@ -132,6 +152,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
         public ICommand OpenPackageCommand { get; set; }
         public ICommand OpenActorInPackEdCommand { get; set; }
         public ICommand RegenActorListCommand { get; set; }
+
         public Requirement.RequirementCommand PackEdWindowOpenCommand { get; set; }
         public ICommand WriteActorValuesCommand { get; set; }
         public ICommand SnapToPlayerPositionCommand { get; set; }
@@ -343,7 +364,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             if (command[0] != "LIVELEVELEDITOR")
                 return; // Not for us
 
-            //Debug.WriteLine($"LLE Command: {msg}");
+            Debug.WriteLine($"LLE Command: {msg}");
             var verb = command[1]; // Message Info
             // "READY" is done on first initialize and will automatically 
             if (verb == "READY") // We polled game, and found LLE is available
@@ -357,6 +378,8 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                 // Reload all files in the game to make sure the list is current
                 MELoadedFiles.GetFilesLoadedInGame(Game, true);
                 ActorDict.Clear();
+
+                InitializeCamPath();
             }
             else if (verb == "LEVELSUPDATE")
             {
@@ -398,6 +421,8 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                     ZPos = (int)zPosf;
                 }
 
+                // Also get the component materials. This must be done after as it doesn't seem to queue
+                InteropHelper.SendMessageToGame("LLE_GET_COMPONENT_MATERIALS", Game);
                 noUpdate = false;
                 EndBusy();
             }
@@ -445,6 +470,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             }
         }
 
+
         private readonly DispatcherTimer GameOpenTimer;
         private void CheckIfGameOpen(object sender, EventArgs e)
         {
@@ -456,6 +482,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                 ActorDict.Clear();
                 instructionsTab.IsSelected = true;
                 GameOpenTimer.Stop();
+                MatEdLLE?.GameClosed(); // Must go last
             }
         }
 
@@ -477,17 +504,78 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
 
         public ObservableDictionary<string, ObservableCollectionExtended<ActorEntryLE>> ActorDict { get; } = new();
 
+
         private class JsonMapObj
         {
             public string Name { get; set; }
             public JsonActorObj[] Actors { get; set; }
         }
 
+        private class JsonStaticMeshCollectionComponentObj
+        {
+            /// <summary>
+            /// Name of the SMCA
+            /// </summary>
+            public string SMCAName { get; set; }
+
+            /// <summary>
+            /// IFP of the StaticMesh
+            /// </summary>
+            public string SMCAMesh { get; set; }
+        }
+
+        private class JsonStaticLightCollectionComponentObj
+        {
+            /// <summary>
+            /// Name of the SLCA
+            /// </summary>
+            public string SLCAName { get; set; }
+        }
+
+        public class JsonMaterialSource
+        {
+            /// <summary>
+            /// Memory path of the material that was loaded
+            /// </summary>
+            [JsonProperty("material")]
+            public string MaterialMemoryPath { get; set; }
+
+            /// <summary>
+            /// File the asset was loaded from (in-game pathing)
+            /// </summary>
+            [JsonProperty("source")]
+            public string LinkerPath { get; set; }
+
+            /// <summary>
+            /// Index of the material in the materials list
+            /// </summary>
+            [JsonProperty("materialindex")]
+            public int SlotIdx { get; set; }
+
+            [JsonIgnore]
+            public string DisplayString => $"Slot {SlotIdx}: {MaterialMemoryPath}";
+
+        }
+
         private class JsonActorObj
         {
             public string Name { get; set; }
             public string Tag { get; set; }
-            public string[] Components { get; set; }
+
+            /// <summary>
+            /// Mesh collection components
+            /// </summary>
+            public JsonStaticMeshCollectionComponentObj[] StaticMeshCollectionComponents { get; set; } = [];
+
+            /// <summary>
+            /// Light collection components
+            /// </summary>
+            public JsonStaticLightCollectionComponentObj[] StaticLightCollectionComponents { get; set; } = [];
+
+            /// <summary>
+            /// Standard actor components that have a mesh.
+            /// </summary>
+            public List<string> ActorComponents { get; set; } = [];
         }
 
         /// <summary>
@@ -507,18 +595,23 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                 string mapName = $"{jsonMapObj.Name}.pcc";
                 if (!filesLoadedInGame.ContainsKey(mapName))
                 {
-                    continue;
+                    // For memory loaded files, we shouldn't filter them out.
+                    // Unsure how to track memory loaded files.
+                    // continue;
                 }
                 maps.Add(mapName);
                 //there will never be changes in what actors are loaded in a specific map,
                 //so we can skip maps we've already loaded
+
+                // unless they dynamically spawn :) - Mgamerz
                 if (ActorDict.ContainsKey(mapName))
                 {
                     continue;
                 }
                 foreach (JsonActorObj jsonActorObj in jsonMapObj.Actors)
                 {
-                    if (jsonActorObj.Components is null)
+                    // STANDARD ACTOR
+                    if (jsonActorObj.StaticMeshCollectionComponents.Length == 0 && jsonActorObj.StaticLightCollectionComponents.Length == 0)
                     {
                         var actor = new ActorEntryLE
                         {
@@ -526,19 +619,46 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                             ActorName = jsonActorObj.Name,
                             Tag = jsonActorObj.Tag
                         };
+
+                        List<string> components = new List<string>();
+                        for (int i = 0; i < jsonActorObj.ActorComponents.Count; i++)
+                        {
+                            components.Add(jsonActorObj.ActorComponents[i] ?? "<null>");
+                        }
+
+                        actor.ActorComponents = components.ToArray();
                         ActorDict.AddToListAt(mapName, actor);
                         continue;
                     }
-                    for (int i = 0; i < jsonActorObj.Components.Length; i++)
+
+                    // Collection actors
+                    for (int i = 0; i < jsonActorObj.StaticMeshCollectionComponents.Length; i++)
                     {
-                        if (jsonActorObj.Components[i] is string componentName)
+                        if (jsonActorObj.StaticMeshCollectionComponents[i] is JsonStaticMeshCollectionComponentObj component)
                         {
                             var actor = new ActorEntryLE
                             {
                                 FileName = mapName,
                                 ActorName = jsonActorObj.Name,
-                                ComponentName = componentName,
-                                ComponentIdx = i
+                                ComponentName = component.SMCAName,
+                                Mesh = component.SMCAMesh,
+                                ComponentIdx = i,
+                                IsCollectionActor = true
+                            };
+                            ActorDict.AddToListAt(mapName, actor);
+                        }
+                    }
+                    for (int i = 0; i < jsonActorObj.StaticLightCollectionComponents.Length; i++)
+                    {
+                        if (jsonActorObj.StaticLightCollectionComponents[i] is JsonStaticLightCollectionComponentObj component)
+                        {
+                            var actor = new ActorEntryLE
+                            {
+                                FileName = mapName,
+                                ActorName = jsonActorObj.Name,
+                                ComponentName = component.SLCAName,
+                                ComponentIdx = i ,
+                                IsCollectionActor = true
                             };
                             ActorDict.AddToListAt(mapName, actor);
                         }
@@ -563,6 +683,16 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
                     SetBusy($"Selecting {value.ActorName}", () => { });
                     string message = $"LLE_SELECT_ACTOR {Path.GetFileNameWithoutExtension(value.FileName)} {value.ActorName} {_selectedActor.ComponentIdx}";
                     InteropHelper.SendMessageToGame(message, Game);
+
+                    StaticMeshComponentSelected = _selectedActor?.ComponentName != null;
+                    if (value.ActorComponents == null)
+                    {
+                        MatEdLLE.Components.ClearEx();
+                    }
+                    else
+                    {
+                        MatEdLLE.Components.ReplaceAll(value.ActorComponents);
+                    }
                 }
             }
         }
@@ -590,8 +720,11 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             string text = actorFilterSearchBox.Text;
             return ae.ActorName.Contains(text, StringComparison.OrdinalIgnoreCase)
                    || ae.Tag is not null && ae.Tag.Contains(text, StringComparison.OrdinalIgnoreCase)
+                   || ae.DisplayText.Contains(text, StringComparison.OrdinalIgnoreCase)
                    || ae.ComponentName is not null && ae.ComponentName.Contains(text, StringComparison.OrdinalIgnoreCase);
         }
+
+
 
         #endregion
 
@@ -924,10 +1057,10 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
         #endregion
 
         #region CamPath
-        private const int CamPath_InterpDataIDX = 63;
-        private const int CamPath_LoopGateIDX = 77;
-        private const int CamPath_InterpTrackMoveIDX = 70;
-        private const int CamPath_FOVTrackIDX = 82;
+        private const string CamPath_InterpData_IFP = "TheWorld.PersistentLevel.Main_Sequence.CamPathSeq.InterpData_0";
+        private const string CamPath_LoopGate_IFP = "TheWorld.PersistentLevel.Main_Sequence.CamPathSeq.SeqAct_Gate_0";
+        private const string CamPath_InterpTrackMove_IFP = "TheWorld.PersistentLevel.Main_Sequence.CamPathSeq.InterpData_0.InterpGroup_0.InterpTrackMove_0";
+        private const string CamPath_FOVTrack_IFP = "TheWorld.PersistentLevel.Main_Sequence.CamPathSeq.InterpData_0.InterpGroup_1.InterpTrackFloatProp_0";
 
         private IMEPackage camPathPackage;
 
@@ -1003,25 +1136,39 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
 
         private void SaveCamPath(object sender, RoutedEventArgs e)
         {
-            camPathPackage.GetUExport(CamPath_InterpDataIDX).WriteProperty(new FloatProperty(Math.Max(Move_CurveEditor.Time, FOV_CurveEditor.Time), "InterpLength"));
-            camPathPackage.GetUExport(CamPath_LoopGateIDX).WriteProperty(new BoolProperty(ShouldLoop, "bOpen"));
-            camPathPackage.Save();
-            LiveEditHelper.PadCamPathFile(Game);
             GameTarget.ModernExecuteConsoleCommand("ce stopcam");
-            GameTarget.ModernExecuteConsoleCommand("ce LoadCamPath");
+            camPathPackage.FindExport(CamPath_InterpData_IFP).WriteProperty(new FloatProperty(Math.Max(Move_CurveEditor.Time, FOV_CurveEditor.Time), "InterpLength"));
+            camPathPackage.FindExport(CamPath_LoopGate_IFP).WriteProperty(new BoolProperty(ShouldLoop, "bOpen"));
+
+            InteropHelper.SendMessageToGame($"{InteropCommands.STREAMLEVELOUT} {camPathPackage.FileNameNoExtension}", Game);
+            InteropHelper.SendMessageToGame($"{InteropCommands.INTEROP_SHOWLOADINGINDICATOR}", Game);
+            InteropHelper.SendFileToGame(camPathPackage); // Send package into game for loading
+            Task.Run(() =>
+            {
+                Thread.Sleep(500);
+            }).ContinueWithOnUIThread(x =>
+            {
+                InteropHelper.SendMessageToGame($"{InteropCommands.STREAMLEVELIN} {camPathPackage.FileNameNoExtension}", Game);
+            }).ContinueWith(x =>
+            {
+                Thread.Sleep(500);
+            }).ContinueWithOnUIThread(x =>
+            {
+                InteropHelper.SendMessageToGame($"{InteropCommands.INTEROP_HIDELOADINGINDICATOR}", Game);
+            });
             playbackState = PlaybackState.Stopped;
             PlayPauseIcon = EFontAwesomeIcon.Solid_Play;
         }
 
         private void InitializeCamPath()
         {
-            if (Game is not MEGame.ME3)
+            if (!App.IsDebug || Game is not MEGame.LE1)
             {
                 return;
             }
-            camPathPackage = MEPackageHandler.OpenMEPackage(LiveEditHelper.CamPathFilePath(Game));
-            interpTrackMove = camPathPackage.GetUExport(CamPath_InterpTrackMoveIDX);
-            fovTrackExport = camPathPackage.GetUExport(CamPath_FOVTrackIDX);
+            camPathPackage = MEPackageHandler.OpenMEPackage(Path.Combine(AppDirectories.ExecFolder, "LELiveEditorCamPath.pcc"));
+            interpTrackMove = camPathPackage.FindExport(CamPath_InterpTrackMove_IFP);
+            fovTrackExport = camPathPackage.FindExport(CamPath_FOVTrack_IFP);
             ReloadCurveEdExports();
 
             savedCamsFileWatcher = new FileSystemWatcher(MEDirectories.GetExecutableFolderPath(Game), "savedCams") { NotifyFilter = NotifyFilters.LastWrite };
@@ -1043,7 +1190,7 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             Dispatcher.BeginInvoke(new Action(ReloadCams));
         }
 
-        private void ReloadCams() => SavedCams.ReplaceAll(LiveEditHelper.ReadSavedCamsFile());
+        private void ReloadCams() => SavedCams.ReplaceAll(LiveEditHelper.ReadSavedCamsFile(Game));
 
         private void DisposeCamPath()
         {
@@ -1097,6 +1244,16 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
         }
 
         #endregion
+
+        /// <summary>
+        /// Sends a material to Live Material Editor and sets it on the current component
+        /// </summary>
+        /// <param name="export"></param>
+        /// <exception cref="NotImplementedException"></exception>
+        public void SetCustomMaterial(ExportEntry export)
+        {
+            MatEdLLE.SetSpecificMaterial(export);
+        }
     }
 
     public class ActorEntryLE
@@ -1107,6 +1264,10 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
             {
                 if (ComponentName is not null)
                 {
+                    if (Mesh != null)
+                    {
+                        return $"{ActorName}:{ComponentName} ({Mesh})";
+                    }
                     return $"{ActorName}:{ComponentName}";
                 }
                 if (Tag is not null)
@@ -1121,8 +1282,18 @@ namespace LegendaryExplorer.Tools.LiveLevelEditor
         public string Tag;
         public string ActorName;
         public string ComponentName;
+        /// <summary>
+        /// Only on standard AActor, not collection. Collections only have one type of component, Light or Static, and are indexed
+        /// </summary>
+        public string[] ActorComponents;
+        public string Mesh;
         public int ComponentIdx = -1;
 
         public string PathInLevel => ComponentName is null ? ActorName : $"{ActorName}.{ComponentName}";
+        
+        /// <summary>
+        /// If this object is for one in a collection
+        /// </summary>
+        public bool IsCollectionActor { get; set; }
     }
 }

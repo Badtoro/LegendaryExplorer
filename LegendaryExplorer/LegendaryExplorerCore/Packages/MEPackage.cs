@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -21,6 +22,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace LegendaryExplorerCore.Packages
 {
+    [DebuggerDisplay("MEPackage {FilePath} | {Game}")]
+
     public sealed class MEPackage : UnrealPackageFile, IMEPackage, IDisposable
     {
         /// <summary>
@@ -78,7 +81,7 @@ namespace LegendaryExplorerCore.Packages
         public int PackageTypeId { get; }
 
         /// <summary>
-        /// This is not useful for modding but we should not be changing the format of the package file.
+        /// Present only on persistent level packages. List of sublevel files that are also part of this map
         /// </summary>
         public readonly List<string> AdditionalPackagesToCook = new();
 
@@ -117,7 +120,7 @@ namespace LegendaryExplorerCore.Packages
         /// <summary>
         /// Metadata that is serialized to the end of the package file and contains useful information for tooling
         /// </summary>
-        public LECLData LECLTagData { get; }
+        public LECLData LECLTagData { get; } = new LECLData();
 
         public byte[] getHeader()
         {
@@ -127,9 +130,9 @@ namespace LegendaryExplorerCore.Packages
         }
 
         #region HeaderMisc
-        private int Gen0ExportCount;
-        private int Gen0NameCount;
-        private int Gen0NetworkedObjectCount;
+        public int Gen0ExportCount;
+        public int Gen0NameCount;
+        public int Gen0NetworkedObjectCount;
         private int ImportExportGuidsOffset;
         //private int ImportGuidsCount;
         //private int ExportGuidsCount;
@@ -1327,6 +1330,7 @@ namespace LegendaryExplorerCore.Packages
 
             //Write 1 generation
             ms.WriteInt32(1);
+            // Todo: Properly calculate these on save (for LE)
             ms.WriteInt32(Gen0ExportCount);
             ms.WriteInt32(Gen0NameCount);
             ms.WriteInt32(Gen0NetworkedObjectCount);

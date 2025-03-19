@@ -50,7 +50,7 @@ namespace LegendaryExplorer.GameInterop
 
             if (Target.ModInfo.CanUseCamPath)
             {
-                LiveEditHelper.PadCamPathFile(Game);
+                LiveEditHelper.PadME3CamPathFile();
             }
 
             var augmentedFiles = AugmentAndInstall(GetFilesToAugment(), fileMap);

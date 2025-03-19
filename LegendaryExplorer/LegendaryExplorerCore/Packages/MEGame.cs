@@ -8,6 +8,8 @@ namespace LegendaryExplorerCore.Packages
     /// <remarks><see cref="MEGameExtensions">Extension Methods</see></remarks>
     public enum MEGame
     {
+        //DO NOT CHANGE ENUM NAMES. There is quite a bit of code that relies on these enum values being converted to strings
+
         /// <summary>Unknown game</summary>
         /// <remarks>Used when a game is not able to be determined</remarks>
         Unknown = 0,

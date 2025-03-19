@@ -50,7 +50,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                     {
                         var emitterExport = CurrentLoadedExport.FileRef.GetUExport(emitter.Value);
                         var emitterName = emitterExport.GetProperty<NameProperty>("EmitterName");
-                        string header = emitterName?.Value.Name ?? "Emitter";
+                        string header = emitterName?.Value.Instanced ?? "Emitter";
                         ParticleSystemNode p = new() { 
                             Entry = emitterExport, 
                             Header = $"{emitterExport.UIndex} {header}" 
@@ -90,7 +90,17 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                                         }
                                     }
                                 }
+                                var spawnModule = (ExportEntry) lodExport.GetProperty<ObjectProperty>("SpawnModule")?.ResolveToEntry(CurrentLoadedExport.FileRef);
+                                if (spawnModule != null)
+                                {
+                                    ParticleSystemNode spwnModule = new()
+                                    {
+                                        Entry = spawnModule,
+                                        Header = $"Spawn Module: {spawnModule.UIndex} {spawnModule.InstancedFullPath}"
+                                    };
+                                    psLod.Children.Add(spwnModule);
 
+                                }
                                 var typeDataExport = (ExportEntry) lodExport.GetProperty<ObjectProperty>("TypeDataModule")?.ResolveToEntry(CurrentLoadedExport.FileRef);
                                 if (typeDataExport != null)
                                 {

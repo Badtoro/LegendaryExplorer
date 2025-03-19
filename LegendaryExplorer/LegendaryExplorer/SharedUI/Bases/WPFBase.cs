@@ -58,6 +58,10 @@ namespace LegendaryExplorer.SharedUI.Bases
                     return;
                 }
             }
+
+            // This could be optimized by making it only do it when all windows are closed. But this is probably fine.
+            TreeViewEntry.ClearCache();
+
             DataContext = null; //Remove all binding sources
             Closing -= WPFBase_Closing;
         }
