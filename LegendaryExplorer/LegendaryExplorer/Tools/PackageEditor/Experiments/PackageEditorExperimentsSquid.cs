@@ -605,6 +605,7 @@ defaultproperties
 
         public static void BioMorphFaceToMesh(PackageEditorWindow pew)
         {
+            
             // make sure something is selected, a package is open ,and the right thing is selected
             if (pew.SelectedItem == null
                 || pew.Pcc == null
@@ -643,23 +644,7 @@ defaultproperties
                 }
             }
 
-            // now copy the bone offsets and vertices to the mesh
-            var finalSkeleton = bmf.GetProperty<ArrayProperty<StructProperty>>("m_aFinalSkeleton");
-            foreach (var skelProp in finalSkeleton)
-            {
-                var boneName = skelProp.GetProp<NameProperty>("nName").Value;
-                var bonePos = skelProp.GetProp<StructProperty>("vPos");
-
-                var meshBone = newHeadBinary.RefSkeleton.FirstOrDefault(x => x.Name == boneName);
-                
-                if (meshBone != null)
-                {
-                    meshBone.Position.X = bonePos.GetProp<FloatProperty>("X");
-                    meshBone.Position.Y = bonePos.GetProp<FloatProperty>("Y");
-                    meshBone.Position.Z = bonePos.GetProp<FloatProperty>("Z");
-                }
-            }
-
+            // next, copy the vertices from the bioMorphFace binary to the mesh binary
             var bmfBinary = bmf.GetBinaryData<LegendaryExplorerCore.Unreal.BinaryConverters.BioMorphFace>();
 
             for (int lodIndex = 0; lodIndex < bmfBinary.LODs.Length && lodIndex < newHeadBinary.LODModels.Length; lodIndex++)
@@ -678,6 +663,14 @@ defaultproperties
             }
 
             newHeadEntry.WriteBinary(newHeadBinary);
+
+            // make a new BioMorphFace with the same material overrides and skeleton adjstments, but remove the binary data with the vertex positions
+            // so you can use this with an edited mesh and it won't deform it
+            var newBmf = EntryCloner.CloneTree(bmf);
+            var newBmfBinary = newBmf.GetBinaryData<LegendaryExplorerCore.Unreal.BinaryConverters.BioMorphFace>();
+            newBmfBinary.LODs = [];
+            newBmf.WriteBinary(newBmfBinary);
+            // TODO remove the morph features (useless), point the base head to the new mesh
         }
 
         private static char NumToLetter(int input)
