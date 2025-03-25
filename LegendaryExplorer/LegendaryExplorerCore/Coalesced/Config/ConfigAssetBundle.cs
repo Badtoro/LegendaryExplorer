@@ -12,7 +12,6 @@ using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
 
 namespace LegendaryExplorerCore.Coalesced.Config
 {
-
     /// <summary>
     /// Handler for a bundle of config assets
     /// </summary>
@@ -113,7 +112,6 @@ namespace LegendaryExplorerCore.Coalesced.Config
             {
                 var assetBundle = new ConfigAssetBundle(game, cookedDir, dlcFolderName);
                 return assetBundle.Assets != null ? assetBundle : null;
-
             }
             catch (Exception e)
             {
@@ -144,7 +142,7 @@ namespace LegendaryExplorerCore.Coalesced.Config
                         SearchOption.TopDirectoryOnly)
                     .Where(x => Path.GetFileName(x).StartsWith(ConfigMerge.CONFIG_MERGE_PREFIX))
                     .ToList(); // Find CoalescedMerge-*.m3cd files
-                
+
                 foreach (var m3cd in m3cds)
                 {
                     LECLog.Information($@"Merging M3 Config Delta {m3cd} in {dlcFolderName}");
@@ -158,8 +156,8 @@ namespace LegendaryExplorerCore.Coalesced.Config
                 foreach (var ini in iniFiles)
                 {
                     var fname = Path.GetFileNameWithoutExtension(ini);
-                    if (!CoalescedConverter.ProperNames.Contains(fname, StringComparer.InvariantCultureIgnoreCase))
-                        continue; // Not supported.
+                    if (!CoalescedConverter.ProperNames.Contains(fname, StringComparer.OrdinalIgnoreCase))
+                        continue; // Not supported. localization files are only supported in the main single file.
                     Assets[fname] = ConfigFileProxy.LoadIni(ini);
                 }
             }
@@ -189,7 +187,11 @@ namespace LegendaryExplorerCore.Coalesced.Config
 
             if (createIfNotFound)
             {
-                Assets[asset] = new CoalesceAsset($@"{asset}.ini"); // Even game 3 uses .ini, I think...
+                Assets[asset] = new CoalesceAsset($@"{asset}.ini")
+                {
+                    // Source is required or game 3 compiler will not serialize it
+                    Source = $@"..\..\biogame\config\{asset.ToLower()}.ini"
+                }; // Even game 3 uses .ini, I think...
                 return Assets[asset];
             }
 
@@ -199,7 +201,9 @@ namespace LegendaryExplorerCore.Coalesced.Config
         /// <summary>
         /// Commits this bundle to the specified single config file
         /// </summary>
-        public void CommitAssets(string outPath)
+        /// <param name="outPath">Where to write the single output file to</param>
+        /// <param name="loc">LE1/LE2 only: What localization this is for. This is important for error messages being written out via debug logger from within native code. For other games, this is not used, and can be set to None.</param>
+        public void CommitAssets(string outPath, MELocalization loc)
         {
             if (Game is MEGame.LE1 or MEGame.LE2)
             {
@@ -210,7 +214,7 @@ namespace LegendaryExplorerCore.Coalesced.Config
                     inis[asset.Key] = CoalesceAsset.ToIni(asset.Value);
                 }
 
-                var compiledStream = CoalescedConverter.CompileLE1LE2FromMemory(inis);
+                var compiledStream = CoalescedConverter.CompileLE1LE2FromMemory(inis, loc);
                 compiledStream.WriteToFile(outPath);
                 HasChanges = false;
             }
@@ -230,7 +234,7 @@ namespace LegendaryExplorerCore.Coalesced.Config
         /// <summary>
         /// Commits this bundle to the same folder it was loaded from
         /// </summary>
-        public void CommitDLCAssets(string outPath = null)
+        public void CommitDLCAssets(string outPath = null, string dlcName = null)
         {
             if (Game.IsGame2())
             {
@@ -243,10 +247,9 @@ namespace LegendaryExplorerCore.Coalesced.Config
             }
             else if (Game.IsGame3())
             {
-                var coalFile = Path.Combine(outPath ?? CookedDir, $@"Default_{DLCFolderName}.bin");
-                CommitAssets(coalFile);
+                var coalFile = Path.Combine(outPath ?? CookedDir, $@"Default_{dlcName ?? DLCFolderName}.bin");
+                CommitAssets(coalFile, MELocalization.INT); // DLC does not support localization files as part of config.
                 HasChanges = false;
-
             }
         }
 

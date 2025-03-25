@@ -73,7 +73,6 @@ namespace LegendaryExplorer.Tools.SequenceObjects
         protected SequenceGraphEditor g;
         public RectangleF PosAtDragStart;
 
-
         protected ExportEntry export;
         public ExportEntry Export => export;
         public int UIndex => export.UIndex;
@@ -271,11 +270,8 @@ namespace LegendaryExplorer.Tools.SequenceObjects
                             var index = properties.GetProp<IntProperty>("m_nIndex");
                             if (index != null)
                             {
-                                var label = PlotDatabases.FindPlotConditionalByID(index.Value, export.Game)?.Path;
-                                if (label != null)
-                                {
-                                    res += label + "\n";
-                                }
+                                res += PlotDatabases.FindPlotConditionalByID(index.Value, export.Game)?.Path ?? $"Conditional {index.Value}";
+                                res += "\n";
                             }
                         }
                         break;
@@ -284,11 +280,8 @@ namespace LegendaryExplorer.Tools.SequenceObjects
                             var index = properties.GetProp<IntProperty>("m_nIndex");
                             if (index != null)
                             {
-                                var label = PlotDatabases.FindPlotBoolByID(index.Value, export.Game)?.Path;
-                                if (label != null)
-                                {
-                                    res += label + "\n";
-                                }
+                                res += PlotDatabases.FindPlotBoolByID(index.Value, export.Game)?.Path ?? $"Plot Bool {index.Value}";
+                                res += "\n";
                             }
                         }
                         break;
@@ -298,11 +291,8 @@ namespace LegendaryExplorer.Tools.SequenceObjects
                             var index = properties.GetProp<IntProperty>("m_nIndex");
                             if (index != null)
                             {
-                                var label = PlotDatabases.FindPlotTransitionByID(index.Value, export.Game)?.Path;
-                                if (label != null)
-                                {
-                                    res += label + "\n";
-                                }
+                                res += PlotDatabases.FindPlotTransitionByID(index.Value, export.Game)?.Path ?? $"Transition {index.Value}";
+                                res += "\n";
                             }
                         }
                         break;
@@ -467,6 +457,20 @@ namespace LegendaryExplorer.Tools.SequenceObjects
                             {
                                 return "Plot Float\n#" + m_nIndex.Value;
                             }
+                        }
+
+                        if (export.ClassName == "SeqVar_FloatList")
+                        {
+                            var floatList = export.GetProperty<ArrayProperty<FloatProperty>>("FloatList") ?? new ArrayProperty<FloatProperty>("FloatList");
+                            string text = $"FloatList: {floatList.Count} item (s)";
+                            if (floatList.Count > 0)
+                                text += $"\n0: {floatList[0].Value}";
+                            if (floatList.Count > 1)
+                                text += $"\n1: {floatList[1].Value}";
+                            if (floatList.Count > 2)
+                                text += "\n...";
+
+                            return text;
                         }
                         if (props.GetProp<FloatProperty>("FloatValue") is FloatProperty floatValue)
                         {
@@ -1095,7 +1099,6 @@ namespace LegendaryExplorer.Tools.SequenceObjects
                 graphEditor.addEdge(edge);
                 base.OnStartDrag(sender, e);
                 draggingVarlink = true;
-
             }
 
             protected override void OnDrag(object sender, PInputEventArgs e)
@@ -1209,7 +1212,6 @@ namespace LegendaryExplorer.Tools.SequenceObjects
                 return;
             KismetHelper.CreateOutputLink(start.export, linkDesc, end.export, inputIndex);
         }
-
 
         private static void CreateVarlink(PNode p1, SVar end)
         {
@@ -1641,9 +1643,9 @@ namespace LegendaryExplorer.Tools.SequenceObjects
                 {
                     case ObjectProperty objProp when objProp.Name == "oSequenceReference":
                         {
-                            string seqName = Pcc.GetEntry(objProp.Value)?.ObjectName ?? "";
+                            string seqName = Pcc.GetEntry(objProp.Value)?.ObjectName.Instanced ?? "";
                             if (Pcc.IsUExport(objProp.Value)
-                                && seqName == "Sequence"
+                                && seqName.StartsWith("Sequence")
                                 && Pcc.GetUExport(objProp.Value).GetProperty<StrProperty>("ObjName") is StrProperty objNameProp)
                             {
                                 seqName = objNameProp;

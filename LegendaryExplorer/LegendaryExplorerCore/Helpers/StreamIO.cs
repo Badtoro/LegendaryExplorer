@@ -24,8 +24,10 @@ using System;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using LegendaryExplorerCore.Gammtek.Extensions;
 using LegendaryExplorerCore.Gammtek.IO;
 using LegendaryExplorerCore.Memory;
 
@@ -33,7 +35,6 @@ namespace LegendaryExplorerCore.Helpers
 {
     public static class StreamHelpers
     {
-
         public static MemoryStream ReadToMemoryStream(this Stream stream, long size)
         {
             MemoryStream memory = MemoryManager.GetMemoryStream((int)size);
@@ -92,18 +93,15 @@ namespace LegendaryExplorerCore.Helpers
 
         public static Guid ReadGuid(this Stream stream)
         {
-            Span<byte> guidBytes = stackalloc byte[16];
-            stream.Read(guidBytes);
-            return new Guid(guidBytes);
+            Unsafe.SkipInit(out Guid guid);
+            stream.Read(guid.AsBytes());
+            return guid;
         }
 
         public static void WriteGuid(this Stream stream, Guid value)
         {
-            Span<byte> data = stackalloc byte[16];
-            MemoryMarshal.Write(data, ref value);
-            stream.Write(data);
+            stream.Write(value.AsBytes());
         }
-
 
         public static void WriteToFile(this MemoryStream stream, string outfile)
         {
@@ -355,7 +353,7 @@ namespace LegendaryExplorerCore.Helpers
         public static void WriteUInt64(this Stream stream, ulong data)
         {
             Span<byte> buffer = stackalloc byte[sizeof(ulong)];
-            MemoryMarshal.Write(buffer, ref data);
+            MemoryMarshal.Write(buffer, in data);
             stream.Write(buffer);
         }
 
@@ -370,7 +368,7 @@ namespace LegendaryExplorerCore.Helpers
         public static void WriteInt64(this Stream stream, long data)
         {
             Span<byte> buffer = stackalloc byte[sizeof(long)];
-            MemoryMarshal.Write(buffer, ref data);
+            MemoryMarshal.Write(buffer, in data);
             stream.Write(buffer);
         }
 
@@ -385,22 +383,22 @@ namespace LegendaryExplorerCore.Helpers
         public static void WriteUInt32(this Stream stream, uint data)
         {
             Span<byte> buffer = stackalloc byte[sizeof(uint)];
-            MemoryMarshal.Write(buffer, ref data);
+            MemoryMarshal.Write(buffer, in data);
             stream.Write(buffer);
         }
 
         public static int ReadInt32(this Stream stream)
         {
-            Span<byte> buffer = stackalloc byte[sizeof(int)];
-            if (stream.Read(buffer) != sizeof(int))
+            Unsafe.SkipInit(out int val);
+            if (stream.Read(val.AsBytes()) != sizeof(int))
                 ThrowEndOfStreamException();
-            return BitConverter.ToInt32(buffer);
+            return val;
         }
 
         public static void WriteInt32(this Stream stream, int data)
         {
             Span<byte> buffer = stackalloc byte[sizeof(int)];
-            MemoryMarshal.Write(buffer, ref data);
+            MemoryMarshal.Write(buffer, in data);
             stream.Write(buffer);
         }
 
@@ -493,7 +491,6 @@ namespace LegendaryExplorerCore.Helpers
 
         private const int DEFAULT_BUFFER_SIZE = 8 * 1024;
 
-
         /// <summary>
         ///     Reads the given stream up to the end, returning the data as a byte
         ///     array, using the given buffer size.
@@ -563,17 +560,15 @@ namespace LegendaryExplorerCore.Helpers
             }
             // We could do all our own work here, but using MemoryStream is easier
             // and likely to be just as efficient.
-            using (var tempStream = new MemoryStream()) // do not use memory manager as GetBuffer() should not be used with it
+            using var tempStream = new MemoryStream(); // do not use memory manager as GetBuffer() should not be used with it
+            Copy(input, tempStream, buffer);
+            // No need to copy the buffer if it's the right size
+            if (tempStream.Length == tempStream.GetBuffer().Length)
             {
-                Copy(input, tempStream, buffer);
-                // No need to copy the buffer if it's the right size
-                if (tempStream.Length == tempStream.GetBuffer().Length)
-                {
-                    return tempStream.GetBuffer();
-                }
-                // Okay, make a copy that's the right size
-                return tempStream.ToArray();
+                return tempStream.GetBuffer();
             }
+            // Okay, make a copy that's the right size
+            return tempStream.ToArray();
         }
 
         /// <summary>

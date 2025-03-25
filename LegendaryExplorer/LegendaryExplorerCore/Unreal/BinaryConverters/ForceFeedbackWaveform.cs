@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using LegendaryExplorerCore.Packages;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters
@@ -12,12 +9,12 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public bool IsLooping;
         public List<WaveformSample> Samples;
 
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             if (sc.Game < MEGame.ME3)
             {
                 sc.Serialize(ref IsLooping);
-                sc.Serialize(ref Samples, SCExt.Serialize);
+                sc.Serialize(ref Samples, sc.Serialize);
             }
         }
 
@@ -25,7 +22,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         {
             var waveform = new ForceFeedbackWaveform
             {
-                Samples = new List<WaveformSample>()
+                Samples = []
             };
             if (props is not null)
             {
@@ -60,23 +57,23 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public float Duration;
     }
 
-    public static partial class SCExt
+    public partial class SerializingContainer
     {
-        public static void Serialize(this SerializingContainer2 sc, ref WaveformSample sample)
+        public void Serialize(ref WaveformSample sample)
         {
-            if (sc.IsLoading)
+            if (IsLoading)
             {
                 sample = new WaveformSample();
             }
-            sc.Serialize(ref sample.LeftAmplitude);
-            sc.Serialize(ref sample.RightAmplitude);
+            Serialize(ref sample.LeftAmplitude);
+            Serialize(ref sample.RightAmplitude);
             byte leftFunc = (byte)sample.LeftFunction;
             byte rightFunc = (byte)sample.RightFunction;
-            sc.Serialize(ref leftFunc);
-            sc.Serialize(ref rightFunc);
+            Serialize(ref leftFunc);
+            Serialize(ref rightFunc);
             sample.LeftFunction = (EWaveformFunction)leftFunc;
             sample.RightFunction = (EWaveformFunction)rightFunc;
-            sc.Serialize(ref sample.Duration);
+            Serialize(ref sample.Duration);
         }
     }
 }

@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using LegendaryExplorerCore.Sound.ISACT;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters
@@ -11,7 +7,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     {
         public ISACTBankPair BankPair;
 
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             int dataSize = 0;
             sc.Serialize(ref dataSize);
@@ -20,8 +16,10 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             sc.Serialize(ref isbOffset);
             if (sc.IsLoading)
             {
-                BankPair = new ISACTBankPair();
-                BankPair.ICBBank = new ISACTBank(sc.ms.BaseStream);
+                BankPair = new ISACTBankPair
+                {
+                    ICBBank = new ISACTBank(sc.ms.BaseStream)
+                };
                 if (BankPair.ICBBank.BankType is not ISACTBankType.ICB)
                 {
                     throw new Exception($"Expected first bank to be an ICB, not a {BankPair.ICBBank.BankType}");
@@ -45,7 +43,6 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 sc.ms.JumpTo(endPos);
             }
         }
-
 
         public static BioSoundNodeWaveStreamingData Create()
         {

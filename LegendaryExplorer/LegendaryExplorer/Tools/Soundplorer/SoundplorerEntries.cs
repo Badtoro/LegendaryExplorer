@@ -259,8 +259,6 @@ namespace LegendaryExplorer.Tools.Soundplorer
                 }
             }
 
-
-
             if (Entry.SampleInfo != null)
             {
                 SubText = (Entry.SampleInfo.TimeLength / 1000.0f).ToString(@"mm\:ss\:fff");
@@ -372,7 +370,6 @@ namespace LegendaryExplorer.Tools.Soundplorer
                             }
                         }
 
-
                         WwiseStream w = Export.GetBinaryData<WwiseStream>();
                         if (!w.IsPCCStored && w.GetPathToAFC() == "")
                         {
@@ -419,7 +416,7 @@ namespace LegendaryExplorer.Tools.Soundplorer
                     }
                 case "WwiseBank":
                     {
-                        var bank = Export.GetBinaryData<WwiseBank>();
+                        var bank = Export.GetBinaryData<WwiseBankParsed>();
                         SubText = $"{bank.EmbeddedFiles.Count} embedded WEM{(bank.EmbeddedFiles.Count != 1 ? "s" : "")}";
                         NeedsLoading = false;
                         Icon = EFontAwesomeIcon.Solid_University;

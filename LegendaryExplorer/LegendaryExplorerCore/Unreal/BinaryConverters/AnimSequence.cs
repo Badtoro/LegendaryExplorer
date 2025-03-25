@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 using LegendaryExplorerCore.Gammtek;
 using LegendaryExplorerCore.Gammtek.Extensions;
 using LegendaryExplorerCore.Helpers;
@@ -33,7 +31,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         private AnimationCompressionFormat posCompression;
         private AnimationKeyFormat keyEncoding;
 
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             if (sc.Game.IsGame2())
             {
@@ -50,7 +48,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 {
                     DecompressAnimationData();
                 }
-                sc.Serialize(ref RawAnimationData, SCExt.Serialize);
+                sc.Serialize(ref RawAnimationData, sc.Serialize);
             }
 
             if (sc.IsLoading)
@@ -87,12 +85,12 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         {
             return new()
             {
-                RawAnimationData = new List<AnimTrack>(),
-                CompressedAnimationData = Array.Empty<byte>(),
-                Bones = new List<string>(),
+                RawAnimationData = [],
+                CompressedAnimationData = [],
+                Bones = [],
                 Name = new NameReference("None"),
                 RateScale = 1,
-                TrackOffsets = Array.Empty<int>(),
+                TrackOffsets = [],
             };
         }
 
@@ -255,7 +253,6 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                             }
                             case AnimationCompressionFormat.ACF_Fixed48NoW:
                             {
-
                                 const float scale = 32767.0f;
                                 const ushort shift = 32767;
                                 float x = (ms.ReadUInt16() - shift) / scale;
@@ -324,10 +321,11 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
 
         private void CompressAnimationData(MEGame game, AnimationCompressionFormat newRotationCompression)
         {
-            if (RawAnimationData is null)
-            {
-                DecompressAnimationData();
-            }
+            /* SirCxyrtyx 8/12/24: Always decompress, do not use pre-existing RawAnimationData if from a upk.
+             * In same cases, the RawAnimationData is wrong for unknown reasons ¯\_(ツ)_/¯
+             * The compressed data should be regarded as the source of truth
+             */
+            DecompressAnimationData();
 
             keyEncoding = AnimationKeyFormat.AKF_ConstantKeyLerp;
             posCompression = AnimationCompressionFormat.ACF_None;
@@ -479,7 +477,6 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                                 break;
                             case AnimationCompressionFormat.ACF_Fixed48NoW:
                             {
-
                                 const float scale = 32767.0f;
                                 const ushort shift = 32767;
                                 ms.WriteUInt16((ushort)(rot.X * scale + shift).Clamp(0, ushort.MaxValue));
@@ -500,7 +497,6 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
 
             CompressedAnimationData = ms.ToArray();
             compressedDataSource = game;
-
 
             void PadTo4()
             {
@@ -526,21 +522,21 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public List<Quaternion> Rotations;
     }
 
-    public static partial class SCExt
+    public partial class SerializingContainer
     {
-        public static void Serialize(this SerializingContainer2 sc, ref AnimTrack track)
+        public void Serialize(ref AnimTrack track)
         {
-            if (sc.IsLoading)
+            if (IsLoading)
             {
                 track = new AnimTrack();
             }
 
             int vector3Size = 12;
-            sc.Serialize(ref vector3Size);
-            sc.Serialize(ref track.Positions, Serialize);
+            Serialize(ref vector3Size);
+            Serialize(ref track.Positions, Serialize);
             int quatSize = 16;
-            sc.Serialize(ref quatSize);
-            sc.Serialize(ref track.Rotations, Serialize);
+            Serialize(ref quatSize);
+            Serialize(ref track.Rotations, Serialize);
         }
     }
 }

@@ -159,7 +159,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
         public SequenceEditorWPF(ExportEntry export) : this()
         {
-            FileQueuedForLoad = export.FileRef.FilePath;
+            PackageQueuedForLoad = export.FileRef;
             ExportQueuedForFocusing = export;
         }
 
@@ -264,7 +264,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             if (p != null)
             {
                 string typeName = p.Reference;
-                PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(Pcc.Game, typeName, true);
+                PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(Pcc.Game, typeName, true, Pcc);
                 props.AddOrReplaceProp(new NameProperty(finished.ObjectName, "LinkAction"));
                 props.AddOrReplaceProp(new StrProperty(outputLabel, "LinkDesc"));
                 props.AddOrReplaceProp(new ObjectProperty(finished, "LinkedOp"));
@@ -284,6 +284,8 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             // Create an add activation to sequence
             var activation = SequenceObjectCreator.CreateSequenceObject(Pcc, "SeqEvent_SequenceActivated");
             activation.idxLink = SelectedSequence.UIndex;
+            activation.WriteProperty(new StrProperty(inputLabel, "InputLabel"));
+
             // Reindex if necessary
             var expCount = Pcc.Exports.Count(x => x.InstancedFullPath == activation.InstancedFullPath);
             if (expCount > 1)
@@ -311,7 +313,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             if (p != null)
             {
                 string typeName = p.Reference;
-                PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(Pcc.Game, typeName, true);
+                PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(Pcc.Game, typeName, true, Pcc);
                 props.AddOrReplaceProp(new NameProperty(activation.ObjectName, "LinkAction"));
                 props.AddOrReplaceProp(new StrProperty(inputLabel, "LinkDesc"));
                 props.AddOrReplaceProp(new ObjectProperty(activation, "LinkedOp"));
@@ -338,7 +340,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             {
                 return;
             }
-
 
             // Create a new extern
             var externalVar = SequenceObjectCreator.CreateSequenceObject(Pcc, "SeqVar_External");
@@ -375,7 +376,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             if (p != null)
             {
                 string typeName = p.Reference;
-                PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(Pcc.Game, typeName, true);
+                PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(Pcc.Game, typeName, true, Pcc);
                 props.AddOrReplaceProp(new NameProperty(externalVar.ObjectName, "LinkVar"));
                 props.AddOrReplaceProp(new StrProperty(externName, "LinkDesc"));
                 props.AddOrReplaceProp(new ObjectProperty(expectedDataTypeClass, "ExpectedType"));
@@ -446,7 +447,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                 foreach (var file in packageFiles)
                 {
                     Debug.WriteLine("Opening package " + file);
-                    var p = MEPackageHandler.OpenMEPackage(file);
+                    using var p = MEPackageHandler.OpenMEPackage(file);
                     //find sequence objects
                     var sequences = p.Exports.Where(x => !x.IsDefaultObject && x.ClassName == "Sequence");
                     foreach (var sequence in sequences)
@@ -481,7 +482,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                                                             $"Tight loop in {Path.GetFileName(file)}, export {seqObjectRef.Value} {seqObj.InstancedFullPath}");
                                                     }
                                                 }
-
                                             }
                                         }
                                     }
@@ -542,13 +542,14 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                 return;
             }
 
-            var packageCache = new PackageCache { AlwaysOpenFromDisk = false };
+            using var packageCache = new PackageCache { AlwaysOpenFromDisk = false };
             packageCache.InsertIntoCache(Pcc);
             var newSeqObj = new ExportEntry(Pcc, SelectedSequence, Pcc.GetNextIndexedName(info.ClassName),
                 properties: SequenceObjectCreator.GetSequenceObjectDefaults(Pcc, info, packageCache))
             {
                 Class = classEntry,
             };
+            packageCache.RemoveFromCache(Pcc); // This prevents ref decrementing when cache is disposed
             newSeqObj.ObjectFlags |= UnrealFlags.EObjectFlags.Transactional;
             Pcc.AddExport(newSeqObj);
             addObject(newSeqObj);
@@ -885,7 +886,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                 {
                     GoToExport(exp);
                 }
-
             }
             catch (Exception ex) when (!App.IsDebug)
             {
@@ -944,7 +944,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                 RecentsController.SaveRecentList(true);
 
                 postloadPackage(fileName);
-
             }
             catch (Exception ex) when (!App.IsDebug)
             {
@@ -1423,7 +1422,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             foreach (SeqEdEdge edge in graphEditor.edgeLayer)
                 SequenceGraphEditor.UpdateEdge(edge);
 
-
             void LayoutTree(SBox sAction, float verticalSpacing)
             {
                 firstNode ??= sAction;
@@ -1608,7 +1606,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                     }
                 }
             }
-
 
             if (updatedExports.Any(uIdx => Pcc.GetEntry(uIdx) is ExportEntry { IsClass: true }))
             {
@@ -1867,7 +1864,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
                 if (contextMenu.GetChild("dialogueEditorMenuItem") is MenuItem dialogueEditorMenuItem)
                 {
-
                     if (obj is SAction sAction &&
                         (sAction.Export.ClassName.EndsWith("SeqAct_StartConversation") ||
                          sAction.Export.ClassName.EndsWith("StartAmbientConv")) &&
@@ -1883,7 +1879,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
                 if (contextMenu.GetChild("openRefInPackEdMenuItem") is MenuItem openRefInPackEdMenuItem)
                 {
-
                     if (Pcc.Game.IsGame3() && obj is SVar sVar &&
                         Pcc.IsEntry(sVar.Export.GetProperty<ObjectProperty>("ObjValue")?.Value ?? 0))
                     {
@@ -1897,7 +1892,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
                 if (contextMenu.GetChild("repointIncomingReferences") is MenuItem repointIncomingReferences)
                 {
-
                     if (obj is SVar sVar)
                     {
                         repointIncomingReferences.Visibility = Visibility.Visible;
@@ -1910,7 +1904,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
                 if (contextMenu.GetChild("sequenceRefGotoMenuItem") is MenuItem sequenceRefGotoMenuItem)
                 {
-
                     if (obj is SAction sAction && sAction.Export != null &&
                         (sAction.Export.ClassName is "SequenceReference" or "Sequence"))
                     {
@@ -1953,7 +1946,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
                 if (contextMenu.GetChild("seqLogAddItemMenuItem") is MenuItem seqLogAddItemMenuItem)
                 {
-
                     if (obj is SAction sAction && sAction.Export != null && sAction.Export.ClassName == "SeqAct_Log")
                     {
                         seqLogAddItemMenuItem.Visibility = Visibility.Visible;
@@ -1966,7 +1958,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
                 if (contextMenu.GetChild("seqLogLogObjectMenuItem") is MenuItem seqLogLogObjectMenuItem)
                 {
-
                     if (obj is SVar sVar && sVar.Export != null)
                     {
                         seqLogLogObjectMenuItem.Visibility = Visibility.Visible;
@@ -2276,7 +2267,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             }
         }
 
-
         private void ContextMenu_Closed(object sender, RoutedEventArgs e)
         {
             graphEditor.AllowDragging();
@@ -2400,12 +2390,10 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             {
                 RefreshView();
             }
-
         }
 
         private void OpenInInterpViewer_Clicked(object sender, RoutedEventArgs e)
         {
-
             if (CurrentObjects_ListBox.SelectedItem is SObj obj)
             {
                 int uIndex;
@@ -2437,7 +2425,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
         private void OpenInDialogueEditor_Clicked(object sender, RoutedEventArgs e)
         {
-
             if (CurrentObjects_ListBox.SelectedItem is SObj obj &&
                 (obj.Export.ClassName.EndsWith("SeqAct_StartConversation") ||
                  obj.Export.ClassName.EndsWith("StartAmbientConv")) &&
@@ -2470,7 +2457,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                             return;
                         }
                     }
-                    else if (EntryImporter.ResolveImport(convImport) is ExportEntry fauxExport)
+                    else if (EntryImporter.ResolveImport(convImport, new PackageCache()) is ExportEntry fauxExport)
                     {
                         using var convFile = MEPackageHandler.OpenMEPackage(fauxExport.FileRef.FilePath);
                         var convExport = convFile.GetUExport(fauxExport.UIndex);
@@ -2578,7 +2565,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                 foreach (ExportEntry exp in SequenceExports)
                 {
 
-
                     // Get the export for the sequence we will look for objects in
                     ExportEntry sequence = exp;
                     if (sequence.ClassName == "SequenceReference")
@@ -2676,7 +2662,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
 
                     if (filePath != null)
                     {
-
                         var plotEd = new PlotEditorWindow();
                         plotEd.Show();
                         plotEd.LoadFile(filePath);
@@ -2740,7 +2725,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                     RefreshView();
                 }
             }
-
         }
 
         private void ShowAdditionalInfoInCommentTextMenuItem_OnClick(object sender, RoutedEventArgs e)
@@ -2837,46 +2821,50 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                     var stringVarLink = varLinks.First(x => x.LinkDesc == "String");
                     stringVarLink.LinkedNodes.Add(newSeqObj);
 
-
                     VarLinkInfo linkToAttachTo = null;
-                    if (sVar.Export.IsA("SeqVar_String"))
+                    var typeName = sVar.Export.ClassName;
+                    var game = sVar.Export.Game;
+
+                    // Use expected type
+                    if (typeName is "SeqVar_External" or "SeqVar_ScopedNamed")
+                    {
+                        // Just default to object if we can't find the type
+                        typeName = sVar.Export.GetProperty<ObjectProperty>("ExpectedType")?.ResolveToEntry(sVar.Export.FileRef)?.ObjectName.Name ?? "SeqVar_Object";
+                    }
+
+
+                    if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_String", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "String");
                     }
-                    else if (sVar.Export.IsA("SeqVar_Float"))
+                    else if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_Float", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "Float");
                     }
-                    else if (sVar.Export.IsA("SeqVar_Bool"))
+                    else if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_Bool", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "Bool");
                     }
-                    else if (sVar.Export.IsA("SeqVar_Object"))
+                    else if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_Object", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "Object");
                     }
-                    else if (sVar.Export.IsA("SeqVar_Int"))
+                    else if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_Int", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "Int");
                     }
-                    else if (sVar.Export.IsA("SeqVar_Name"))
+                    else if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_Name", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "Name");
                     }
-                    else if (sVar.Export.IsA("SeqVar_Vector"))
+                    else if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_Vector", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "Vector");
                     }
-                    else if (sVar.Export.IsA("SeqVar_ObjectList"))
+                    else if (GlobalUnrealObjectInfo.IsA(typeName,"SeqVar_ObjectList", game))
                     {
                         linkToAttachTo = varLinks.First(x => x.LinkDesc == "Obj List");
                     }
-                    else if (sVar.Export.IsA("SeqVar_External"))
-                    {
-                        // Just use Object
-                        linkToAttachTo = varLinks.First(x => x.LinkDesc == "Object");
-                    }
-
 
                     if (linkToAttachTo == null)
                     {
@@ -2927,7 +2915,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                 string className = objClass.ClassName;
                 if (objClass is ImportEntry imp)
                 {
-                    objClass = EntryImporter.ResolveImport(imp);
+                    objClass = EntryImporter.ResolveImport(imp, new PackageCache());
                 }
 
                 if (objClass != null)
@@ -2967,7 +2955,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
             }
         }
 
-
         private void LoadCustomClasses_Clicked(object sender, RoutedEventArgs e)
         {
             SequenceEditorExperimentsM.LoadCustomClassesFromFile(this);
@@ -3006,6 +2993,11 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
         private void AddAnchorToInterps_Clicked(object sender, RoutedEventArgs e)
         {
             SequenceEditorExperimentsK.UpdateAllInterpAnchorsVarLinks(GetSEWindow());
+        }
+
+        private void ConvertToFindByTag_Clicked(object sender, RoutedEventArgs e)
+        {
+            SequenceEditorExperimentsK.convertSeqVarObjToObjByTag(GetSEWindow());
         }
 
         public SequenceEditorWPF GetSEWindow()
@@ -3063,7 +3055,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                         EndBusy();
                     }
                 }, x => BusyText = x, entryDoubleClick, this);
-
             }
         }
 
@@ -3085,7 +3076,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor
                     "Add switch outlinks", "1", true);
                 if (int.TryParse(result, out var howManyToAdd) && howManyToAdd > 0)
                 {
-
 
                     var sw = sAction.Export;
                     var currentIdx = KismetHelper.GetOutputLinksOfNode(sw).Count;

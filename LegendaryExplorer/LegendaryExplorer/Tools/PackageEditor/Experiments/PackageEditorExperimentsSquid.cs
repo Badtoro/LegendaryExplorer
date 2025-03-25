@@ -7,9 +7,13 @@ using LegendaryExplorerCore.UnrealScript;
 using System.Text;
 using System.Windows;
 using System.Linq;
-using System.Collections.Generic;using System;
+using System.Collections.Generic;
+using System;
 using Tex2D = LegendaryExplorerCore.Unreal.Classes.Texture2D;
 using SixLabors.ImageSharp.PixelFormats;
+using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
+using LegendaryExplorerCore.Unreal.Classes;
+using LegendaryExplorer.Misc.ExperimentsTools;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -117,7 +121,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
             if (folder == null)
             {
-                IEntry packageClass = pew.Pcc.getEntryOrAddImport("Core.Package");
+                IEntry packageClass = pew.Pcc.GetEntryOrAddImport("Core.Package", "Class", "Core");
                 folder = new ExportEntry(pew.Pcc, 0, packageName)
                 {
                     Class = packageClass
@@ -131,7 +135,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
         private static ExportEntry CreateBioMorphFace(PackageEditorWindow pew, string objectName)
         {
-            IEntry BioMorphFaceClass = pew.Pcc.getEntryOrAddImport("SFXGame.BioMorphFace");
+            IEntry BioMorphFaceClass = pew.Pcc.GetEntryOrAddImport("SFXGame.BioMorphFace", "Class", "Core");
             var morphFace = new ExportEntry(pew.Pcc, 0, objectName)
             {
                 Class = BioMorphFaceClass
@@ -217,19 +221,20 @@ defaultproperties
 
         private static ExportEntry MakeNewClass(PackageEditorWindow pew, IEntry parent, string classText, string className)
         {
+            var usop = new UnrealScriptOptionsPackage();
             var fileLib = new FileLib(pew.Pcc);
-            if (!fileLib.Initialize())
+            if (!fileLib.Initialize(usop))
             {
                 var dlg = new ListDialog(fileLib.InitializationLog.AllErrors.Select(msg => msg.ToString()), "Script Error", "Could not build script database for this file!", pew);
                 dlg.Show();
-                throw new System.Exception("fileLib failed to initialize");
+                throw new Exception("fileLib failed to initialize");
             }
-            (_, MessageLog log) = UnrealScriptCompiler.CompileClass(pew.Pcc, classText, fileLib, parent: parent);
+            (_, MessageLog log) = UnrealScriptCompiler.CompileClass(pew.Pcc, classText, fileLib, usop, parent: parent);
             if (log.HasErrors)
             {
                 var dlg = new ListDialog(log.AllErrors.Select(msg => msg.ToString()), "Script Error", "Could not create class!", pew);
                 dlg.Show();
-                throw new System.Exception("class failed to compile");
+                throw new Exception("class failed to compile");
             }
 
             string fullPath = parent is null ? className : $"{parent.InstancedFullPath}.{className}";
@@ -239,7 +244,7 @@ defaultproperties
         private static string HandleSkeletalMesh(PackageEditorWindow pew, ExportEntry headMesh)
         {
             var meshBinary = headMesh.GetBinaryData<SkeletalMesh>();
-            var morphHeadBinary = new BioMorphFace();
+            var morphHeadBinary = new LegendaryExplorerCore.Unreal.BinaryConverters.BioMorphFace();
             var morphHeadProps = new PropertyCollection();
             var morphHeadSkeleton = new ArrayProperty<StructProperty>("m_aFinalSkeleton");
 
@@ -320,6 +325,24 @@ defaultproperties
             return true;
         }
 
+        public static void GetMeshMaterials(PackageEditorWindow pew)
+        {
+            List<string> mats = [];
+            // get the export and binary of the Skeletal Mesh that is currently selected, if any
+            if (GetSelectedMeshBinary(pew, out _, out var meshBinary))
+            {
+
+                foreach (var uIndex in meshBinary.Materials)
+                {
+                    var entry = pew.Pcc.GetEntry(uIndex);
+                    mats.Add($"\"{entry.MemoryFullPath}\"");
+                }
+
+                var result = string.Join(",", mats);
+                Clipboard.SetText(result);
+            }
+        }
+
         public static void MakeHeterochromiaMesh(PackageEditorWindow pew)
         {
             // get the export and binary of the Skeletal Mesh that is currently selected, if any
@@ -367,25 +390,27 @@ defaultproperties
                     return;
                 }
 
-                var textureParams = scalpMIC.GetProperty<ArrayProperty<StructProperty>>("TextureParameterValues");
-                if (textureParams == null)
-                {
-                    ShowError("could not find teeth mask");
-                    return;
-                }
+                var teethMaskTexExport = pew.Pcc.FindExport("BRT.HMM_BRT_MED_Spwr_Stack");
 
-                var teethMaskParam = textureParams.FirstOrDefault(x => x.GetProp<NameProperty>("ParameterName")?.Value.ToString() == "HED_Teeth_Diff");
-                if (teethMaskParam == null)
-                {
-                    ShowError("could not find teeth mask");
-                    return;
-                }
+                //var textureParams = scalpMIC.GetProperty<ArrayProperty<StructProperty>>("TextureParameterValues");
+                //if (textureParams == null)
+                //{
+                //    ShowError("could not find teeth mask");
+                //    return;
+                //}
 
-                if (!pew.Pcc.TryGetUExport(teethMaskParam.GetProp<ObjectProperty>("ParameterValue").Value, out var teethMaskTexExport))
-                {
-                    ShowError("could not find teeth mask");
-                    return;
-                }
+                //var teethMaskParam = textureParams.FirstOrDefault(x => x.GetProp<NameProperty>("ParameterName")?.Value.ToString() == "HED_Teeth_Diff");
+                //if (teethMaskParam == null)
+                //{
+                //    ShowError("could not find teeth mask");
+                //    return;
+                //}
+
+                //if (!pew.Pcc.TryGetUExport(teethMaskParam.GetProp<ObjectProperty>("ParameterValue").Value, out var teethMaskTexExport))
+                //{
+                //    ShowError("could not find teeth mask");
+                //    return;
+                //}
 
                 var teethMaskImg = ToIsImage(new Tex2D(teethMaskTexExport));
 
@@ -398,7 +423,7 @@ defaultproperties
 
                     var centroidPixel = GetPixel(teethMaskImg, uvCentroidX, uvCentroidY);
 
-                    return centroidPixel.G > 0;
+                    return centroidPixel.B > 0;
                 }
 
                 // from there, find the section we need to modify
@@ -410,6 +435,8 @@ defaultproperties
 
         private static Bgra32 GetPixel(SixLabors.ImageSharp.Image<Bgra32> img, float x, float y)
         {
+            x = x % 1;
+            y = y % 1;
             return img[(int)(img.Width * x), (int)(img.Height * y)];
         }
 
@@ -575,6 +602,157 @@ defaultproperties
         {
             MessageBox.Show(errMsg, "Warning", MessageBoxButton.OK);
         }
+
+        public static void BioMorphFaceToMesh(PackageEditorWindow pew)
+        {
+            
+            // make sure something is selected, a package is open ,and the right thing is selected
+            if (pew.SelectedItem == null
+                || pew.Pcc == null
+                || pew.SelectedItem.Entry == null
+                || pew.SelectedItem.Entry as ExportEntry == null
+                || pew.SelectedItem.Entry.ClassName != "BioMorphFace"
+                || ((ExportEntry)pew.SelectedItem.Entry).GetProperty<ObjectProperty>("m_oBaseHead") == null
+                )
+            {
+                ShowError("You must select a BioMorphFace with a base head mesh for this command to work");
+                return;
+            }
+
+            var bmf = (ExportEntry)pew.SelectedItem.Entry;
+            var bmo = pew.Pcc.GetEntry(bmf.GetProperty<ObjectProperty>("m_oMaterialOverrides").Value) as ExportEntry;
+            var baseHeadMesh = pew.Pcc.GetEntry(bmf.GetProperty<ObjectProperty>("m_oBaseHead").Value) as ExportEntry;
+
+            // clone the base head tree
+            var newHeadEntry = EntryCloner.CloneTree(baseHeadMesh, false);
+            newHeadEntry.Parent = bmf.Parent;
+            newHeadEntry.ObjectNameString = $"{bmf.ObjectNameString}_MDL";
+
+            var newHeadBinary = newHeadEntry.GetBinaryData<SkeletalMesh>();
+
+            // create new materials
+            for (int i = 0; i < newHeadBinary.Materials.Length; i++)
+            {
+                var oldMatIndex = newHeadBinary.Materials[i];
+                var newMat = ExportCreator.CreateExport(pew.Pcc, $"{bmf.ObjectNameString}_MAT_1{NumToLetter(i)}", "MaterialInstanceConstant", bmf.Parent, null, false);
+                newMat.WriteProperty(new ObjectProperty(pew.Pcc.GetEntry(oldMatIndex), "Parent"));
+                newHeadBinary.Materials[i] = newMat.UIndex;
+                // copy the relevant material configs from the thing
+                if (bmo != null)
+                {
+                    BmoToMic(bmo, newMat);
+                }
+            }
+
+            // next, copy the vertices from the bioMorphFace binary to the mesh binary
+            var bmfBinary = bmf.GetBinaryData<LegendaryExplorerCore.Unreal.BinaryConverters.BioMorphFace>();
+
+            for (int lodIndex = 0; lodIndex < bmfBinary.LODs.Length && lodIndex < newHeadBinary.LODModels.Length; lodIndex++)
+            {
+                var lod = bmfBinary.LODs[lodIndex];
+                var meshData = newHeadBinary.LODModels[lodIndex];
+
+                for (int i = 0; i < lod.Length && i < meshData.VertexBufferGPUSkin.VertexData.Length; i++)
+                {
+                    var bmfVert = lod[i];
+
+                    meshData.VertexBufferGPUSkin.VertexData[i].Position.X = bmfVert.X;
+                    meshData.VertexBufferGPUSkin.VertexData[i].Position.Y = bmfVert.Y;
+                    meshData.VertexBufferGPUSkin.VertexData[i].Position.Z = bmfVert.Z;
+                }
+            }
+
+            newHeadEntry.WriteBinary(newHeadBinary);
+
+            // make a new BioMorphFace with the same material overrides and skeleton adjstments, but remove the binary data with the vertex positions
+            // so you can use this with an edited mesh and it won't deform it
+            var newBmf = EntryCloner.CloneTree(bmf);
+            var newBmfBinary = newBmf.GetBinaryData<LegendaryExplorerCore.Unreal.BinaryConverters.BioMorphFace>();
+            newBmfBinary.LODs = [];
+            newBmf.WriteBinary(newBmfBinary);
+            // TODO remove the morph features (useless), point the base head to the new mesh
+        }
+
+        private static char NumToLetter(int input)
+        {
+            return (char)('a' + (char)input);
+        }
+
+        private static void BmoToMic(ExportEntry source, ExportEntry targetExport)
+        {
+            var parentMat = SharedMethods.ResolveEntryToExport(targetExport.FileRef.GetEntry(targetExport.GetProperty<ObjectProperty>("Parent").Value), new PackageCache());
+            
+            ArrayProperty<StructProperty>? parentTextures = parentMat?.GetProperty<ArrayProperty<StructProperty>>("TextureParameterValues");
+            //ArrayProperty<StructProperty> parentVectors = parentMat.GetProperty<ArrayProperty<StructProperty>>("VectorParameterValues");
+            //ArrayProperty<StructProperty> parentScalars = parentMat.GetProperty<ArrayProperty<StructProperty>>("ScalarParameterValues");
+
+            ArrayProperty<StructProperty> sourceTextures = source.GetProperty<ArrayProperty<StructProperty>>("m_aTextureOverrides");
+            ArrayProperty<StructProperty> sourceVectors = source.GetProperty<ArrayProperty<StructProperty>>("m_aColorOverrides");
+            ArrayProperty<StructProperty> sourceScalars = source.GetProperty<ArrayProperty<StructProperty>>("m_aScalarOverrides");
+
+            ArrayProperty<StructProperty> targetTextures = new("TextureParameterValues");
+            ArrayProperty<StructProperty> targetVectors = new("VectorParameterValues");
+            ArrayProperty<StructProperty> targetScalars = new("ScalarParameterValues");
+
+            if (sourceTextures != null)
+            {
+                foreach (StructProperty sourceTex in sourceTextures)
+                {
+                    var sourceParamName = sourceTex.GetProp<NameProperty>("nName").Value;
+                    // make sure the texture exists on the base material so LEX is happier displaying it
+                    if (parentTextures == null || parentTextures.Any(x => x.GetProp<NameProperty>("ParameterName").Value == sourceParamName))
+                    {
+                        PropertyCollection props =
+                        [
+                            //GenerateExpressionGUID()
+                            new NameProperty(sourceParamName, "ParameterName"),
+                            new ObjectProperty(sourceTex.GetProp<ObjectProperty>("m_pTexture").Value, "ParameterValue"),
+                        ];
+                        targetTextures.Add(new StructProperty("TextureParameterValue", props));
+                    }
+                }
+            }
+
+            if (sourceVectors != null)
+            {
+                foreach (StructProperty sourceVect in sourceVectors)
+                {
+                    
+                    PropertyCollection color =
+                    [
+                        sourceVect.GetProp<StructProperty>("cValue").GetProp<FloatProperty>("R"),
+                        sourceVect.GetProp<StructProperty>("cValue").GetProp<FloatProperty>("G"),
+                        sourceVect.GetProp<StructProperty>("cValue").GetProp<FloatProperty>("B"),
+                        sourceVect.GetProp<StructProperty>("cValue").GetProp<FloatProperty>("A"),
+                    ];
+                    StructProperty ParameterValue = new("LinearColor", color, "ParameterValue", true);
+                    PropertyCollection props =
+                    [
+                        //GenerateExpressionGUID();
+                        ParameterValue,
+                        new NameProperty(sourceVect.GetProp<NameProperty>("nName").Value, "ParameterName"),
+                    ];
+                    targetVectors.Add(new StructProperty("VectorParameterValue", props));
+                }
+            }
+
+            if (sourceScalars != null)
+            {
+                foreach (StructProperty sourceScal in sourceScalars)
+                {
+                    PropertyCollection props =
+                    [
+                        //props.Add(GenerateExpressionGUID());
+                        new NameProperty(sourceScal.GetProp<NameProperty>("nName").Value, "ParameterName"),
+                        new FloatProperty(sourceScal.GetProp<FloatProperty>("sValue").Value, "ParameterValue"),
+                    ];
+                    targetScalars.Add(new StructProperty("ScalarParameterValue", props));
+                }
+            }
+
+            if (sourceTextures != null) { targetExport.WriteProperty(targetTextures); }
+            if (sourceVectors != null) { targetExport.WriteProperty(targetVectors); }
+            if (sourceScalars != null) { targetExport.WriteProperty(targetScalars); }        }
 
         //public static void CompareMeshes(PackageEditorWindow pew)
         //{
@@ -946,7 +1124,7 @@ defaultproperties
         //                BigDifferences.Add($"LOD {number} IndexBuffer {i} differs");
         //                continue;
         //            }
-                   
+
         //        }
         //    }
         //}

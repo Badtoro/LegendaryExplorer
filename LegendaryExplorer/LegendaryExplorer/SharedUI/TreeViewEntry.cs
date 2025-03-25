@@ -22,6 +22,12 @@ namespace LegendaryExplorer.SharedUI
     [DebuggerDisplay("TreeViewEntry {" + nameof(DisplayName) + "}")]
     public sealed class TreeViewEntry : NotifyPropertyChangedBase, IDisposable
     {
+        /// <summary>
+        /// Dumps packages in the global cache for looking up defaults
+        /// </summary>
+        public static void ClearCache() => DefaultsLookupCache.ReleasePackages();
+
+        // Consider a global tiered package cache 10/16/2024 Mgamerz
         private static readonly PackageCache DefaultsLookupCache = new() { CacheMaxSize = 3 }; // Don't let cache get big.
 
         public bool IsProgramaticallySelecting;
@@ -389,7 +395,6 @@ namespace LegendaryExplorer.SharedUI
 
                     if (_subtext == null)
                     {
-
                         // Parse if export or import
                         switch (Entry.ClassName)
                         {

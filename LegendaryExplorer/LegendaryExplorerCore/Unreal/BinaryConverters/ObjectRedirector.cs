@@ -7,7 +7,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     public class ObjectRedirector : ObjectBinary
     {
         public UIndex DestinationObject;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             sc.Serialize(ref DestinationObject);
         }
@@ -22,7 +22,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
-            Unsafe.AsRef(action).Invoke(ref DestinationObject, nameof(DestinationObject));
+            Unsafe.AsRef(in action).Invoke(ref DestinationObject, nameof(DestinationObject));
         }
     }
 }

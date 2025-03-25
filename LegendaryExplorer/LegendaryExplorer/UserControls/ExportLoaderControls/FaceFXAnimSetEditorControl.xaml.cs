@@ -206,7 +206,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
 
         #endregion
 
-
         private void LoadFaceFXAnimset()
         {
             Lines.Clear();
@@ -231,7 +230,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                     // Cut off the start of the string
                     idStr = idStr.Substring(voPos + 3);
 
-
                     idStr = idStr.TrimEnd('M', 'F').TrimEnd('_'); // Hack
                 }
                 LineEntry.IsMale = !isFemale;
@@ -252,6 +250,8 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 var wwiseEventSearchName = $"VO_{selectedLine.TLKID:D6}_{(selectedLine.IsMale ? "m" : "f")}";
                 var wwiseStreamSearchName = $"{selectedLine.TLKID:D8}";
                 var wwiseStreamSearchNameGendered = $"{wwiseStreamSearchName}_{(selectedLine.IsMale ? "m" : "f")}";
+                var wwiseStreamSearchNamewithUnderscores = $"_{selectedLine.TLKID}_";
+                var wwiseStreamSearchNamewithUnderscoresGendered = $"{wwiseStreamSearchNamewithUnderscores}{(selectedLine.IsMale ? "m" : "f")}";
                 var wwiseEventExp = CurrentLoadedExport.FileRef.Exports.FirstOrDefault(x => x.ClassName == "WwiseEvent" && x.ObjectName.Name.Contains(wwiseEventSearchName, StringComparison.InvariantCultureIgnoreCase));
                 if (wwiseEventExp != null)
                 {
@@ -268,11 +268,18 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                             possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchNameGendered, StringComparison.InvariantCultureIgnoreCase));
                             if (possible != null) return possible;
 
+                            //First fallback to lines without leading 00 and underscores as brackets
+                            possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchNamewithUnderscoresGendered, StringComparison.InvariantCultureIgnoreCase));
+                            if (possible != null) return possible;
+
                             // Fallback to non-gendered search. Sometimes if line has same thing (e.g. nonplayer line) it'll just use male version as there's only one gender
                             // Should only be one version for this TLK...
                             possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchName, StringComparison.InvariantCultureIgnoreCase));
-                            if (possible != null)
-                                return possible;
+                            if (possible != null) return possible;
+
+                            possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchNamewithUnderscores, StringComparison.InvariantCultureIgnoreCase));
+                            if (possible != null) return possible;
+
                         }
                     }
                     else
@@ -284,11 +291,18 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                         possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchNameGendered, StringComparison.InvariantCultureIgnoreCase));
                         if (possible != null) return possible;
 
+                        //First fallback to lines without leading 00 and underscores as brackets
+                        possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchNamewithUnderscoresGendered, StringComparison.InvariantCultureIgnoreCase));
+                        if (possible != null) return possible;
+
                         // Fallback to non-gendered search. Sometimes if line has same thing (e.g. nonplayer line) it'll just use male version as there's only one gender
                         // Should only be one version for this TLK...
                         possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchName, StringComparison.InvariantCultureIgnoreCase));
                         if (possible != null)
                             return possible;
+
+                        possible = possibleExports.FirstOrDefault(x => x.ObjectName.Name.Contains(wwiseStreamSearchNamewithUnderscores, StringComparison.InvariantCultureIgnoreCase));
+                        if (possible != null) return possible;
                     }
                 }
             }
@@ -428,6 +442,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 lineEntry.Line.NameIndex = FaceFX.Names.FindOrAdd(sourceNames[lineEntry.Line.NameIndex]);
                 if (FaceFX.Binary is FaceFXAnimSet animSet) animSet.FixNodeTable();
                 lineEntry.Line.AnimationNames = lineEntry.Line.AnimationNames.Select(idx => FaceFX.Names.FindOrAdd(sourceNames[idx])).ToList();
+                lineEntry.Line.Index = FaceFX.Lines.Count;
                 FaceFX.Lines.Add(lineEntry.Line);
 
                 if (int.TryParse(lineEntry.Line.ID, out int tlkID))
@@ -752,7 +767,8 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
         private void CloneLine_Click(object sender, RoutedEventArgs e)
         {
             // HenBagle: We don't need to do anything with names here because we're cloning within the same file
-            FaceFXLineEntry newEntry = new FaceFXLineEntry(SelectedLine.Clone());
+            var newEntry = new FaceFXLineEntry(SelectedLine.Clone());
+            newEntry.Line.Index = FaceFX.Lines.Count;
             FaceFX.Lines.Add(newEntry.Line);
 
             if (int.TryParse(newEntry.Line.ID, out int tlkID))
@@ -907,7 +923,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             UpdateAnimListBox();
         }
 
-        private struct LineSection
+        public struct LineSection
         {
             //don't alter capitalization of these fields, since that will break deserialization.
             public float span;
@@ -1193,7 +1209,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 graph.SelectedCurve = SelectedAnimation.ToCurve(SaveChanges);
                 graph.Paint(true);
                 SaveChanges();
-
             }
             catch (Exception exp)
             {
@@ -1202,7 +1217,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 MessageBox.Show($"{exp.FlattenException()}", "Error");
 #endif
             }
-
         }
 
         public interface IFaceFXBinary
@@ -1334,7 +1348,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 default:
                     return;
             }*/
-
 
         }
 

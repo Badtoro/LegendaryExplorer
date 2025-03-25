@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -11,6 +10,7 @@ using LegendaryExplorerCore.Gammtek.IO;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Memory;
 using LegendaryExplorerCore.Packages;
+using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
 using LegendaryExplorerCore.Unreal.ObjectInfo;
 using PropertyChanged;
 
@@ -341,22 +341,25 @@ namespace LegendaryExplorerCore.Unreal
             {
                 IMEPackage pcc = export.FileRef;
                 //strip transients unless this is a class definition
-                bool stripTransients = parsingEntry is not {ClassName: "Class" or "ScriptStruct"};
+                bool stripTransients = parsingEntry is not { ClassName: "Class" or "ScriptStruct" };
 
                 MEGame structValueLookupGame = pcc.Game;
+
+                // This should be done already...
+                //GlobalUnrealObjectInfo.EnsureLoaded(pcc.Game);
                 switch (pcc.Game)
                 {
-                    case MEGame.ME1 when parsingEntry != null && parsingEntry.FileRef.Platform == MEPackage.GamePlatform.PS3 && ME3UnrealObjectInfo.Structs.ContainsKey(structType):
-                    case MEGame.ME2 when parsingEntry != null && parsingEntry.FileRef.Platform == MEPackage.GamePlatform.PS3 && ME3UnrealObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.ME1 when parsingEntry != null && parsingEntry.FileRef.Platform == MEPackage.GamePlatform.PS3 && ME3UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.ME2 when parsingEntry != null && parsingEntry.FileRef.Platform == MEPackage.GamePlatform.PS3 && ME3UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
                         structValueLookupGame = MEGame.ME3;
                         break;
-                    case MEGame.ME3 when ME3UnrealObjectInfo.Structs.ContainsKey(structType):
-                    case MEGame.UDK when UDKUnrealObjectInfo.Structs.ContainsKey(structType):
-                    case MEGame.ME2 when ME2UnrealObjectInfo.Structs.ContainsKey(structType):
-                    case MEGame.ME1 when ME1UnrealObjectInfo.Structs.ContainsKey(structType):
-                    case MEGame.LE3 when LE3UnrealObjectInfo.Structs.ContainsKey(structType):
-                    case MEGame.LE2 when LE2UnrealObjectInfo.Structs.ContainsKey(structType):
-                    case MEGame.LE1 when LE1UnrealObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.ME3 when ME3UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.UDK when UDKUnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.ME2 when ME2UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.ME1 when ME1UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.LE3 when LE3UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.LE2 when LE2UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
+                    case MEGame.LE1 when LE1UnrealObjectInfo.ObjectInfo.Structs.ContainsKey(structType):
                         break;
                     default:
                         Debug.WriteLine("Unknown struct type: " + structType);
@@ -364,7 +367,7 @@ namespace LegendaryExplorerCore.Unreal
                         return props;
                 }
 
-                defaultProps = GlobalUnrealObjectInfo.getDefaultStructValue(structValueLookupGame, structType, stripTransients, packageCache, false);
+                defaultProps = GlobalUnrealObjectInfo.getDefaultStructValue(structValueLookupGame, structType, stripTransients, parsingEntry?.FileRef, packageCache, false);
                 if (defaultProps == null)
                 {
                     int startPos = (int)stream.Position;
@@ -656,7 +659,7 @@ namespace LegendaryExplorerCore.Unreal
         /// <returns>A deep copy of the <see cref="PropertyCollection"/></returns>
         public PropertyCollection DeepClone()
         {
-            var clone = new PropertyCollection {EndOffset = EndOffset, IsImmutable = IsImmutable};
+            var clone = new PropertyCollection { EndOffset = EndOffset, IsImmutable = IsImmutable };
             for (int i = 0; i < Count; i++)
             {
                 clone.Add(this[i].DeepClone());
@@ -702,7 +705,7 @@ namespace LegendaryExplorerCore.Unreal
                 }
                 else if (!thisProp.Equivalent(otherProp))
                 {
-                    if (structDiff && thisProp is StructProperty {IsImmutable: false} thisStruct && otherProp is StructProperty otherStruct)
+                    if (structDiff && thisProp is StructProperty { IsImmutable: false } thisStruct && otherProp is StructProperty otherStruct)
                     {
                         diff.Add(new StructProperty(thisStruct.StructType, thisStruct.Properties.Diff(otherStruct.Properties), thisStruct.Name, thisStruct.IsImmutable));
                     }
@@ -715,7 +718,6 @@ namespace LegendaryExplorerCore.Unreal
             return diff;
         }
     }
-
 
     /// <summary>
     /// Base class for all the Unreal property types that go in <see cref="PropertyCollection"/>
@@ -778,7 +780,6 @@ namespace LegendaryExplorerCore.Unreal
             WriteTo(stream.Writer, pcc, valueOnly);
             return stream.Length;
         }
-
 
         /// <summary>
         /// Creates a deep copy of the property
@@ -877,7 +878,7 @@ namespace LegendaryExplorerCore.Unreal
         public StructProperty(string structType, PropertyCollection props, NameReference? name = null, bool isImmutable = false) : base(name)
         {
             StructType = structType;
-            Properties = props ?? new PropertyCollection();
+            Properties = props ?? [];
             IsImmutable = isImmutable;
         }
 
@@ -890,7 +891,7 @@ namespace LegendaryExplorerCore.Unreal
         public StructProperty(string structType, bool isImmutable, params Property[] props) : base(null)
         {
             StructType = structType;
-            Properties = new PropertyCollection();
+            Properties = [];
             IsImmutable = isImmutable;
             foreach (var prop in props)
             {
@@ -932,7 +933,7 @@ namespace LegendaryExplorerCore.Unreal
 
         ///<inheritdoc/>
         public override bool Equivalent(Property other) => other is StructProperty structProperty && base.Equivalent(structProperty) && structProperty.StructType.CaseInsensitiveEquals(StructType)
-                                                           && structProperty.Properties.Equivalent(Properties);
+                                                           && Properties.Equivalent(structProperty.Properties);
 
         /// <summary>
         /// Generates a StructProperty (with the specified name) from the specified Guid
@@ -1000,7 +1001,7 @@ namespace LegendaryExplorerCore.Unreal
         }
 
         ///<inheritdoc/>
-        public override IntProperty DeepClone() => (IntProperty) MemberwiseClone();
+        public override IntProperty DeepClone() => (IntProperty)MemberwiseClone();
         ///<inheritdoc/>
         public override bool Equivalent(Property other) => other is IntProperty intProperty && base.Equivalent(intProperty) && intProperty.Value == Value;
 
@@ -1059,7 +1060,6 @@ namespace LegendaryExplorerCore.Unreal
             }
         }
 
-
         /// <summary>
         /// Creates a <see cref="FloatProperty"/>
         /// </summary>
@@ -1090,7 +1090,7 @@ namespace LegendaryExplorerCore.Unreal
         }
 
         ///<inheritdoc/>
-        public override FloatProperty DeepClone() => (FloatProperty) MemberwiseClone();
+        public override FloatProperty DeepClone() => (FloatProperty)MemberwiseClone();
         ///<inheritdoc/>
         public override bool Equivalent(Property other) => other is FloatProperty floatProperty && base.Equivalent(floatProperty) && floatProperty.Value == Value;
 
@@ -1120,7 +1120,6 @@ namespace LegendaryExplorerCore.Unreal
         public event PropertyChangedEventHandler PropertyChanged;
     }
 
-
     /// <summary>
     /// Property containing a UIndex
     /// </summary>
@@ -1133,6 +1132,40 @@ namespace LegendaryExplorerCore.Unreal
         /// <param name="package">The package to look up the UIndex in</param>
         /// <returns>An IEntry, or null if <see cref="Value"/> is 0 or outside the range of valid UIndexes</returns>
         public IEntry ResolveToEntry(IMEPackage package) => package.GetEntry(Value);
+
+        /// <summary>
+        /// Resolves this property to an export. If the object is an import, it will attempt to resolve it from another package.
+        /// </summary>
+        /// <param name="package">Package this property resides in</param>
+        /// <param name="cache">Cache to use if resolving an import</param>
+        /// <returns></returns>
+        public ExportEntry ResolveToExport(IMEPackage package, PackageCache cache)
+        {
+            var entry = ResolveToEntry(package);
+            if (entry is ExportEntry exp)
+            {
+                return exp;
+            }
+            if (entry is ImportEntry imp)
+            {
+                return EntryImporter.ResolveImport(imp, cache);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Attempts to resolve this object property to an export, returning true if success, false otherwise. This resolves imports to exports.
+        /// </summary>
+        /// <param name="package"></param>
+        /// <param name="cache"></param>
+        /// <param name="exp"></param>
+        /// <returns></returns>
+        public bool TryResolveExport(IMEPackage package, PackageCache cache, out ExportEntry exp)
+        {
+            exp = ResolveToExport(package, cache);
+            return exp != null;
+        }
 
         ///<inheritdoc/>
         public override PropertyType PropType => PropertyType.ObjectProperty;
@@ -1237,6 +1270,24 @@ namespace LegendaryExplorerCore.Unreal
         public override int GetHashCode()
         {
             return Value.GetHashCode();
+        }
+
+        /// <summary>
+        /// Creates a new object property from the given import, with no name. Only use in object arrays!
+        /// </summary>
+        /// <param name="entry"></param>
+        public static implicit operator ObjectProperty(ImportEntry entry)
+        {
+            return new ObjectProperty(entry.UIndex);
+        }
+
+        /// <summary>
+        /// Creates a new object property from the given export, with no name. Only use in object arrays!
+        /// </summary>
+        /// <param name="entry"></param>
+        public static implicit operator ObjectProperty(ExportEntry entry)
+        {
+            return new ObjectProperty(entry.UIndex);
         }
 
 #pragma warning disable
@@ -1589,7 +1640,6 @@ namespace LegendaryExplorerCore.Unreal
                 var eNameNumber = stream.ReadInt32();
                 Value = new NameReference(eName, eNameNumber);
             }
-
         }
 
         ///<inheritdoc/>
@@ -1698,7 +1748,7 @@ namespace LegendaryExplorerCore.Unreal
         /// <param name="name">The property name.</param>
         public ImmutableByteArrayProperty(NameReference name) : base(name)
         {
-            Bytes = Array.Empty<byte>();
+            Bytes = [];
         }
 
         internal ImmutableByteArrayProperty(long startOffset, int count, EndianReader stream, NameReference name) : base(name)
@@ -1740,7 +1790,7 @@ namespace LegendaryExplorerCore.Unreal
         /// <summary>
         /// Do not use with <see cref="ImmutableByteArrayProperty"/>! Returns an empty list
         /// </summary>
-        public override IReadOnlyList<Property> Properties => new List<Property>();
+        public override IReadOnlyList<Property> Properties => [];
 
         /// <summary>
         /// Number of bytes
@@ -1751,7 +1801,7 @@ namespace LegendaryExplorerCore.Unreal
         /// </summary>
         public override void Clear()
         {
-            Bytes = Array.Empty<byte>();
+            Bytes = [];
         }
         /// <summary>
         /// Do not use with <see cref="ImmutableByteArrayProperty"/>! No-op
@@ -1788,7 +1838,7 @@ namespace LegendaryExplorerCore.Unreal
         /// Creates an empty <see cref="ArrayProperty{T}"/>
         /// </summary>
         /// <param name="name">The property name.</param>
-        public ArrayProperty(NameReference name) : this(new List<T>(), name)
+        public ArrayProperty(NameReference name) : this([], name)
         {
         }
 
@@ -1802,7 +1852,7 @@ namespace LegendaryExplorerCore.Unreal
         }
 
         /// <summary>
-        /// 
+        /// Creates an <see cref="ArrayProperty<typeparamref name="T"/>"/> from a <see cref="List<typeparamref name="T"/>"/>
         /// </summary>
         /// <param name="values"></param>
         /// <param name="name">The property name.</param>
@@ -1862,7 +1912,7 @@ namespace LegendaryExplorerCore.Unreal
             {
                 for (int i = 0; i < Count; i++)
                 {
-                    if (!Values[i].Equivalent(arrayProperty))
+                    if (!Values[i].Equivalent(arrayProperty[i]))
                     {
                         return false;
                     }
@@ -2192,7 +2242,6 @@ namespace LegendaryExplorerCore.Unreal
         private byte[] raw;
         private readonly string TypeName;
 
-        ///
         internal UnknownProperty(EndianReader stream, int size, string typeName = null, NameReference? name = null) : base(name)
         {
             ValueOffset = (int)stream.Position;
@@ -2201,7 +2250,7 @@ namespace LegendaryExplorerCore.Unreal
 #if AZURE
             Assert.Fail("Encountered an unknownproperty!");
 #endif
-            LECLog.Warning($@"Initializing an UnknownProperty object! Position: 0x{stream.Position - size:X8}");
+            LECLog.Warning($"Initializing an UnknownProperty object! Position: 0x{stream.Position - size:X8}");
         }
 
         ///<inheritdoc/>

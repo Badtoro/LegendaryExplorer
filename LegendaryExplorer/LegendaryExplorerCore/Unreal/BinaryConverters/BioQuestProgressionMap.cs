@@ -1,15 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace LegendaryExplorerCore.Unreal.BinaryConverters
+﻿namespace LegendaryExplorerCore.Unreal.BinaryConverters
 {
     public class BioQuestProgressionMap : ObjectBinary
     {
         public int unk;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             sc.Serialize(ref unk);
         }

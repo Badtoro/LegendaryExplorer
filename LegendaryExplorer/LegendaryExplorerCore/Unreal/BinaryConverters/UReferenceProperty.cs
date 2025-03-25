@@ -9,7 +9,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public bool IsEnum => Enum != 0;
 
         public UIndex Enum;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             base.Serialize(sc);
             sc.Serialize(ref Enum);
@@ -22,18 +22,18 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 Category = "None"
             };
         }
-        
+
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
             base.ForEachUIndex(game, in action);
-            Unsafe.AsRef(action).Invoke(ref Enum, nameof(Enum));
+            Unsafe.AsRef(in action).Invoke(ref Enum, nameof(Enum));
         }
     }
 
     public class UObjectProperty : UProperty
     {
         public UIndex ObjectRef;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             base.Serialize(sc);
             sc.Serialize(ref ObjectRef);
@@ -50,7 +50,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
             base.ForEachUIndex(game, in action);
-            Unsafe.AsRef(action).Invoke(ref ObjectRef, nameof(ObjectRef));
+            Unsafe.AsRef(in action).Invoke(ref ObjectRef, nameof(ObjectRef));
         }
     }
 
@@ -68,7 +68,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     public class UClassProperty : UObjectProperty
     {
         public UIndex ClassRef;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             base.Serialize(sc);
             sc.Serialize(ref ClassRef);
@@ -85,7 +85,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
             base.ForEachUIndex(game, in action);
-            Unsafe.AsRef(action).Invoke(ref ClassRef, nameof(ClassRef));
+            Unsafe.AsRef(in action).Invoke(ref ClassRef, nameof(ClassRef));
         }
     }
 
@@ -103,7 +103,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     public class UArrayProperty : UProperty
     {
         public UIndex ElementType;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             base.Serialize(sc);
             sc.Serialize(ref ElementType);
@@ -120,14 +120,14 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
             base.ForEachUIndex(game, in action);
-            Unsafe.AsRef(action).Invoke(ref ElementType, nameof(ElementType));
+            Unsafe.AsRef(in action).Invoke(ref ElementType, nameof(ElementType));
         }
     }
 
     public class UStructProperty : UProperty
     {
         public UIndex Struct;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             base.Serialize(sc);
             sc.Serialize(ref Struct);
@@ -144,7 +144,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
             base.ForEachUIndex(game, in action);
-            Unsafe.AsRef(action).Invoke(ref Struct, nameof(Struct));
+            Unsafe.AsRef(in action).Invoke(ref Struct, nameof(Struct));
         }
     }
 
@@ -163,7 +163,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     {
         public UIndex KeyType;
         public UIndex ValueType;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             base.Serialize(sc);
             sc.Serialize(ref KeyType);
@@ -177,19 +177,19 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 Category = "None"
             };
         }
-        
+
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
             base.ForEachUIndex(game, in action);
-            Unsafe.AsRef(action).Invoke(ref KeyType, nameof(KeyType));
-            Unsafe.AsRef(action).Invoke(ref ValueType, nameof(ValueType));
+            Unsafe.AsRef(in action).Invoke(ref KeyType, nameof(KeyType));
+            Unsafe.AsRef(in action).Invoke(ref ValueType, nameof(ValueType));
         }
     }
     public class UDelegateProperty : UProperty
     {
         public UIndex Function;
         public UIndex Delegate;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             base.Serialize(sc);
             sc.Serialize(ref Function);
@@ -203,12 +203,12 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 Category = "None"
             };
         }
-        
+
         public override void ForEachUIndex<TAction>(MEGame game, in TAction action)
         {
             base.ForEachUIndex(game, in action);
-            Unsafe.AsRef(action).Invoke(ref Function, nameof(Function));
-            Unsafe.AsRef(action).Invoke(ref Delegate, nameof(Delegate));
+            Unsafe.AsRef(in action).Invoke(ref Function, nameof(Function));
+            Unsafe.AsRef(in action).Invoke(ref Delegate, nameof(Delegate));
         }
     }
 }

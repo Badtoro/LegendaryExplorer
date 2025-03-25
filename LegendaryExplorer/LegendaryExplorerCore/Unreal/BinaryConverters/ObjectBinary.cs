@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 using LegendaryExplorerCore.Gammtek.IO;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Memory;
@@ -12,15 +13,16 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
 {
     public abstract class ObjectBinary
     {
+        [JsonIgnore]
         public ExportEntry Export { get; init; }
-        public static T From<T>(ExportEntry export, PackageCache packageCache = null) where T : ObjectBinary, new()
+        public static T From<T>(ExportEntry export, PackageCache packageCache = null, int? dataOffsetOverride = null) where T : ObjectBinary, new()
         {
             var t = new T { Export = export };
-            t.Serialize(new SerializingContainer2(export.GetReadOnlyBinaryStream(), export.FileRef, true, export.DataOffset + export.propsEnd(), packageCache));
+            t.Serialize(new SerializingContainer(export.GetReadOnlyBinaryStream(), export.FileRef, true, (dataOffsetOverride ?? export.DataOffset) + export.propsEnd(), packageCache));
             return t;
         }
 
-        public static ObjectBinary From(ExportEntry export, PackageCache packageCache = null)
+        public static ObjectBinary From(ExportEntry export, PackageCache packageCache = null, int? dataOffsetOverride = null)
         {
             if (export.IsDefaultObject)
             {
@@ -32,137 +34,139 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             switch (className)
             {
                 case "AnimSequence":
-                    return From<AnimSequence>(export, packageCache);
+                    return From<AnimSequence>(export, packageCache, dataOffsetOverride);
                 case "BioStage":
-                    return From<BioStage>(export, packageCache);
+                    return From<BioStage>(export, packageCache, dataOffsetOverride);
                 case "Level":
-                    return From<Level>(export, packageCache);
+                    return From<Level>(export, packageCache, dataOffsetOverride);
                 case "World":
-                    return From<World>(export, packageCache);
+                    return From<World>(export, packageCache, dataOffsetOverride);
                 case "Model":
-                    return From<Model>(export, packageCache);
+                    return From<Model>(export, packageCache, dataOffsetOverride);
                 case "Polys":
-                    return From<Polys>(export, packageCache);
+                    return From<Polys>(export, packageCache, dataOffsetOverride);
                 case "DecalMaterial":
                 case "Material":
-                    return From<Material>(export, packageCache);
+                    return From<Material>(export, packageCache, dataOffsetOverride);
                 case "MaterialInstanceConstant":
                 case "MaterialInstanceTimeVarying":
                     if (export.GetProperty<BoolProperty>("bHasStaticPermutationResource")?.Value == true)
                     {
-                        return From<MaterialInstance>(export, packageCache);
+                        return From<MaterialInstance>(export, packageCache, dataOffsetOverride);
                     }
                     return Array.Empty<byte>();
                 case "FracturedStaticMesh":
-                    return From<FracturedStaticMesh>(export, packageCache);
+                    return From<FracturedStaticMesh>(export, packageCache, dataOffsetOverride);
                 case "StaticMesh":
-                    return From<StaticMesh>(export, packageCache);
+                    return From<StaticMesh>(export, packageCache, dataOffsetOverride);
                 case "SkeletalMesh":
                 case "BioSocketSupermodel":
-                    return From<SkeletalMesh>(export, packageCache);
+                    return From<SkeletalMesh>(export, packageCache, dataOffsetOverride);
                 case "CoverMeshComponent":
                 case "InteractiveFoliageComponent":
                 case "SplineMeshComponent":
                 case "FracturedStaticMeshComponent":
                 case "FracturedSkinnedMeshComponent":
                 case "StaticMeshComponent":
-                    return From<StaticMeshComponent>(export, packageCache);
+                    return From<StaticMeshComponent>(export, packageCache, dataOffsetOverride);
                 case "DecalComponent":
-                    return From<DecalComponent>(export, packageCache);
+                    return From<DecalComponent>(export, packageCache, dataOffsetOverride);
                 case "Terrain":
-                    return From<Terrain>(export, packageCache);
+                    return From<Terrain>(export, packageCache, dataOffsetOverride);
                 case "TerrainComponent":
-                    return From<TerrainComponent>(export, packageCache);
+                    return From<TerrainComponent>(export, packageCache, dataOffsetOverride);
                 case "FluidSurfaceComponent":
-                    return From<FluidSurfaceComponent>(export, packageCache);
+                    return From<FluidSurfaceComponent>(export, packageCache, dataOffsetOverride);
                 case "ModelComponent":
-                    return From<ModelComponent>(export, packageCache);
+                    return From<ModelComponent>(export, packageCache, dataOffsetOverride);
                 case "BioDynamicAnimSet":
-                    return From<BioDynamicAnimSet>(export, packageCache);
+                    return From<BioDynamicAnimSet>(export, packageCache, dataOffsetOverride);
                 case "PrefabInstance":
-                    return From<PrefabInstance>(export, packageCache);
+                    return From<PrefabInstance>(export, packageCache, dataOffsetOverride);
                 case "Class":
-                    return From<UClass>(export, packageCache);
+                    return From<UClass>(export, packageCache, dataOffsetOverride);
                 case "State":
-                    return From<UState>(export, packageCache);
+                    return From<UState>(export, packageCache, dataOffsetOverride);
                 case "Function":
-                    return From<UFunction>(export, packageCache);
+                    return From<UFunction>(export, packageCache, dataOffsetOverride);
                 case "Enum":
-                    return From<UEnum>(export, packageCache);
+                    return From<UEnum>(export, packageCache, dataOffsetOverride);
                 case "Const":
-                    return From<UConst>(export, packageCache);
+                    return From<UConst>(export, packageCache, dataOffsetOverride);
                 case "ScriptStruct":
-                    return From<UScriptStruct>(export, packageCache);
+                    return From<UScriptStruct>(export, packageCache, dataOffsetOverride);
                 case "IntProperty":
-                    return From<UIntProperty>(export, packageCache);
+                    return From<UIntProperty>(export, packageCache, dataOffsetOverride);
                 case "BoolProperty":
-                    return From<UBoolProperty>(export, packageCache);
+                    return From<UBoolProperty>(export, packageCache, dataOffsetOverride);
                 case "FloatProperty":
-                    return From<UFloatProperty>(export, packageCache);
+                    return From<UFloatProperty>(export, packageCache, dataOffsetOverride);
                 case "NameProperty":
-                    return From<UNameProperty>(export, packageCache);
+                    return From<UNameProperty>(export, packageCache, dataOffsetOverride);
                 case "StrProperty":
-                    return From<UStrProperty>(export, packageCache);
+                    return From<UStrProperty>(export, packageCache, dataOffsetOverride);
                 case "StringRefProperty":
-                    return From<UStringRefProperty>(export, packageCache);
+                    return From<UStringRefProperty>(export, packageCache, dataOffsetOverride);
                 case "ByteProperty":
-                    return From<UByteProperty>(export, packageCache);
+                    return From<UByteProperty>(export, packageCache, dataOffsetOverride);
                 case "ObjectProperty":
-                    return From<UObjectProperty>(export, packageCache);
+                    return From<UObjectProperty>(export, packageCache, dataOffsetOverride);
                 case "ComponentProperty":
-                    return From<UComponentProperty>(export, packageCache);
+                    return From<UComponentProperty>(export, packageCache, dataOffsetOverride);
                 case "InterfaceProperty":
-                    return From<UInterfaceProperty>(export, packageCache);
+                    return From<UInterfaceProperty>(export, packageCache, dataOffsetOverride);
                 case "ArrayProperty":
-                    return From<UArrayProperty>(export, packageCache);
+                    return From<UArrayProperty>(export, packageCache, dataOffsetOverride);
                 case "StructProperty":
-                    return From<UStructProperty>(export, packageCache);
+                    return From<UStructProperty>(export, packageCache, dataOffsetOverride);
                 case "BioMask4Property":
-                    return From<UBioMask4Property>(export, packageCache);
+                    return From<UBioMask4Property>(export, packageCache, dataOffsetOverride);
                 case "MapProperty":
-                    return From<UMapProperty>(export, packageCache);
+                    return From<UMapProperty>(export, packageCache, dataOffsetOverride);
                 case "ClassProperty":
-                    return From<UClassProperty>(export, packageCache);
+                    return From<UClassProperty>(export, packageCache, dataOffsetOverride);
                 case "DelegateProperty":
-                    return From<UDelegateProperty>(export, packageCache);
+                    return From<UDelegateProperty>(export, packageCache, dataOffsetOverride);
                 case "ShaderCache":
-                    return From<ShaderCache>(export, packageCache);
+                    return From<ShaderCache>(export, packageCache, dataOffsetOverride);
                 case "StaticMeshCollectionActor":
-                    return From<StaticMeshCollectionActor>(export, packageCache);
+                    return From<StaticMeshCollectionActor>(export, packageCache, dataOffsetOverride);
                 case "StaticLightCollectionActor":
-                    return From<StaticLightCollectionActor>(export, packageCache);
+                    return From<StaticLightCollectionActor>(export, packageCache, dataOffsetOverride);
                 case "WwiseEvent":
-                    return From<WwiseEvent>(export, packageCache);
+                    return From<WwiseEvent>(export, packageCache, dataOffsetOverride);
                 case "WwiseStream":
-                    return From<WwiseStream>(export, packageCache);
+                    return From<WwiseStream>(export, packageCache, dataOffsetOverride);
                 case "WwiseBank":
-                    return From<WwiseBank>(export, packageCache);
+                    return From<WwiseBank>(export, packageCache, dataOffsetOverride);
                 case "BioGestureRuntimeData":
-                    return From<BioGestureRuntimeData>(export, packageCache);
+                    return From<BioGestureRuntimeData>(export, packageCache, dataOffsetOverride);
+                case "TextureRenderTarget2D":
+                    return From<UTextureRenderTarget2D>(export, packageCache, dataOffsetOverride);
                 case "LightMapTexture2D":
-                    return From<LightMapTexture2D>(export, packageCache);
+                    return From<LightMapTexture2D>(export, packageCache, dataOffsetOverride);
                 case "TextureCube":
-                    return From<UTextureCube>(export, packageCache);
+                    return From<UTextureCube>(export, packageCache, dataOffsetOverride);
                 case "Texture2D":
                 case "ShadowMapTexture2D":
                 case "TerrainWeightMapTexture":
                 case "TextureFlipBook":
-                    return From<UTexture2D>(export, packageCache);
+                    return From<UTexture2D>(export, packageCache, dataOffsetOverride);
                 case "GuidCache":
-                    return From<GuidCache>(export, packageCache);
+                    return From<GuidCache>(export, packageCache, dataOffsetOverride);
                 case "FaceFXAnimSet":
-                    return From<FaceFXAnimSet>(export, packageCache);
+                    return From<FaceFXAnimSet>(export, packageCache, dataOffsetOverride);
                 case "Bio2DA":
                 case "Bio2DANumberedRows":
-                    return From<Bio2DABinary>(export, packageCache);
+                    return From<Bio2DABinary>(export, packageCache, dataOffsetOverride);
                 case "BioMorphFace":
-                    return From<BioMorphFace>(export, packageCache);
+                    return From<BioMorphFace>(export, packageCache, dataOffsetOverride);
                 case "MorphTarget":
-                    return From<MorphTarget>(export, packageCache);
+                    return From<MorphTarget>(export, packageCache, dataOffsetOverride);
                 case "SFXMorphFaceFrontEndDataSource":
-                    return From<SFXMorphFaceFrontEndDataSource>(export, packageCache);
+                    return From<SFXMorphFaceFrontEndDataSource>(export, packageCache, dataOffsetOverride);
                 case "PhysicsAssetInstance":
-                    return From<PhysicsAssetInstance>(export, packageCache);
+                    return From<PhysicsAssetInstance>(export, packageCache, dataOffsetOverride);
                 case "DirectionalLightComponent":
                 case "PointLightComponent":
                 case "SkyLightComponent":
@@ -171,49 +175,49 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 case "DominantSpotLightComponent":
                 case "DominantPointLightComponent":
                 case "DominantDirectionalLightComponent":
-                    return From<LightComponent>(export, packageCache);
+                    return From<LightComponent>(export, packageCache, dataOffsetOverride);
                 case "ShadowMap1D":
-                    return From<ShadowMap1D>(export, packageCache);
+                    return From<ShadowMap1D>(export, packageCache, dataOffsetOverride);
                 case "BioTlkFileSet":
-                    return From<BioTlkFileSet>(export, packageCache);
+                    return From<BioTlkFileSet>(export, packageCache, dataOffsetOverride);
                 case "RB_BodySetup":
-                    return From<RB_BodySetup>(export, packageCache);
+                    return From<RB_BodySetup>(export, packageCache, dataOffsetOverride);
                 case "BrushComponent":
-                    return From<BrushComponent>(export, packageCache);
+                    return From<BrushComponent>(export, packageCache, dataOffsetOverride);
                 case "ForceFeedbackWaveform":
-                    return From<ForceFeedbackWaveform>(export, packageCache);
+                    return From<ForceFeedbackWaveform>(export, packageCache, dataOffsetOverride);
                 case "SoundCue":
-                    return From<SoundCue>(export, packageCache);
+                    return From<SoundCue>(export, packageCache, dataOffsetOverride);
                 case "SoundNodeWave":
-                    return From<SoundNodeWave>(export, packageCache);
+                    return From<SoundNodeWave>(export, packageCache, dataOffsetOverride);
                 case "ObjectRedirector":
-                    return From<ObjectRedirector>(export, packageCache);
+                    return From<ObjectRedirector>(export, packageCache, dataOffsetOverride);
                 case "TextureMovie":
-                    return From<TextureMovie>(export, packageCache);
+                    return From<TextureMovie>(export, packageCache, dataOffsetOverride);
                 case "BioCodexMap":
-                    return From<BioCodexMap>(export, packageCache);
+                    return From<BioCodexMap>(export, packageCache, dataOffsetOverride);
                 case "BioQuestMap":
-                    return From<BioQuestMap>(export, packageCache);
+                    return From<BioQuestMap>(export, packageCache, dataOffsetOverride);
                 case "BioStateEventMap":
-                    return From<BioStateEventMap>(export, packageCache);
+                    return From<BioStateEventMap>(export, packageCache, dataOffsetOverride);
                 case "BioSoundNodeWaveStreamingData":
-                    return From<BioSoundNodeWaveStreamingData>(export, packageCache);
+                    return From<BioSoundNodeWaveStreamingData>(export, packageCache, dataOffsetOverride);
                 case "FaceFXAsset" when export.Game != MEGame.ME2:
-                    return From<FaceFXAsset>(export, packageCache);
+                    return From<FaceFXAsset>(export, packageCache, dataOffsetOverride);
                 case "BioInert":
-                    return From<BioInert>(export, packageCache);
+                    return From<BioInert>(export, packageCache, dataOffsetOverride);
                 case "BioSquadCombat":
-                    return From<BioSquadCombat>(export, packageCache);
+                    return From<BioSquadCombat>(export, packageCache, dataOffsetOverride);
                 case "BioGestureAnimSetMgr":
-                    return From<BioGestureAnimSetMgr>(export, packageCache);
+                    return From<BioGestureAnimSetMgr>(export, packageCache, dataOffsetOverride);
                 case "BioQuestProgressionMap":
-                    return From<BioQuestProgressionMap>(export, packageCache);
+                    return From<BioQuestProgressionMap>(export, packageCache, dataOffsetOverride);
                 case "BioDiscoveredCodexMap":
-                    return From<BioDiscoveredCodexMap>(export, packageCache);
+                    return From<BioDiscoveredCodexMap>(export, packageCache, dataOffsetOverride);
                 case "SpeedTreeComponent":
-                    return From<SpeedTreeComponent>(export, packageCache);
+                    return From<SpeedTreeComponent>(export, packageCache, dataOffsetOverride);
                 case "BioGamePropertyEventDispatcher":
-                    return From<BioGamePropertyEventDispatcher>(export, packageCache);
+                    return From<BioGamePropertyEventDispatcher>(export, packageCache, dataOffsetOverride);
                 default:
                     //way, waaay too many subclasses of BioPawn and BioActorBehavior to put in the switch statement, so we take care of it here
                     if (IsEither(className, export.Game, "BioPawn", "BioActorBehavior"))
@@ -221,11 +225,11 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                         //export actually being a subclass of BioPawn or BioActorBehavior is rare, so it's simpler and not very costly to just do the lookup again
                         if (export.IsA("BioPawn"))
                         {
-                            return From<BioPawn>(export, packageCache);
+                            return From<BioPawn>(export, packageCache, dataOffsetOverride);
                         }
                         if (export.IsA("BioActorBehavior"))
                         {
-                            return From<BioActorBehavior>(export, packageCache);
+                            return From<BioActorBehavior>(export, packageCache, dataOffsetOverride);
                         }
                     }
                     return null;
@@ -238,13 +242,13 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             if (className == baseClass1 || className == baseClass2) return true;
             var classes = game switch
             {
-                MEGame.ME1 => ME1UnrealObjectInfo.Classes,
-                MEGame.ME2 => ME2UnrealObjectInfo.Classes,
-                MEGame.ME3 => ME3UnrealObjectInfo.Classes,
-                MEGame.UDK => ME3UnrealObjectInfo.Classes,
-                MEGame.LE1 => LE1UnrealObjectInfo.Classes,
-                MEGame.LE2 => LE2UnrealObjectInfo.Classes,
-                MEGame.LE3 => LE3UnrealObjectInfo.Classes,
+                MEGame.ME1 => ME1UnrealObjectInfo.ObjectInfo.Classes,
+                MEGame.ME2 => ME2UnrealObjectInfo.ObjectInfo.Classes,
+                MEGame.ME3 => ME3UnrealObjectInfo.ObjectInfo.Classes,
+                MEGame.UDK => ME3UnrealObjectInfo.ObjectInfo.Classes,
+                MEGame.LE1 => LE1UnrealObjectInfo.ObjectInfo.Classes,
+                MEGame.LE2 => LE2UnrealObjectInfo.ObjectInfo.Classes,
+                MEGame.LE3 => LE3UnrealObjectInfo.ObjectInfo.Classes,
                 _ => throw new ArgumentOutOfRangeException(nameof(game), game, null)
             };
             while (true)
@@ -464,7 +468,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             return GenericObjectBinary.Create();
         }
 
-        protected abstract void Serialize(SerializingContainer2 sc);
+        protected abstract void Serialize(SerializingContainer sc);
 
         /// <summary>
         /// Gets a list of entry references made in this ObjectBinary.
@@ -492,7 +496,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
 
         public virtual void WriteTo(EndianWriter ms, IMEPackage pcc, int fileOffset = 0)
         {
-            Serialize(new SerializingContainer2(ms.BaseStream, pcc, false, fileOffset));
+            Serialize(new SerializingContainer(ms.BaseStream, pcc, false, fileOffset));
         }
 
         public virtual byte[] ToBytes(IMEPackage pcc, int fileOffset = 0)
@@ -518,7 +522,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 ref KeyValuePair<int, TValue> kvp = ref refEnumerator.CurrentRef;
                 int key = kvp.Key;
                 int originalValue = key;
-                Unsafe.AsRef(action).Invoke(ref key, $"{name}[{i}]");
+                Unsafe.AsRef(in action).Invoke(ref key, $"{name}[{i}]");
                 if (key != originalValue)
                 {
                     isUpdated = true;
@@ -540,7 +544,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 ref var kvp = ref refEnumerator.CurrentRef;
                 int value = kvp.Value;
                 int originalValue = value;
-                Unsafe.AsRef(action).Invoke(ref value, $"{name}[{i}]");
+                Unsafe.AsRef(in action).Invoke(ref value, $"{name}[{i}]");
                 if (value != originalValue)
                 {
                     kvp = new (kvp.Key, value);
@@ -554,7 +558,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         {
             for (int i = 0; i < span.Length; i++)
             {
-                Unsafe.AsRef(action).Invoke(ref span[i], $"{name}[{i}]");
+                Unsafe.AsRef(in action).Invoke(ref span[i], $"{name}[{i}]");
             }
         }
         #endregion
@@ -580,36 +584,22 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     /// <summary>
     /// Puts all the UIndexes in a List
     /// </summary>
-    public readonly struct UIndexCollector : IUIndexAction
+    public readonly struct UIndexCollector(List<int> uIndexes) : IUIndexAction
     {
-        private readonly List<int> UIndexes;
-
-        public UIndexCollector(List<int> uIndexes)
-        {
-            UIndexes = uIndexes;
-        }
-
         public void Invoke(ref int uIndex, string propName)
         {
-            UIndexes.Add(uIndex);
+            uIndexes.Add(uIndex);
         }
     }
 
     /// <summary>
     /// Puts all the UIndexes and PropNames in a List
     /// </summary>
-    public readonly struct UIndexAndPropNameCollector : IUIndexAction
+    public readonly struct UIndexAndPropNameCollector(List<(int, string)> uindexAndPropNames) : IUIndexAction
     {
-        private readonly List<(int, string)> UindexAndPropNames;
-
-        public UIndexAndPropNameCollector(List<(int, string)> uindexAndPropNames)
-        {
-            UindexAndPropNames = uindexAndPropNames;
-        }
-
         public void Invoke(ref int uIndex, string propName)
         {
-            UindexAndPropNames.Add((uIndex, propName));
+            uindexAndPropNames.Add((uIndex, propName));
         }
     }
 
@@ -623,12 +613,12 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         }
 
         //should never be called
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             data = sc.ms.BaseStream.ReadFully();
         }
 
-        public static GenericObjectBinary Create() => new(Array.Empty<byte>());
+        public static GenericObjectBinary Create() => new([]);
 
         public override void WriteTo(EndianWriter ms, IMEPackage pcc, int fileOffset = 0)
         {

@@ -166,7 +166,7 @@ namespace LegendaryExplorerCore.GameFilesystem
         /// <summary>
         /// Path to the folder where career profiles are stored in the user config directory.
         /// </summary>
-        public static string SaveFolderPath => Path.Combine(LEDirectory.BioWareDocumentsPath, @"Save");
+        public static string SaveFolderPath => Path.Combine(ME3Directory.BioWareDocumentsPath, @"Save");
 
         /// <summary>
         /// Path to the persistent storage file in the user config directory.
@@ -182,7 +182,6 @@ namespace LegendaryExplorerCore.GameFilesystem
         /// Gets the name of the Cooked folder for ME3
         /// </summary>
         public static string CookedName => "CookedPCConsole";
-
 
         private static string _DefaultGamePath;
         /// <summary>
@@ -225,8 +224,6 @@ namespace LegendaryExplorerCore.GameFilesystem
         /// TFCs that reside in the basegame directory
         /// </summary>
         public static readonly string[] BasegameTFCs = { "CharTextures", "Movies", "Textures", "Lighting" };
-
-
 
         static ME3Directory()
         {

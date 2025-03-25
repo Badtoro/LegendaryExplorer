@@ -1,9 +1,5 @@
 ﻿using System.Numerics;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using LegendaryExplorerCore.Packages;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters
@@ -12,17 +8,17 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     {
         public ConvexVolume[] InclusionConvexVolumes;
         public ConvexVolume[] ExclusionConvexVolumes;
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             if (sc.Game is not MEGame.UDK)
             {
-                sc.Serialize(ref InclusionConvexVolumes, SCExt.Serialize);
-                sc.Serialize(ref ExclusionConvexVolumes, SCExt.Serialize);
+                sc.Serialize(ref InclusionConvexVolumes, sc.Serialize);
+                sc.Serialize(ref ExclusionConvexVolumes, sc.Serialize);
             }
             else if (sc.IsLoading)
             {
-                InclusionConvexVolumes = Array.Empty<ConvexVolume>();
-                ExclusionConvexVolumes = Array.Empty<ConvexVolume>();
+                InclusionConvexVolumes = [];
+                ExclusionConvexVolumes = [];
             }
         }
 
@@ -30,8 +26,8 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         {
             return new()
             {
-                InclusionConvexVolumes = Array.Empty<ConvexVolume>(),
-                ExclusionConvexVolumes = Array.Empty<ConvexVolume>()
+                InclusionConvexVolumes = [],
+                ExclusionConvexVolumes = []
             };
         }
     }
@@ -42,16 +38,16 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public Plane[] PermutedPlanes;
     }
 
-    public static partial class SCExt
+    public partial class SerializingContainer
     {
-        public static void Serialize(SerializingContainer2 sc, ref ConvexVolume vol)
+        public void Serialize(ref ConvexVolume vol)
         {
-            if (sc.IsLoading)
+            if (IsLoading)
             {
                 vol = new ConvexVolume();
             }
-            sc.Serialize(ref vol.Planes, Serialize);
-            sc.Serialize(ref vol.PermutedPlanes, Serialize);
+            Serialize(ref vol.Planes, Serialize);
+            Serialize(ref vol.PermutedPlanes, Serialize);
         }
     }
 }

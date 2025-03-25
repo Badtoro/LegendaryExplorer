@@ -115,7 +115,6 @@ namespace LegendaryExplorerCore.Misc
             return di;
         }
 
-
         /// <summary>
         /// Converts this DuplicatingIni object into an ini file as a string.
         /// </summary>
@@ -253,6 +252,27 @@ namespace LegendaryExplorerCore.Misc
                 {
                     Entries.Clear();
                 }
+            }
+
+            /// <summary>
+            /// Tries to get the value of a key-value pair with the specified key. Only the first one encountered is returned.
+            /// </summary>
+            /// <param name="key"></param>
+            /// <param name="value"></param>
+            /// <param name="caseInsensitive"></param>
+            /// <returns></returns>
+            public bool TryGetValue(string key, out string value, bool caseInsensitive = false)
+            {
+                value = null;
+                var found = Entries.FirstOrDefault(x => x.Key.Equals(key,
+                    caseInsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+                if (found != null)
+                {
+                    value = found.Value;
+                    return true;
+                }
+
+                return false;
             }
         }
 

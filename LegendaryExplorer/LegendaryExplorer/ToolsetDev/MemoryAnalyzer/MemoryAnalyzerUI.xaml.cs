@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using JetBrains.Profiler.SelfApi;
 using LegendaryExplorer.Dialogs;
 using LegendaryExplorer.SharedUI.Bases;
 using LegendaryExplorerCore.Helpers;
+using LegendaryExplorerCore.Misc;
 using LegendaryExplorerCore.Packages;
 #if DEBUG
 #endif
@@ -46,8 +48,6 @@ namespace LegendaryExplorer.ToolsetDev.MemoryAnalyzer
             dispatcherTimer.Start();
         }
 
-
-
         private string _lastRefreshText;
         public string LastRefreshText { get => _lastRefreshText; set => SetProperty(ref _lastRefreshText, value); }
         private string _currentUsageText;
@@ -76,8 +76,6 @@ namespace LegendaryExplorer.ToolsetDev.MemoryAnalyzer
             LegendaryExplorerCore.Misc.MemoryAnalyzer.CleanupOldRefs();
         }
 
-
-
         private void MemoryAnalyzer_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             dispatcherTimer.Stop();
@@ -105,6 +103,26 @@ namespace LegendaryExplorer.ToolsetDev.MemoryAnalyzer
             IsBusyText = "Opening dotMemory";
             await Task.Run(() => Thread.Sleep(4000));
             IsBusy = false;
+#endif
+        }
+
+        private void MAUI_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+#if DEBUG
+            if (sender is FrameworkElement fe && fe.DataContext is MemoryAnalyzerObject mao)
+            {
+                if (mao.reference.IsAlive)
+                {
+                    if (mao.reference.Target is UnrealPackageFile package)
+                    {
+                        var list = new List<string>();
+                        list.Add($"CREATION STACK TRACE:\n{package.CreationStackTrace}");
+                        list.AddRange(package.RegisterStackTraces);
+                        ListDialog ld = new ListDialog(list, "Package register stack traces", "This is the list of stack traces that were used to register use of this package", this);
+                        ld.Show();
+                    }
+                }
+            }
 #endif
         }
     }

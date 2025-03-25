@@ -1,6 +1,5 @@
 ﻿using LegendaryExplorerCore.UnrealScript.Analysis.Visitors;
 using LegendaryExplorerCore.UnrealScript.Lexing;
-using LegendaryExplorerCore.UnrealScript.Utilities;
 
 namespace LegendaryExplorerCore.UnrealScript.Language.Tree
 {
@@ -8,7 +7,7 @@ namespace LegendaryExplorerCore.UnrealScript.Language.Tree
     {
         public readonly Statement InnerStatement;
 
-        public readonly ScriptToken[] ErrorTokens; 
+        public readonly ScriptToken[] ErrorTokens;
 
         public ErrorStatement(Statement innerStatement) : base(ASTNodeType.INVALID, innerStatement.StartPos, innerStatement.EndPos)
         {

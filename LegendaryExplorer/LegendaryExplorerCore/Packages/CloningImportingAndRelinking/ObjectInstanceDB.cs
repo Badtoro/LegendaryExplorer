@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Misc;
@@ -16,13 +17,27 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
     /// </summary>
     public class ObjectInstanceDB
     {
+        /// <summary>
+        /// Game this DB is for
+        /// </summary>
         private readonly MEGame Game;
 
+        /// <summary>
+        /// List of FilePaths
+        /// </summary>
         private readonly List<string> FilePaths;
 
-        private readonly CaseInsensitiveDictionary<List<int>> ExportMap;
+        /// <summary>
+        /// The version of this ObjectInstanceDB
+        /// </summary>
+        public int Version { get; init; }
 
-        private ObjectInstanceDB(MEGame game, List<string> filePaths, CaseInsensitiveDictionary<List<int>> exportMap)
+        /// <summary>
+        /// Map of Instanced Full Paths to the files that contain them (indexes into FilePaths)
+        /// </summary>
+        private readonly CaseInsensitiveDictionary<ObjectInstanceInfo> ExportMap;
+
+        private ObjectInstanceDB(MEGame game, List<string> filePaths, CaseInsensitiveDictionary<ObjectInstanceInfo> exportMap)
         {
             Game = game;
             FilePaths = filePaths;
@@ -30,7 +45,9 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
         }
 
         private const uint MAGIC = 0x1552D027;
-        private const uint CURRENT_VERSION = 1;
+
+        // V2 05/14/2024 - Add NetIndex
+        private const uint CURRENT_VERSION = 2;
 
         public void Serialize(Stream outStream)
         {
@@ -44,11 +61,13 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             }
 
             outStream.WriteInt32(ExportMap.Count);
-            foreach ((string ifp, List<int> files) in ExportMap)
+            foreach ((string ifp, ObjectInstanceInfo oii) in ExportMap)
             {
                 outStream.WriteStringUtf8WithLength(ifp);
-                outStream.WriteInt32(files.Count);
-                outStream.Write(files.AsSpan().AsBytes());
+                outStream.WriteInt32(oii.NetIndex); // V2
+                outStream.WriteInt32(oii.GenerationNetObjCount); // V2
+                outStream.WriteInt32(oii.Files.Count);
+                outStream.Write(oii.Files.AsSpan().AsBytes());
             }
         }
 
@@ -70,22 +89,61 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                         }
 
                         int exportMapCount = inStream.ReadInt32();
-                        var exportMap = new CaseInsensitiveDictionary<List<int>>(exportMapCount);
+                        var exportMap = new CaseInsensitiveDictionary<ObjectInstanceInfo>(exportMapCount);
                         for (int i = 0; i < exportMapCount; i++)
                         {
                             string key = inStream.ReadStringUtf8WithLength();
                             int filesCount = inStream.ReadInt32();
-                            int[] files = new int[filesCount];
+                            var files = new List<int>(filesCount);
+                            CollectionsMarshal.SetCount(files, filesCount);
                             inStream.ReadToSpan(files.AsSpan().AsBytes());
-                            exportMap.Add(key, new List<int>(files));
+                            exportMap.Add(key, new ObjectInstanceInfo(files)); // V1 uses NetIndex 0 for everything.
                         }
-                        return new ObjectInstanceDB(game, filePaths, exportMap);
+                        return new ObjectInstanceDB(game, filePaths, exportMap) { Version = 1 };
+                    }
+                case 2:
+                    {
+                        int filePathsCount = inStream.ReadInt32();
+                        var filePaths = new List<string>(filePathsCount);
+                        for (int i = 0; i < filePathsCount; i++)
+                        {
+                            filePaths.Add(inStream.ReadStringUtf8WithLength());
+                        }
+
+                        int exportMapCount = inStream.ReadInt32();
+                        var exportMap = new CaseInsensitiveDictionary<ObjectInstanceInfo>(exportMapCount);
+                        for (int i = 0; i < exportMapCount; i++)
+                        {
+                            string key = inStream.ReadStringUtf8WithLength();
+                            int netIndex = inStream.ReadInt32();
+                            int generationNetObjsCount = inStream.ReadInt32();
+
+                            int filesCount = inStream.ReadInt32();
+                            var files = new List<int>(filesCount);
+                            CollectionsMarshal.SetCount(files, filesCount);
+                            inStream.ReadToSpan(files.AsSpan().AsBytes());
+                            exportMap.Add(key, new ObjectInstanceInfo(files)
+                            {
+                                NetIndex = netIndex,
+                                GenerationNetObjCount = generationNetObjsCount
+                            });
+                        }
+                        return new ObjectInstanceDB(game, filePaths, exportMap) { Version = 2 };
                     }
                 case var unsupportedVersion:
                     throw new Exception($"{unsupportedVersion} is not a supported {nameof(ObjectInstanceDB)} version!");
             }
         }
 
+        public ObjectInstanceInfo GetInfo(string ifp)
+        {
+            if (ExportMap.TryGetValue(ifp, out ObjectInstanceInfo info))
+            {
+                return info;
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// Returns a list of relative package file paths (to the game root) that contain the specified ExportEntry with the same InstancedFullPath. Returns null if the specified IFP is not in the database, indicating an object of that name does not exist in the game.
@@ -95,9 +153,9 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
         /// <returns></returns>
         public List<string> GetFilesContainingObject(string ifp, MELocalization localization = MELocalization.None)
         {
-            if (ExportMap.TryGetValue(ifp, out List<int> files))
+            if (ExportMap.TryGetValue(ifp, out ObjectInstanceInfo info))
             {
-                return files.Select(x => FilePaths[x]).Where(x => localization == MELocalization.None || x.GetUnrealLocalization() == localization).ToList();
+                return info.Files.Select(x => FilePaths[x]).Where(x => localization == MELocalization.None || x.GetUnrealLocalization() == localization).ToList();
             }
 
             return null;
@@ -105,7 +163,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 
         public static ObjectInstanceDB Create(MEGame game, List<string> files, Action<int> numDoneReporter = null, Action<int> addExtraFiles = null)
         {
-            var objectDB = new ObjectInstanceDB(game, new List<string>(files.Count), new CaseInsensitiveDictionary<List<int>>());
+            var objectDB = new ObjectInstanceDB(game, new List<string>(files.Count), new CaseInsensitiveDictionary<ObjectInstanceInfo>());
             int numDone = 0;
             for (int i = 0; i < files.Count; i++)
             {
@@ -120,7 +178,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                         if (f.isActualFile && f.FileName.RepresentsPackageFilePath())
                         {
                             var decompress = dlc.DecompressEntry(f);
-                            using var dlcP = MEPackageHandler.UnsafePartialLoadFromStream(decompress, f.FileName, _ => false);
+                            using var dlcP = MEPackageHandler.OpenMEPackageFromStream(decompress, f.FileName);
                             objectDB.AddFileToDB(dlcP, f.FileName);
                             numDone++;
                             numDoneReporter?.Invoke(numDone);
@@ -148,7 +206,8 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
         /// <param name="package">Package object to inventory</param>
         /// <param name="filePath">Path to package file on disk</param>
         /// <param name="insertAtStart">If true, add new instances of objects to the start of a list, so they will be preferred.</param>
-        public void AddFileToDB(IMEPackage package, string filePath, bool insertAtStart = true)
+        /// <param name="objectsToAddPredicate">Predicate to determine which objects to add to the database. If null, all objects will be added.</param>
+        public void AddFileToDB(IMEPackage package, string filePath, bool insertAtStart = true, Func<ExportEntry, bool> objectsToAddPredicate = null)
         {
             int filePathIndex = FilePaths.Count;
             if (package.Game != Game)
@@ -160,7 +219,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             if (package.FilePath.StartsWith(defaultGamePath))
             {
                 // Store relative path
-                FilePaths.Add(package.FilePath.Substring(defaultGamePath.Trim('\\','/').Length + 1));
+                FilePaths.Add(package.FilePath.Substring(defaultGamePath.Trim('\\', '/').Length + 1));
             }
             else
             {
@@ -169,7 +228,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             }
 
             // Index objects
-            foreach (ExportEntry exp in package.Exports)
+            foreach (ExportEntry exp in package.Exports.Where(objectsToAddPredicate ?? AlwaysAdd))
             {
                 string ifp = exp.InstancedFullPath;
 
@@ -180,21 +239,26 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                     continue;
 
                 // Index it
-                if (!ExportMap.TryGetValue(ifp, out List<int> records))
+                if (!ExportMap.TryGetValue(ifp, out ObjectInstanceInfo records))
                 {
-                    records = new List<int>();
+                    records = new ObjectInstanceInfo(new List<int>(), exp);
                     ExportMap.Add(ifp, records);
                 }
 
                 if (insertAtStart)
                 {
-                    records.Insert(0, filePathIndex);
+                    records.Files.Insert(0, filePathIndex);
                 }
                 else
                 {
-                    records.Add(filePathIndex);
+                    records.Files.Add(filePathIndex);
                 }
             }
+        }
+
+        private bool AlwaysAdd(ExportEntry entry)
+        {
+            return true;
         }
 
         /// <summary>
@@ -204,15 +268,27 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
         public void RemoveFileFromDB(IMEPackage package)
         {
             var fileIndex = FilePaths.IndexOf(package.FilePath);
-            foreach (ExportEntry exp in package.Exports)
+            if (fileIndex != -1)
             {
-                if (ExportMap.TryGetValue(exp.InstancedFullPath, out List<int> records))
+                foreach (ExportEntry exp in package.Exports)
                 {
-                    records.Remove(fileIndex);
+                    if (ExportMap.TryGetValue(exp.InstancedFullPath, out ObjectInstanceInfo records))
+                    {
+                        var fIndex = records.Files.IndexOf(fileIndex);
+                        if (fIndex != -1)
+                        {
+                            records.Files.RemoveAt(fIndex);
+                            if (records.Files.Count == 0)
+                            {
+                                // Removed from DB entirely
+                                ExportMap.Remove(exp.InstancedFullPath);
+                            }
+                        }
+                    }
                 }
+                // Removing it would offset indices for later added files. We have to store null instead.
+                FilePaths[fileIndex] = null;
             }
-
-            FilePaths.RemoveAt(fileIndex);
         }
 
         /// <summary>
@@ -223,9 +299,98 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
         //keep public; is used by external tools
         public void AddFileToDB(string filePath, bool insertAtStart = true)
         {
-            // Load tables only to increase performance.
-            using IMEPackage package = MEPackageHandler.UnsafePartialLoad(filePath, _ => false);
+            using IMEPackage package = MEPackageHandler.OpenMEPackage(filePath);
             AddFileToDB(package, filePath, insertAtStart);
+        }
+
+        /// <summary>
+        /// Gets a list of all unique object paths in this database. This returns an enumerator.
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<string> GetAllObjectPaths(bool alphabetical)
+        {
+            if (alphabetical)
+            {
+                return ExportMap.Keys.OrderBy(x => x);
+            }
+            return ExportMap.Keys;
+        }
+
+        /// <summary>
+        /// Adds a single export object to the database
+        /// </summary>
+        /// <param name="export"></param>
+        /// <param name="insertAtStart"></param>
+        /// <exception cref="InvalidOperationException"></exception>
+        public void AddObjectToDB(ExportEntry export, bool insertAtStart = false)
+        {
+            string ifp = export.InstancedFullPath;
+
+            // These items will never be indexed
+            if (ifp.StartsWith(@"ObjectReferencer"))
+                return;
+
+            int filePathIndex = FilePaths.IndexOf(export.FileRef.FilePath);
+            if (export.Game != Game)
+            {
+                throw new InvalidOperationException($"Cannot add a {export.Game} object to a {Game} database");
+            }
+
+            string defaultGamePath = MEDirectories.GetDefaultGamePath(Game);
+            if (export.FileRef.FilePath.StartsWith(defaultGamePath))
+            {
+                // Store relative path
+                FilePaths.Add(export.FileRef.FilePath.Substring(defaultGamePath.Trim('\\', '/').Length + 1));
+            }
+            else
+            {
+                // Store full path
+                FilePaths.Add(export.FileRef.FilePath);
+            }
+
+            // Index it
+            if (!ExportMap.TryGetValue(ifp, out ObjectInstanceInfo records))
+            {
+                records = new ObjectInstanceInfo(new List<int>(), export);
+                ExportMap.Add(ifp, records);
+            }
+
+            if (insertAtStart)
+            {
+                records.Files.Insert(0, filePathIndex);
+            }
+            else
+            {
+                records.Files.Add(filePathIndex);
+            }
+        }
+    }
+
+    public class ObjectInstanceInfo
+    {
+        public List<int> Files;
+        public int NetIndex;
+        public int GenerationNetObjCount; // Set on Package only
+
+        /// <summary>
+        /// For serialization
+        /// </summary>
+        /// <param name="files">List of file indices</param>
+        /// <param name="export">Export to parse</param>
+        public ObjectInstanceInfo(List<int> files, ExportEntry export)
+        {
+            Files = files;
+            NetIndex = export.NetIndex;
+            GenerationNetObjCount = export.GenerationNetObjectCount.Length == 1 ? export.GenerationNetObjectCount[0] : 0;
+        }
+
+        /// <summary>
+        /// For deserialization
+        /// </summary>
+        /// <param name="files">List of file indices</param>
+        public ObjectInstanceInfo(List<int> files)
+        {
+            Files = files;
         }
     }
 }

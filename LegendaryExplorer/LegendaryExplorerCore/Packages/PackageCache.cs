@@ -78,7 +78,7 @@ namespace LegendaryExplorerCore.Packages
                 {
                     if (File.Exists(packagePath))
                     {
-                        Debug.WriteLine($@"PackageCache {guid} load: {packagePath}");
+                        //Debug.WriteLine($@"PackageCache {guid} load: {packagePath} - custom open method: {(openPackageMethod != null)}");
                         package = openPackageMethod?.Invoke(packagePath) ?? MEPackageHandler.OpenMEPackage(packagePath, forceLoadFromDisk: AlwaysOpenFromDisk);
                         InsertIntoCache(package);
                         return package;
@@ -126,7 +126,7 @@ namespace LegendaryExplorerCore.Packages
             }
         }
 
-        public virtual void CheckCacheFullness()
+        public virtual void CheckCacheFullness(bool gcOnRelease = false, bool largeGc = false)
         {
             if (CacheMaxSize > 1 && Cache.Count > CacheMaxSize)
             {
@@ -134,12 +134,20 @@ namespace LegendaryExplorerCore.Packages
                 while (CacheMaxSize > 1 && Cache.Count > CacheMaxSize)
                 {
                     // Find the oldest package
-                    if (!ResidentPackages.Contains(accessOrder[0].Key))
+                    if (!IsResidentPackage(accessOrder[0].Key))
                     {
                         ReleasePackage(accessOrder[0].Key);
+                        if (gcOnRelease)
+                        {
+                            GC.Collect();
+                            if (largeGc)
+                            {
+                                GC.WaitForPendingFinalizers();
+                                GC.Collect();
+                            }
+                        }
                     }
                     accessOrder.RemoveAt(0);
-
                 }
             }
 
@@ -150,6 +158,30 @@ namespace LegendaryExplorerCore.Packages
             }
         }
 
+        /// <summary>
+        /// Returns if this package is marked as a Resident Package. Packages without <see cref="IMEPackage.FilePath"/> set will return false.
+        /// </summary>
+        /// <param name="package">Package object to check</param>
+        /// <returns></returns>
+        public bool IsResidentPackage(IMEPackage package)
+        {
+            if (package.FilePath != null)
+            {
+                return IsResidentPackage(package.FilePath);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns if this package path (case insensitive) is marked as a Resident Package.
+        /// </summary>
+        /// <param name="packagePath">Path of the package file</param>
+        /// <returns></returns>
+        public virtual bool IsResidentPackage(string packagePath)
+        {
+            return ResidentPackages.Contains(packagePath, StringComparer.InvariantCultureIgnoreCase);
+        }
 
         /// <summary>
         /// Releases a package by it's filepath from the cache.
@@ -191,21 +223,27 @@ namespace LegendaryExplorerCore.Packages
         /// <summary>
         /// Releases all packages referenced by this cache that match the specified predicate, and can optionally force a garbage collection to reclaim memory they may have used. This does not remove resident packages.
         /// </summary>
-        public void ReleasePackages(Predicate<string> packagesToDropPredicate, bool gc = false)
+        public int ReleasePackages(Predicate<string> packagesToDropPredicate, bool gc = false)
         {
+            int numReleased = 0;
             var keys = Cache.Keys.ToList();
             foreach (var key in keys)
             {
                 if (!ResidentPackages.Contains(key) && (packagesToDropPredicate?.Invoke(key) ?? true))
                 {
                     Cache[key].Dispose();
-                    Cache.Remove(key, out _);
+                    if (Cache.Remove(key, out _))
+                    {
+                        numReleased++;
+                    }
                     LastAccessMap.TryRemove(key, out _);
                 }
             }
 
             if (gc)
                 GC.Collect();
+
+            return numReleased;
         }
 
         /// <summary>
@@ -268,7 +306,6 @@ namespace LegendaryExplorerCore.Packages
             return null;
         }
 
-
         public virtual IReadOnlyCollection<IMEPackage> GetPackages()
         {
             return new ReadOnlyCollection<IMEPackage>(Cache.Values.ToList());
@@ -281,6 +318,15 @@ namespace LegendaryExplorerCore.Packages
         public virtual List<IMEPackage> GetPackageList()
         {
             return Cache.Values.ToList();
+        }
+
+        /// <summary>
+        /// Removes a package from the cache. The package is not disposed, use ReleasePackage for that.
+        /// </summary>
+        /// <param name="pcc"></param>
+        public bool RemoveFromCache(IMEPackage pcc)
+        {
+            return Cache.TryRemove(pcc.FilePath, out _);
         }
     }
 }

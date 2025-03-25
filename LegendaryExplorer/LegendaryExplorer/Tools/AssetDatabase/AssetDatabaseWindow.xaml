@@ -13,6 +13,7 @@
         xmlns:controls="clr-namespace:LegendaryExplorer.SharedUI.Controls"
         xmlns:exportLoaderControls="clr-namespace:LegendaryExplorer.UserControls.ExportLoaderControls"
         xmlns:assetDbFilters="clr-namespace:LegendaryExplorer.Tools.AssetDatabase.Filters"
+        xmlns:materialEditor="clr-namespace:LegendaryExplorer.UserControls.ExportLoaderControls.MaterialEditor"
         Loaded="AssetDB_Loaded"
         Closing="AssetDB_Closing"
         AllowDrop="True"
@@ -138,11 +139,11 @@
                                 </Style.Triggers>
                             </Style>
                         </MenuItem.Resources>
-                        <MenuItem Name="menu_fltrCustFiles" Header="Filter by Filelist" Command="{Binding FilterFilesCommand}" CommandParameter="CustFiles" ToolTip="Filter the entire database by the current filelist." StaysOpenOnClick="True" IsCheckable="True" IsChecked="{Binding Path=FileListFilter.IsSelected, Mode=TwoWay}"/>
-                        <MenuItem Header="Filelist Actions">
-                            <MenuItem Header="Load" Command="{Binding LoadFileListCommand}" ToolTip="Load an existing filelist."/>
-                            <MenuItem Header="Save" Command="{Binding SaveFileListCommand}" ToolTip="Save the current filelist."/>
-                            <MenuItem Header="Clear" Command="{Binding EditFileListCommand}" CommandParameter="Clear" ToolTip="Clear the current filelist."/>
+                        <MenuItem Name="menu_fltrCustFiles" Header="Filter by File List" Command="{Binding FilterFilesCommand}" CommandParameter="CustFiles" ToolTip="Filter the entire database by the current custom file list." StaysOpenOnClick="True" IsCheckable="True" IsChecked="{Binding Path=FileListFilter.IsSelected, Mode=TwoWay}"/>
+                        <MenuItem Header="File List Actions">
+                            <MenuItem Header="Load" Command="{Binding LoadFileListCommand}" ToolTip="Load an existing file list."/>
+                            <MenuItem Header="Save" Command="{Binding SaveFileListCommand}" ToolTip="Save the current file list."/>
+                            <MenuItem Header="Clear" Command="{Binding EditFileListCommand}" CommandParameter="Clear" ToolTip="Clear the current file list."/>
                         </MenuItem>
                         <Separator/>
                         <MenuItem Header="Filter Animations" ItemsSource="{Binding AssetFilters.AnimationFilter.Filters}" ItemContainerStyle="{DynamicResource CustomFilterMenuItem}"/>
@@ -160,7 +161,8 @@
                             <MenuItem.ItemsSource>
                                 <CompositeCollection>
                                     <CollectionContainer Collection="{Binding Source={StaticResource TextureFilters}}"/>
-                                    <MenuItem Header="LOD Groups" ItemsSource="{Binding AssetFilters.TextureFilter.LODGroups}" ItemContainerStyle="{DynamicResource CustomFilterMenuItem}" CommandParameter=""/>
+                                    <MenuItem Header="LOD Groups" Style="{x:Null}" ItemsSource="{Binding AssetFilters.TextureFilter.LODGroups}" ItemContainerStyle="{DynamicResource CustomFilterMenuItem}" />
+
                                 </CompositeCollection>
                             </MenuItem.ItemsSource>
                         </MenuItem>
@@ -247,7 +249,7 @@
                                                                 DockPanel.Dock="Bottom">
                                             <controls:ListBoxScroll.ContextMenu>
                                                 <ContextMenu>
-                                                    <MenuItem Header="Remove From Custom List" Command="{Binding EditFileListCommand}" CommandParameter="Remove" ToolTip="Remove this from Custom File List" />
+                                                    <MenuItem Header="Remove from File List" Command="{Binding EditFileListCommand}" CommandParameter="Remove" ToolTip="Remove this from Custom File List" />
                                                 </ContextMenu>
                                             </controls:ListBoxScroll.ContextMenu>
                                             <controls:ListBoxScroll.ItemTemplate>
@@ -299,7 +301,7 @@
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <Separator/>
-                                            <MenuItem Header="Add to Filtered Files" Command="{Binding EditFileListCommand}" CommandParameter="Add" ToolTip="Add this file to the filtered file list."/>
+                                            <MenuItem Header="Add to Custom File List" Command="{Binding EditFileListCommand}" CommandParameter="Add" ToolTip="Add this file to the custom file list."/>
                                             <MenuItem Header="Open in Windows Explorer" Command="{Binding OpenInWindowsExplorerCommand}" ToolTip="Opens this file in Windows Explorer."/>
                                         </ContextMenu>
                                     </ListView.ContextMenu>
@@ -432,19 +434,22 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Material Records" Background="AliceBlue" HorizontalAlignment="Stretch" Padding="3" ToolTip="Material Records (Grey shows DLC only materials that require a shadercache)" Grid.Row="0" Grid.Column="0"/>
-                            <controls:ListBoxScroll x:Name="lstbx_Materials" MinWidth="300" ItemsSource="{Binding Path=CurrentDataBase.Materials}" Grid.Row="1" Grid.Column="0" >
+                            <controls:ListBoxScroll x:Name="lstbx_Materials" MinWidth="300" ItemsSource="{Binding Path=CurrentDataBase.Materials}" Grid.Row="1" Grid.Column="0" SelectionChanged="SelectedMaterial_Changed">
                                 <controls:ListBoxScroll.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding MaterialName}" />
-                                            <TextBlock FontSize="10" Text=" (" VerticalAlignment="Center"/>
-                                            <TextBlock FontSize="10" Text="{Binding ParentPackage}" VerticalAlignment="Center"/>
-                                            <TextBlock FontSize="10" Text=")" VerticalAlignment="Center" />
-                                        </StackPanel>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" HorizontalAlignment="Right" ToolTip="Load in Live Material Editor" Click="Material_LoadInLiveMaterialEditor">
+                                                <Button.Content>
+                                                    <fa:ImageAwesome Icon="Regular_PlayCircle" Height="16" Width="16" Cursor="Hand"/>
+                                                </Button.Content>
+                                            </Button>
+                                            <TextBlock Text="{Binding DisplayString}"/>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </controls:ListBoxScroll.ItemTemplate>
                                 <controls:ListBoxScroll.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"></Setter>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=IsDLCOnly}" Value="True">
                                                 <Setter Property="Background" Value="LightGray"/>
@@ -454,7 +459,8 @@
                                     </Style>
                                 </controls:ListBoxScroll.ItemContainerStyle>
                             </controls:ListBoxScroll>
-                            <TextBlock Text="Properties" Background="AliceBlue" HorizontalAlignment="Stretch" Padding="3" ToolTip="The default properties of the material" Grid.Row="0"  Grid.Column="1"/>
+                            <TextBlock Text="Material Info" Background="AliceBlue" HorizontalAlignment="Stretch" Padding="3" ToolTip="The default properties of the material" Grid.Row="0"  Grid.Column="1"/>
+                            <!--
                             <controls:ListBoxScroll x:Name="lstbx_MatProps" MinWidth="200" ItemsSource="{Binding SelectedItem.MatSettings, ElementName=lstbx_Materials }" Grid.Row="1" Grid.Column="1">
                                 <controls:ListBoxScroll.ItemTemplate>
                                     <DataTemplate>
@@ -467,7 +473,8 @@
                                         </StackPanel>
                                     </DataTemplate>
                                 </controls:ListBoxScroll.ItemTemplate>
-                            </controls:ListBoxScroll>
+                            </controls:ListBoxScroll>-->
+                            <materialEditor:MaterialEditorExportLoader x:Name="MaterialEditorExportLoader_Control" Grid.Row="1" Grid.Column="1" IsReadOnly="True" ShowSaveBar="False" AlwaysLoadData="True"/>
                             <TextBlock Text="Usages" Background="AliceBlue" HorizontalAlignment="Stretch" Padding="3" ToolTip="All the files that use the material (grey is official DLC with shadercache)&#x0a;Right click to open in Package Editor" Grid.Row="0" Grid.Column="2"/>
                             <Button ToolTip="Copies the list of usages to the clipboard as text" Name="CopyUsagesMaterials_Button" Click="CopyUsages_Click" VerticalAlignment="Center" Padding="3" HorizontalAlignment="Right" Width="26" Grid.Row="0" Grid.Column="2">
                                 <fa:ImageAwesome Icon="Solid_Copy" Foreground="CornflowerBlue"/>
@@ -488,6 +495,7 @@
                                 </controls:ListBoxScroll.ItemTemplate>
                                 <controls:ListBoxScroll.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=IsInDLC}" Value="True">
                                                 <Setter Property="Background" Value="LightGray"/>
@@ -521,19 +529,29 @@
                             <controls:ListBoxScroll x:Name="lstbx_Meshes" MinWidth="300" ItemsSource="{Binding Path=CurrentDataBase.Meshes}" SelectionChanged="lstbx_Meshes_SelectionChanged" Grid.Row="1" Grid.Column="0">
                                 <controls:ListBoxScroll.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding MeshName}" />
+                                            <!--<TextBlock Text="{Binding MeshName}" />
                                             <StackPanel Orientation="Horizontal" Name="details_skelmesh" Visibility="{Binding IsSkeleton, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock FontSize="10" Text=" (Skeletal Mesh " VerticalAlignment="Center"/>
                                                 <TextBlock FontSize="10" Text=", Bone Count: " VerticalAlignment="Center" />
                                                 <TextBlock FontSize="10" Text="{Binding BoneCount}" VerticalAlignment="Center" />
                                                 <TextBlock FontSize="10" Text=")  " VerticalAlignment="Center" />
-                                            </StackPanel>
-                                        </StackPanel>
+                                            </StackPanel>-->
+
+
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" HorizontalAlignment="Right" ToolTip="Play in Asset Viewer" Click="Mesh_PlayInAssetViewer">
+                                                    <Button.Content>
+                                                        <fa:ImageAwesome Icon="Regular_PlayCircle" Height="16" Width="16" ToolTip="Double click to goto this export" Cursor="Hand"/>
+                                                    </Button.Content>
+                                                </Button>
+                                                <TextBlock Text="{Binding DisplayString}"/>
+                                            </DockPanel>
+
                                     </DataTemplate>
                                 </controls:ListBoxScroll.ItemTemplate>
                                 <controls:ListBoxScroll.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"></Setter>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=IsModOnly}" Value="True">
                                                 <Setter Property="Foreground" Value="IndianRed"/>
@@ -708,14 +726,22 @@
                             <controls:ListBoxScroll x:Name="lstbx_Anims" MinWidth="300" ItemsSource="{Binding Path=CurrentDataBase.Animations}" Grid.Row="1" Grid.Column="0">
                                 <controls:ListBoxScroll.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding AnimSequence}"/>
-                                            <TextBlock FontSize="10" Text=" (Ambient Performance)" VerticalAlignment="Center" Visibility="{Binding IsAmbPerf, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                        </StackPanel>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" HorizontalAlignment="Right" ToolTip="Play in Asset Viewer" Click="Animation_PlayInAssetViewer">
+                                                <Button.Content>
+                                                    <fa:ImageAwesome Icon="Regular_PlayCircle" Height="16" Width="16" ToolTip="Double click to goto this export" Cursor="Hand"/>
+                                                </Button.Content>
+                                            </Button>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding AnimSequence}"/>
+                                                <TextBlock FontSize="10" Text=" (Ambient Performance)" VerticalAlignment="Center" Visibility="{Binding IsAmbPerf, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </StackPanel>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </controls:ListBoxScroll.ItemTemplate>
                                 <controls:ListBoxScroll.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"></Setter>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=IsModOnly}" Value="True">
                                                 <Setter Property="Foreground" Value="IndianRed"/>
@@ -735,15 +761,6 @@
                             <TextBlock Text="Details" Background="AliceBlue" HorizontalAlignment="Stretch" Padding="3" ToolTip="Details of each animation" Grid.Row="0" Grid.Column="1"/>
                             <Border BorderBrush="LightSlateGray" BorderThickness="0.65" Grid.Row="1" Grid.Column="1">
                                 <StackPanel x:Name="details_Anim" MinWidth="200" Margin="8">
-                                    <StackPanel.Style>
-                                        <Style>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=lstbx_Anims, Path=SelectedIndex}" Value=">=0">
-                                                    <Setter Property="StackPanel.Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
                                     <TextBlock Text="Ambient Performance" FontWeight="DemiBold" Margin="0,5,0,0" Visibility="{Binding Path=SelectedItem.IsAmbPerf, ElementName=lstbx_Anims, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     <TextBlock Text="Sequence Name: " Margin="0,5,0,0" />
                                     <TextBlock Text="{Binding Path=SelectedItem.SeqName, ElementName=lstbx_Anims}" />
@@ -814,16 +831,19 @@
                             <controls:ListBoxScroll x:Name="lstbx_Particles" DockPanel.Dock="Left" MinWidth="300" ItemsSource="{Binding Path=CurrentDataBase.Particles}" Grid.Row="1" Grid.Column="0">
                                 <controls:ListBoxScroll.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding PSName}" />
-                                            <TextBlock Text=" (" FontSize="10" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding VFXType}" FontSize="10" VerticalAlignment="Center"/>
-                                            <TextBlock Text=")" FontSize="10" VerticalAlignment="Center"/>
-                                        </StackPanel>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" HorizontalAlignment="Right" ToolTip="Play in Asset Viewer" Click="VFX_PlayInAssetViewer">
+                                                <Button.Content>
+                                                    <fa:ImageAwesome Icon="Regular_PlayCircle" Height="16" Width="16" ToolTip="Double click to goto this export" Cursor="Hand"/>
+                                                </Button.Content>
+                                            </Button>
+                                            <TextBlock Text="{Binding DisplayString}" HorizontalAlignment="Stretch"/>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </controls:ListBoxScroll.ItemTemplate>
                                 <controls:ListBoxScroll.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"></Setter>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=IsDLCOnly}" Value="True">
                                                 <Setter Property="Background" Value="LightGray"/>
@@ -840,15 +860,6 @@
                             <TextBlock Text="Details" Background="AliceBlue" HorizontalAlignment="Stretch" Padding="3" ToolTip="Additional details" Grid.Row="0" Grid.Column="1"/>
                             <Border BorderBrush="LightSlateGray" BorderThickness="0.65" Grid.Row="1" Grid.Column="1">
                                 <StackPanel x:Name="details_PS" MinWidth="200" Margin="3">
-                                    <StackPanel.Style>
-                                        <Style>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=lstbx_Particles, Path=SelectedIndex}" Value=">=0">
-                                                    <Setter Property="StackPanel.Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
                                     <TextBlock Text="Parent Package: " Margin="0,5,0,0"/>
                                     <TextBlock Text="{Binding Path=SelectedItem.ParentPackage, ElementName=lstbx_Particles}" />
                                     <TextBlock Text="System Complexity (effect count): " Margin="0,5,0,0"/>
@@ -1063,11 +1074,16 @@
                     </TabItem>
                     <!-- Plot-->
                     <TabItem Header="Plot Elements" TabIndex="9">
-                        <DockPanel>
-                            <TabControl x:Name="tabCtrl_plotUsage" SelectionChanged="PETabControl_SelectionChanged">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="3*"/>
+                                <ColumnDefinition Width="5"/>
+                                <ColumnDefinition Width="2*"/>
+                            </Grid.ColumnDefinitions>
+                            <TabControl Grid.Column="0" x:Name="tabCtrl_plotUsage" SelectionChanged="PETabControl_SelectionChanged">
                                 <TabItem Header="Bools" TabIndex="1">
                                     <controls:ListBoxScroll x:Name="lstbx_PlotBool" ItemsSource="{Binding CurrentDataBase.PlotUsages.Bools}" 
-                                                            MinWidth="300" MaxWidth="500"  SelectionChanged="lstbx_PlotElement_SelectionChanged">
+                                                          SelectionChanged="lstbx_PlotElement_SelectionChanged">
                                         <controls:ListBoxScroll.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding DisplayText}"/>
@@ -1082,7 +1098,7 @@
                                 </TabItem>
                                 <TabItem Header="Ints" TabIndex="2">
                                     <controls:ListBoxScroll x:Name="lstbx_PlotInt" ItemsSource="{Binding CurrentDataBase.PlotUsages.Ints}" 
-                                                            MinWidth="300" MaxWidth="500"  SelectionChanged="lstbx_PlotElement_SelectionChanged">
+                                                            SelectionChanged="lstbx_PlotElement_SelectionChanged">
                                         <controls:ListBoxScroll.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding DisplayText}"/>
@@ -1097,7 +1113,7 @@
                                 </TabItem>
                                 <TabItem Header="Floats" TabIndex="3">
                                     <controls:ListBoxScroll x:Name="lstbx_PlotFloat" ItemsSource="{Binding CurrentDataBase.PlotUsages.Floats}" 
-                                                            MinWidth="300" MaxWidth="500"  SelectionChanged="lstbx_PlotElement_SelectionChanged">
+                                                           SelectionChanged="lstbx_PlotElement_SelectionChanged">
                                         <controls:ListBoxScroll.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding DisplayText}"/>
@@ -1112,7 +1128,7 @@
                                 </TabItem>
                                 <TabItem Header="Transitions" TabIndex="4">
                                     <controls:ListBoxScroll x:Name="lstbx_PlotTrans" ItemsSource="{Binding CurrentDataBase.PlotUsages.Transitions}" 
-                                                            MinWidth="300" MaxWidth="500"  SelectionChanged="lstbx_PlotElement_SelectionChanged">
+                                                            SelectionChanged="lstbx_PlotElement_SelectionChanged">
                                         <controls:ListBoxScroll.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding DisplayText}"/>
@@ -1128,7 +1144,7 @@
                                 </TabItem>
                                 <TabItem Header="Conditionals" TabIndex="5">
                                     <controls:ListBoxScroll x:Name="lstbx_PlotCond" ItemsSource="{Binding CurrentDataBase.PlotUsages.Conditionals}" 
-                                                            MinWidth="300" MaxWidth="500"  SelectionChanged="lstbx_PlotElement_SelectionChanged">
+                                                            SelectionChanged="lstbx_PlotElement_SelectionChanged">
                                         <controls:ListBoxScroll.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding DisplayText}"/>
@@ -1143,8 +1159,8 @@
                                     </controls:ListBoxScroll>
                                 </TabItem>
                             </TabControl>
-
-                            <Grid DockPanel.Dock="Right">
+                            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"/>
+                            <Grid Grid.Column="2">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="24"/>
                                     <RowDefinition Height="*"/>
@@ -1175,10 +1191,6 @@
                                     <controls:ListBoxScroll.ItemContainerStyle>
                                         <Style TargetType="ListBoxItem">
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Path=IsDefault}" Value="True">
-                                                    <Setter Property="TextElement.FontWeight" Value="Bold"/>
-                                                    <Setter Property="TextElement.ToolTip" Value="Default value"/>
-                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding Path=IsMod}" Value="True">
                                                     <Setter Property="TextElement.Foreground" Value="IndianRed"/>
                                                     <Setter Property="TextElement.ToolTip" Value="Is Mod File"/>
@@ -1194,7 +1206,7 @@
                                     </controls:ListBoxScroll.ContextMenu>
                                 </controls:ListBoxScroll>
                             </Grid>
-                        </DockPanel>
+                        </Grid>
                     </TabItem>
                 </TabControl>
             </DockPanel>

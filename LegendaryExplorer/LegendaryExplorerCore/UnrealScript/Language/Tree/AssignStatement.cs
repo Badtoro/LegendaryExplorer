@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using LegendaryExplorerCore.UnrealScript.Analysis.Visitors;
-using LegendaryExplorerCore.UnrealScript.Utilities;
 
 namespace LegendaryExplorerCore.UnrealScript.Language.Tree
 {
@@ -9,8 +8,8 @@ namespace LegendaryExplorerCore.UnrealScript.Language.Tree
         public Expression Target;
         public Expression Value;
         public AssignStatement(Expression target, Expression value,
-            int start = -1, int end = -1) 
-            : base(ASTNodeType.AssignStatement, start, end) 
+            int start = -1, int end = -1)
+            : base(ASTNodeType.AssignStatement, start, end)
         {
             Target = target;
             Value = value;

@@ -10,7 +10,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using static LegendaryExplorerCore.Kismet.SeqTools;
+using static LegendaryExplorerCore.Kismet.KismetHelper;
+using static LegendaryExplorer.Misc.ExperimentsTools.SharedMethods;
 
 namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
 {
@@ -54,7 +55,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
                 return;
             }
 
-
             List<StructProperty> dataLinks = varLinks.Where(link => link.GetProp<StrProperty>("LinkDesc").Value == "Data").ToList();
             if (!dataLinks.Any())
             {
@@ -62,7 +62,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
                 return;
             }
 
-            ObjectProperty dataObj = dataLinks.First().GetProp<ArrayProperty<ObjectProperty>>("LinkedVariables").FirstOrDefault();
+            ObjectProperty dataObj = dataLinks[0].GetProp<ArrayProperty<ObjectProperty>>("LinkedVariables").FirstOrDefault();
             if (dataObj == null)
             {
                 ShowError("No InterpDatas were linked to the Data variable link");
@@ -79,23 +79,23 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
             // Don't check if there are no InterpGroups, since an update could be to remove all of them
             ArrayProperty<ObjectProperty> interpGroups = interpData.GetProperty<ArrayProperty<ObjectProperty>>("InterpGroups");
 
-            List<string> groupNames = new();
-            // We want to keep the Data and Anchor links
-            groupNames.Add("Data");
-            groupNames.Add("Anchor");
+            List<string> groupNames =
+            [
+                // We want to keep the Data and Anchor links
+                "Data",
+                "Anchor",
+                .. interpGroups.Where(id =>
+                {
+                    if (!sew.Pcc.TryGetUExport(id.Value, out ExportEntry group)) { return false; }
+                    return group.GetProperty<NameProperty>("GroupName") != null;
+                }).Select(id =>
+                {
+                    ExportEntry group = sew.Pcc.GetUExport(id.Value);
+                    return group.GetProperty<NameProperty>("GroupName").Value.Instanced;
+                }).Distinct(),
+            ];
 
-            groupNames.AddRange(interpGroups.Where(id =>
-            {
-                ExportEntry group = null;
-                if (!sew.Pcc.TryGetUExport(id.Value, out group)) { return false; }
-                return group.GetProperty<NameProperty>("GroupName") != null;
-            }).Select(id =>
-            {
-                ExportEntry group = sew.Pcc.GetUExport(id.Value);
-                return group.GetProperty<NameProperty>("GroupName").Value.Instanced;
-            }).Distinct().ToList());
-
-            List<StructProperty> updatedLinks = new();
+            List<StructProperty> updatedLinks = [];
             foreach (string name in groupNames)
             {
                 // Keep existing varLinks if they are the default Data or Anchor, or if it already exists in the list, and add new links.
@@ -106,7 +106,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
                 }
                 else
                 {
-                    PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(sew.Pcc.Game, "SeqVarLink", true);
+                    PropertyCollection props = GlobalUnrealObjectInfo.getDefaultStructValue(sew.Pcc.Game, "SeqVarLink", true, sew.Pcc);
                     props.AddOrReplaceProp(new StrProperty(name, "LinkDesc"));
                     int index = sew.Pcc.FindImport("Engine.SeqVar_Object").UIndex;
                     props.AddOrReplaceProp(new ObjectProperty(index, "ExpectedType"));
@@ -152,7 +152,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
             }
 
             IEnumerable<ExportEntry> interps = selected ? sew.SelectedObjects.Select(el => el.Export)
-                                                        : GetAllSequenceElements(selectedSequence).Select(el => (ExportEntry)el);
+                                                        : KismetHelper.GetAllSequenceElements(selectedSequence).Select(el => (ExportEntry)el);
 
             interps = interps.Where(export =>
             {
@@ -198,7 +198,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
         {
             if (sew.Pcc == null || sew.SelectedSequence == null) { return; }
 
-            string camActor = promptForActor($"Name of camera actor to {(wantDir ? "control" : "add")}:", "Not a valid camera actor name.");
+            string camActor = PromptForStr($"Name of camera actor to {(wantDir ? "control" : "add")}:", "Not a valid camera actor name.");
 
             PackageCache cache = new();
 
@@ -208,7 +208,7 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
 
             ArrayProperty<StructProperty> variableLinks = interp.GetProperty<ArrayProperty<StructProperty>>("VariableLinks");
             // Add camera varLink
-            PropertyCollection camProps = GlobalUnrealObjectInfo.getDefaultStructValue(sew.Pcc.Game, "SeqVarLink", true);
+            PropertyCollection camProps = GlobalUnrealObjectInfo.getDefaultStructValue(sew.Pcc.Game, "SeqVarLink", true, sew.Pcc);
             camProps.AddOrReplaceProp(new StrProperty(camActor, "LinkDesc"));
             int objIdx = sew.Pcc.FindImport("Engine.SeqVar_Object").UIndex;
             camProps.AddOrReplaceProp(new ObjectProperty(objIdx, "ExpectedType"));
@@ -248,25 +248,6 @@ namespace LegendaryExplorer.Tools.Sequence_Editor.Experiments
             }
 
             MessageBox.Show($"Added dialogue wheel {(wantDir ? "director" : "camera")} template", "Success", MessageBoxButton.OK);
-        }
-
-        private static void ShowError(string errMsg)
-        {
-            MessageBox.Show(errMsg, "Warning", MessageBoxButton.OK);
-        }
-
-        private static string promptForActor(string msg, string err)
-        {
-            if (PromptDialog.Prompt(null, msg) is string actor)
-            {
-                if (string.IsNullOrEmpty(actor))
-                {
-                    MessageBox.Show(err, "Warning", MessageBoxButton.OK);
-                    return null;
-                }
-                return actor;
-            }
-            return null;
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using LegendaryExplorerCore.Misc;
 
 namespace Be.Windows.Forms
 {
@@ -94,7 +95,6 @@ namespace Be.Windows.Forms
         /// Occurs, when InsertBytes or DeleteBytes method is called.
         /// </summary>
         public event EventHandler LengthChanged;
-
 
         /// <summary>
         /// Reads a byte from the byte collection.

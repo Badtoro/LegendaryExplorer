@@ -15,7 +15,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
 
         public uint ID { get; set; }
 
-
         public byte SoundType { get; set; }
 
         public uint State { get; set; }
@@ -60,7 +59,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             return clone;
         }
 
-        public HIRCDisplayObject(int i, WwiseBank.HIRCObject src, MEGame game)
+        public HIRCDisplayObject(int i, WwiseBankParsed.HIRCObject src, MEGame game)
         {
             Data = src.ToBytes(game);
             Index = i;
@@ -68,14 +67,14 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             ID = src.ID;
             switch (src)
             {
-                case WwiseBank.SoundSFXVoice sfxVoice:
+                case WwiseBankParsed.SoundSFXVoice sfxVoice:
                     unk1 = sfxVoice.Unk1;
                     State = (uint)sfxVoice.State;
                     SourceID = sfxVoice.SourceID;
                     AudioID = sfxVoice.AudioID;
                     SoundType = (byte)sfxVoice.SoundType;
                     break;
-                case WwiseBank.Event eventHIRC:
+                case WwiseBankParsed.Event eventHIRC:
                     EventIDs = eventHIRC.EventActions.Clone();
                     break;
             }

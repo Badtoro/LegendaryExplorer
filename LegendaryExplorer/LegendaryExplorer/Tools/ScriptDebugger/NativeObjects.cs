@@ -137,6 +137,9 @@ namespace LegendaryExplorer.Tools.ScriptDebugger
                 case "Package":
                     obj = new NPackage(address, nClass, this);
                     break;
+                case "LinkerLoad":
+                    obj = new NLinker(address, nClass, this);
+                    break;
                 default:
                     obj = new NObject(address, nClass, nClass.PropertySize, this);
                     break;
@@ -145,7 +148,6 @@ namespace LegendaryExplorer.Tools.ScriptDebugger
             ObjectCache[address] = obj;
             return obj;
         }
-
 
         public class NObject
         {
@@ -167,7 +169,7 @@ namespace LegendaryExplorer.Tools.ScriptDebugger
                 Address = address;
             }
 
-            public NLinker Linker => ReadObject<NLinker>(OFFSET_LINKER); //likely null
+            public NObject Linker => ReadObject<NObject>(OFFSET_LINKER); //likely null
             public NObject Outer => ReadObject<NObject>(OFFSET_OUTER);
 
             private NameReference? _name;
@@ -183,9 +185,17 @@ namespace LegendaryExplorer.Tools.ScriptDebugger
                 return $"{outer.GetFullPath()}.{Name.Instanced}";
             }
 
-
             protected T ReadValue<T>(int offset) where T : unmanaged => MemoryMarshal.Read<T>(buff.AsSpan(offset));
-            protected T ReadObject<T>(int offset) where T : NObject => (T)Debugger.ReadObject(ReadValue<IntPtr>(offset));
+            protected T ReadObject<T>(int offset) where T : NObject
+            {
+                NObject readObject = Debugger.ReadObject(ReadValue<IntPtr>(offset));
+                if (readObject is T or null)
+                {
+                    return (T)readObject;
+                }
+                throw new InvalidCastException($"Cannot cast an {readObject.Class?.Name} to an {typeof(T).Name}");
+            }
+
             protected NClass ReadClass(int offset) => Debugger.ReadClass(ReadValue<IntPtr>(offset));
 
             protected string ReadFString(int offset)
@@ -615,7 +625,6 @@ namespace LegendaryExplorer.Tools.ScriptDebugger
                     {
                         return new EnumPropertyValue(Debugger, address, name, Debugger.GetNameReference(enumValues[byteVal]), enumValues.ToList());
                     }
-
                 }
                 return new BytePropertyValue(Debugger, address, name, byteVal);
             }

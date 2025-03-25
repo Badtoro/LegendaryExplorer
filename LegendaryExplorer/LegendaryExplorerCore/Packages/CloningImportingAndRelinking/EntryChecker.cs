@@ -14,7 +14,6 @@ using LegendaryExplorerCore.Unreal.ObjectInfo;
 
 namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 {
-
     public class ReferenceCheckPackage
     {
         // The list of generated warnings, errors, and blocking errors
@@ -76,7 +75,6 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             }
         }
 
-
         public void ClearMessages()
         {
             BlockingErrors.Clear();
@@ -90,7 +88,6 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
     /// </summary>
     public class EntryChecker
     {
-
         /// <summary>
         /// Checks object and name references for invalid values and if values are of the incorrect typing. Returns localized messages, if you do not want localized messages, pass it the NonLocalizedStringConverter delegate from this class.
         /// </summary>
@@ -135,6 +132,11 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                     continue;
                 }
 
+                if (exp.Game == MEGame.UDK && exp.Parent is ImportEntry)
+                {
+                    item.AddBlockingError("UDK does not support exports under imports in non-cooked packages - UDK will crash loading this package file!", exp);
+                }
+
                 var prefix = localizationDelegate(LECLocalizationShim.string_interp_warningGenericExportPrefix, relativePath ?? fName, exp.UIndex, exp.ObjectName.Name, exp.ClassName);
                 try
                 {
@@ -160,16 +162,15 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                         item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningLinkOutsideTables, prefix, exp.idxLink), exp);
                     }
 
-
-
                     if (exp.HasComponentMap)
                     {
-                        foreach (var c in exp.ComponentMap)
+                        foreach ((_, int index) in exp.ComponentMap)
                         {
-                            if (c.Value != 0 && !package.IsEntry(c.Value))
+                            int uindex = index + 1;
+                            if (uindex != 0 && !package.IsEntry(uindex))
                             {
                                 // Can components point to 0? I don't think so
-                                item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningComponentMapItemOutsideTables, prefix, c.Value), exp);
+                                item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningComponentMapItemOutsideTables, prefix, uindex), exp);
                             }
                         }
                     }
@@ -222,11 +223,11 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                             {
                                 item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningBinaryReferenceOutsideTables, prefix, uIndex), exp);
                             }
-                            else if (exp.FileRef.GetEntry(uIndex)?.ClassName == @"Package" && exp.FileRef.GetEntry(uIndex)?.ObjectName.ToString() == @"Trash")
+                            else if (exp.FileRef.GetEntry(uIndex)?.ClassName == @"Package" && exp.FileRef.GetEntry(uIndex).ObjectName.ToString().CaseInsensitiveEquals(@"Trash"))
                             {
                                 item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningBinaryReferenceTrashed, prefix, uIndex), exp);
                             }
-                            else if (exp.FileRef.GetEntry(uIndex)?.ObjectName.ToString() == UnrealPackageFile.TrashPackageName)
+                            else if (exp.FileRef.GetEntry(uIndex) != null && exp.FileRef.GetEntry(uIndex).ObjectName.ToString().CaseInsensitiveEquals(UnrealPackageFile.TrashPackageName))
                             {
                                 item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningBinaryReferenceTrashed, prefix, uIndex), exp);
                             }
@@ -259,6 +260,11 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                     item.AddBlockingError(localizationDelegate(LECLocalizationShim.string_interp_fatalImportCircularReference, relativePath ?? fName, imp.UIndex), imp);
                 }
 
+                if (imp.Game == MEGame.UDK && imp.Parent is ExportEntry)
+                {
+                    item.AddBlockingError("UDK does not support imports under exports in non-cooked packages - UDK will crash loading this package file!", imp);
+                }
+
                 // Values check
                 checkName(item, localizationDelegate, () => imp.PackageFile, "Package file", $"import {imp.UIndex}", relativePath, fName, imp);
                 checkName(item, localizationDelegate, () => imp.ClassName, "Class name", $"import {imp.UIndex}", relativePath, fName, imp);
@@ -275,7 +281,6 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             }
             catch (Exception)
             {
-
                 item.AddBlockingError(localizationDelegate(LECLocalizationShim.string_interp_refCheckInvalidNameValue, relativePath ?? fName, nameBeingChecked, itemBeingChecked), entry);
             }
         }
@@ -286,7 +291,6 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             if (property is UnknownProperty up)
             {
                 item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningFoundBrokenPropertyData, prefix), entry);
-
             }
             else if (property is ObjectProperty op)
             {
@@ -312,22 +316,24 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                     {
                         item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_warningReferenceNotInImportTable, prefix, op.Name.Name, op.Value), entry);
                         validRef = false;
-
                     }
                     else
                     {
                         item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_nested_warningReferenceNoInImportTable, prefix, op.Value), entry);
                         validRef = false;
-
                     }
                 }
-                else if (op.Value != 0 && entry.FileRef.GetEntry(op.Value).ClassName == "Package" &&
-                         (entry.FileRef.GetEntry(op.Value)?.ObjectName.ToString() == @"Trash" ||
-                          entry.FileRef.GetEntry(op.Value)?.ObjectName.ToString() ==
-                          UnrealPackageFile.TrashPackageName))
+                else if (op.Value != 0 && entry.FileRef.GetEntry(op.Value).ClassName == "Package")
                 {
-                    item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_nested_warningTrashedExportReference, prefix, op.Value), entry);
-                    validRef = false;
+                    // Nested if to make this a bit more readable
+                    if (entry.FileRef.GetEntry(op.Value) != null &&
+                        (entry.FileRef.GetEntry(op.Value).ObjectName.ToString().CaseInsensitiveEquals(@"Trash") 
+                         || entry.FileRef.GetEntry(op.Value).ObjectName.ToString().CaseInsensitiveEquals(UnrealPackageFile.TrashPackageName)))
+                    {
+                        item.AddSignificantIssue(localizationDelegate(LECLocalizationShim.string_interp_nested_warningTrashedExportReference,
+                                prefix, op.Value), entry);
+                        validRef = false;
+                    }
                 }
 
                 // Check object is of correct typing?
@@ -347,7 +353,6 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 
                     if (referencedEntry.ClassName == @"Class" && op.Value > 0)
                     {
-
                         // Make sure we have info about this class.
                         var lookupEnt = referencedEntry as ExportEntry;
                         while (lookupEnt != null && lookupEnt.IsClass && !GlobalUnrealObjectInfo.GetClasses(entry.FileRef.Game).ContainsKey(lookupEnt.ObjectName))
@@ -374,7 +379,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                         // Like Engine.CodecBinkMovie
                         if (!referencedEntry.IsAKnownNativeClass())
                         {
-                            if (referencedEntry.ClassName == @"Class")
+                            if (referencedEntry.ClassName == @"Class" && propInfo.Reference != @"Class")
                             {
                                 // Inherits
                                 if (!referencedEntry.InheritsFrom(propInfo.Reference, customClassInfos /*, (entry as ExportEntry)?.SuperClassName) */))
@@ -467,7 +472,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             foreach (ExportEntry exp in Pcc.Exports)
             {
                 string key = exp.InstancedFullPath;
-                if (key.StartsWith(UnrealPackageFile.TrashPackageName))
+                if (key.StartsWith(UnrealPackageFile.TrashPackageName, StringComparison.OrdinalIgnoreCase))
                     continue; //Do not report these as requiring re-indexing.
                 if (!duplicatesPackagePathIndexMapping.TryGetValue(key, out List<int> indexList))
                 {
@@ -487,7 +492,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             foreach (ImportEntry imp in Pcc.Imports)
             {
                 string key = imp.InstancedFullPath;
-                if (key.StartsWith(UnrealPackageFile.TrashPackageName))
+                if (key.StartsWith(UnrealPackageFile.TrashPackageName, StringComparison.OrdinalIgnoreCase))
                     continue; //Do not report these as requiring re-indexing.
                 if (!duplicatesPackagePathIndexMapping.TryGetValue(key, out List<int> indexList))
                 {

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections;
+using LegendaryExplorerCore.Misc;
 
 namespace Be.Windows.Forms
 {
@@ -39,7 +40,6 @@ namespace Be.Windows.Forms
             /// <returns>true, if the is in the collection</returns>
             public bool Contains(long index)
             { return Dictionary.Contains(index); }
-
         }
         #endregion
 

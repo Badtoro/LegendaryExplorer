@@ -101,7 +101,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase
             Lines.AddRange(from.Lines);
             PlotUsages.AddRecords(from.PlotUsages);
         }
-
     }
 
     public interface IAssetRecord
@@ -126,7 +125,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public List<PlotRecord> Transitions { get; set; } = new();
         public PlotUsageDB()
         {
-
         }
 
         public void ClearRecords()
@@ -175,7 +173,7 @@ namespace LegendaryExplorer.Tools.AssetDatabase
 
         public PropertyRecord[] PropertyRecords { get; set; }
 
-        [IgnoredMember] public IEnumerable<IAssetUsage> AssetUsages => (IEnumerable<IAssetUsage>)Usages.AsEnumerable();
+        [IgnoredMember] public IEnumerable<IAssetUsage> AssetUsages => Usages.Cast<IAssetUsage>(); // Boxes ClassUsages to IAssetRecord
         public ClassUsage[] Usages { get; set; }
 
         public ClassRecord(string @class, int definitionFile, int definitionUIndex, string superClass, PropertyRecord[] propertyRecords, ClassUsage[] usages)
@@ -197,10 +195,8 @@ namespace LegendaryExplorer.Tools.AssetDatabase
     }
     public readonly record struct PropertyRecord(string Property, string Type) { public PropertyRecord() : this(default, default) { } }
 
-
     public struct ClassUsage : IAssetUsage
     {
-
         public int FileKey { get; init; }
 
         //There are millions of ClassUsage instances in a typical db, so bitpacking here can result in major memory savings (>100mb on a lightly modded LE3).
@@ -266,7 +262,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase
 
     public class MaterialRecord : IAssetRecord
     {
-
         public string MaterialName { get; set; }
 
         public string ParentPackage { get; set; }
@@ -277,6 +272,8 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public List<MatUsage> Usages { get; set; } = new();
 
         public List<MatSetting> MatSettings { get; set; } = new();
+
+        public string DisplayString => $"{MaterialName} ({ParentPackage})";
 
         public MaterialRecord(string MaterialName, string ParentPackage, bool IsDLCOnly, IEnumerable<MatSetting> MatSettings)
         {
@@ -300,10 +297,8 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public MatSetting() : this(default, default, default) { }
     }
 
-
     public class AnimationRecord : IAssetRecord
     {
-
         public string AnimSequence { get; set; }
 
         public string SeqName { get; set; }
@@ -348,10 +343,8 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public AnimUsage() : this(default, default, default) { }
     }
 
-
     public class MeshRecord : IAssetRecord
     {
-
         public string MeshName { get; set; }
 
         public bool IsSkeleton { get; set; }
@@ -362,6 +355,19 @@ namespace LegendaryExplorer.Tools.AssetDatabase
 
         [IgnoredMember] public IEnumerable<IAssetUsage> AssetUsages => Usages;
         public List<MeshUsage> Usages { get; set; } = new();
+
+        public string DisplayString
+        {
+            get
+            {
+                if (IsSkeleton)
+                {
+                    return $"{MeshName} (Skeletal Mesh, Bone Count: {BoneCount})";
+                }
+
+                return MeshName;
+            }
+        }
 
         public MeshRecord(string MeshName, bool IsSkeleton, bool IsModOnly, int BoneCount)
         {
@@ -380,7 +386,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public MeshUsage() : this(default, default, default) { }
     }
 
-
     public class ParticleSysRecord : IAssetRecord
     {
         public enum VFXClass
@@ -390,6 +395,7 @@ namespace LegendaryExplorer.Tools.AssetDatabase
             BioVFXTemplate
         }
 
+        public string DisplayString => $"{PSName} ({VFXType})";
 
         public string PSName { get; set; }
 
@@ -425,10 +431,8 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public ParticleSysUsage() : this(default, default, default, default) { }
     }
 
-
     public class TextureRecord : IAssetRecord
     {
-
         public string TextureName { get; set; }
 
         public string ParentPackage { get; set; }
@@ -473,10 +477,8 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public TextureUsage() : this(default, default, default, default) { }
     }
 
-
     public class GUIElement : IAssetRecord
     {
-
         public string GUIName { get; set; }
 
         public int DataSize { get; set; }
@@ -503,10 +505,8 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         public GUIUsage() : this(default, default, default) { }
     }
 
-
     public class Conversation
     {
-
         public string ConvName { get; set; }
 
         public bool IsAmbient { get; set; }
@@ -530,7 +530,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase
 
     public class ConvoLine
     {
-
         public int StrRef { get; set; }
 
         public string Speaker { get; set; }
@@ -597,7 +596,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase
             _ => puc.ToString()
         };
 
-
         public static PlotElementType ToPlotElementType(this PlotRecordType prt) => prt switch
         {
             PlotRecordType.Bool => PlotElementType.State,
@@ -660,8 +658,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase
         }
         public PlotUsage()
         {
-
         }
     }
-
 }

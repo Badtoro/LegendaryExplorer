@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using LegendaryExplorer.Misc;
@@ -28,6 +29,9 @@ using Newtonsoft.Json;
 using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Packages;
 using System.Text;
+using LegendaryExplorer.GameInterop;
+using LegendaryExplorer.Tools.AnimationViewer;
+using LegendaryExplorer.Tools.AssetViewer;
 using LegendaryExplorer.Tools.ClassViewer;
 using LegendaryExplorer.Tools.PlotDatabase;
 using LegendaryExplorer.Tools.ScriptDebugger;
@@ -179,30 +183,46 @@ namespace LegendaryExplorer
 #if DEBUG
             set.Add(new Tool
             {
-                name = "Animation Viewer 2",
-                type = typeof(Tools.AnimationViewer.AnimationViewerWindow2),
-                icon = Application.Current.FindResource("iconAnimViewer") as ImageSource,
+                name = "Asset Viewer",
+                type = typeof(AssetViewerWindow),
+                icon = Application.Current.FindResource("iconAssetViewer") as ImageSource,
                 open = () =>
                 {
-                    var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you want to use Animation Viewer 2 with.", "Live Level Editor 2 game selector",
-                        new[] { "LE1", "LE2", /*"LE3"*/ }, "LE2");
+                    var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you want to use Asset Viewer with.", "Asset Viewer game selector",
+                        new[] { "LE1", "LE2", "LE3" }, "LE3", getDefaultValueFunc: GameController.GetRunningMEGameStrDelegate(AssetViewerWindow.SupportedGames));
 
                     if (Enum.TryParse(gameStr, out MEGame game))
                     {
-                        if (Tools.AnimationViewer.AnimationViewerWindow2.Instance(game) is { } instance)
+                        if (AssetViewerWindow.Instance(game) is { } instance)
                         {
                             instance.RestoreAndBringToFront();
                         }
                         else
                         {
-                            (new Tools.AnimationViewer.AnimationViewerWindow2(game)).Show();
+                            (new AssetViewerWindow(game, true)).Show();
                         }
                     }
                 },
                 tags = new List<string> { "utility", "animation", "gesture" },
                 category = "Cinematic Tools",
                 category2 = "Utilities",
-                description = "IN DEVELOPMENT: (LE ONLY) Animation Viewer 2 allows you to preview any animation in the Legendary Edition versions of the games."
+                description = "IN DEVELOPMENT: (LE ONLY) Asset Viewer allows you to preview game assets within the game. Asset types include meshes, animations, and particle systems."
+            });
+
+            set.Add(new Tool
+            {
+                name = "Object Instance Database Viewer",
+                type = typeof(Tools.ObjectInstanceViewer.ObjectInstanceDBViewerWindow),
+                icon = Application.Current.FindResource("iconObjectDBViewer") as ImageSource,
+                open = () =>
+                {
+                    var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you want to use Object Instance Database Viewer with.", "Game selector",
+                        new[] { "LE1", "LE2", "LE3", "ME1", "ME2", "ME3" }, "LE3");
+                    (new Tools.ObjectInstanceViewer.ObjectInstanceDBViewerWindow(Enum.Parse<MEGame>(gameStr))).Show();
+                },
+                tags = new List<string> { "utility", "database" },
+                category = "Utilities",
+                description = "Tool to locate objects in files by name using the Object Instance Databse (ObjectInstanceDB) system."
             });
 #endif
             set.Add(new Tool
@@ -213,7 +233,7 @@ namespace LegendaryExplorer
                 open = () =>
                 {
                     var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you want to use Class Hierarchy Viewer with.", "Class Hierarchy Viewer game selector",
-                        new[] { "LE1", "LE2", "LE3", "ME1", "ME2", "ME3" }, "LE3");
+                        new[] { "LE1", "LE2", "LE3", "ME1", "ME2", "ME3" }, "LE3", getDefaultValueFunc: GameController.GetRunningMEGameStrDelegate());
 
                     if (Enum.TryParse(gameStr, out MEGame game))
                     {
@@ -232,7 +252,7 @@ namespace LegendaryExplorer
                 open = () =>
                 {
                     var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you want to use Live Level Editor with.", "Live Level Editor game selector",
-                                              new[] { "LE3", "LE2", "LE1", "ME3", "ME2" }, "LE3");
+                                              new[] { "LE3", "LE2", "LE1", "ME3", "ME2" }, "LE3", getDefaultValueFunc: GameController.GetRunningMEGameStrDelegate([MEGame.ME2, MEGame.ME3, MEGame.LE1, MEGame.LE2, MEGame.LE3]));
 
                     if (Enum.TryParse(gameStr, out MEGame game))
                     {
@@ -273,7 +293,7 @@ namespace LegendaryExplorer
                 open = () =>
                 {
                     var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you want to use Script Debugger with.", "Script Debugger game selector",
-                        new[] { "LE1", "LE2", "LE3" }, "LE3");
+                        ScriptDebuggerWindow.SupportedGames.Select(x => x.ToString()), "LE3", getDefaultValueFunc: GameController.GetRunningMEGameStrDelegate(ScriptDebuggerWindow.SupportedGames));
 
                     if (Enum.TryParse(gameStr, out MEGame game))
                     {
@@ -733,7 +753,6 @@ namespace LegendaryExplorer
 
         public static void saveFavorites()
         {
-
             if (FavoritesChanged != null)
             {
                 FavoritesChanged.Invoke(null, EventArgs.Empty);

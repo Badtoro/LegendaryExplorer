@@ -11,6 +11,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using System.Windows;
@@ -28,6 +29,8 @@ using LegendaryExplorerCore.Unreal.BinaryConverters;
 using LegendaryExplorerCore.Unreal.Classes;
 using Microsoft.WindowsAPICodePack.Taskbar;
 using LegendaryExplorer.UserControls.ExportLoaderControls;
+using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
+using LegendaryExplorerCore.Unreal.ObjectInfo;
 using LegendaryExplorerCore.UnrealScript;
 
 namespace LegendaryExplorer.Tools.PackageDumper
@@ -67,10 +70,13 @@ namespace LegendaryExplorer.Tools.PackageDumper
         private MEGame _selectedGame = MEGame.ME1;
         public MEGame SelectedGame { get => _selectedGame; set => SetProperty(ref _selectedGame, value); }
 
+        private TieredPackageCache GlobalCache;
+        private TieredPackageCache PostLoadCache;
+
         private void LoadCommands()
         {
             // Player commands
-            DumpSelectedGameCommand = new GenericCommand(() => DumpGame(SelectedGame), () => CanDumpGame(SelectedGame) );
+            DumpSelectedGameCommand = new GenericCommand(() => DumpGame(SelectedGame), () => CanDumpGame(SelectedGame));
             DumpSpecificFilesCommand = new RelayCommand(DumpSpecificFiles, CanDumpSpecificFiles);
             CancelDumpCommand = new RelayCommand(CancelDump, CanCancelDump);
         }
@@ -86,7 +92,6 @@ namespace LegendaryExplorer.Tools.PackageDumper
             dlg.Filters.Add(new CommonFileDialogFilter("All supported files", "*.pcc;*.sfm;*.u;*.upk;*.xxx"));
             dlg.Filters.Add(new CommonFileDialogFilter("Mass Effect 1 package files", "*.sfm;*.u;*.upk;*.xxx"));
             dlg.Filters.Add(new CommonFileDialogFilter("Mass Effect 2/3/LE package files", "*.pcc;*.xxx"));
-
 
             if (dlg.ShowDialog(this) == CommonFileDialogResult.Ok)
             {
@@ -143,7 +148,6 @@ namespace LegendaryExplorer.Tools.PackageDumper
             set => SetProperty(ref _overallProgressMaximum, value);
         }
 
-
         private string _currentOverallOperationText;
         public string CurrentOverallOperationText
         {
@@ -193,6 +197,34 @@ namespace LegendaryExplorer.Tools.PackageDumper
             set => verbose = value;
         }
 
+        private object _syncObj = new object();
+
+        private void EnsureCaches(MEGame game)
+        {
+            lock (_syncObj)
+            {
+                if (GlobalCache == null)
+                {
+                    GlobalCache = TieredPackageCache.GetGlobalPackageCache(game);
+                    PostLoadCache = new TieredPackageCache(GlobalCache);
+                    foreach (var f in EntryImporter.FilesSafeToImportFromPostLoad(game))
+                    {
+                        if (MELoadedFiles.TryGetHighestMountedFile(game, f, out var fPath))
+                        {
+                            // Use forceloadfromdisk so we don't use shared version that will be later released
+                            PostLoadCache.InsertIntoCache(MEPackageHandler.OpenMEPackage(fPath, forceLoadFromDisk: true));
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ReleaseAllCaches()
+        {
+            GlobalCache?.Dispose();
+            PostLoadCache?.Dispose();
+        }
+
         private async void DumpGame(MEGame game)
         {
             CommonOpenFileDialog m = new()
@@ -228,7 +260,6 @@ namespace LegendaryExplorer.Tools.PackageDumper
             //throw new NotImplementedException();
         }
 
-
         /// <summary>
         /// Dumps PCC data from all PCCs in the specified folder, recursively.
         /// </summary>
@@ -243,16 +274,23 @@ namespace LegendaryExplorer.Tools.PackageDumper
             await DumpPackages(files, outputfolder);
         }
 
+        private TieredPackageCache GetCache(MEGame game, bool isPostLoad)
+        {
+            EnsureCaches(game);
+            return isPostLoad ? PostLoadCache : GlobalCache;
+        }
+
         private async Task DumpPackages(List<string> files, string outputfolder = null)
         {
             CurrentOverallOperationText = "Dumping packages...";
             OverallProgressMaximum = files.Count;
             OverallProgressValue = 0;
+
             ProcessingQueue = new ActionBlock<PackageDumperSingleFileTask>(x =>
             {
                 if (x.DumpCanceled) { OverallProgressValue++; return; }
                 Application.Current.Dispatcher.Invoke(() => CurrentDumpingItems.Add(x));
-                x.DumpPackageFile(); // What to do on each item
+                x.DumpPackageFile(GetCache); // What to do on each item
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     OverallProgressValue++; //Concurrency
@@ -341,11 +379,13 @@ namespace LegendaryExplorer.Tools.PackageDumper
                 CurrentOverallOperationText = "Dump completed";
             }
 
+            GlobalCache?.Dispose();
+            PostLoadCache?.Dispose();
+            GlobalCache = PostLoadCache = null;
             ProcessingQueue = null;
             TaskbarHelper.SetProgressState(TaskbarProgressBarState.NoProgress);
             CommandManager.InvalidateRequerySuggested();
         }
-
 
         /// <summary>
         /// Writes a line to the console if verbose mode is turned on
@@ -416,6 +456,7 @@ namespace LegendaryExplorer.Tools.PackageDumper
 
         private void PackageDumper_Closing(object sender, CancelEventArgs e)
         {
+            ReleaseAllCaches();
             DumpCanceled = true;
             AllDumpingItems?.ForEach(x => x.DumpCanceled = true);
             AllDumpingItems = null;
@@ -462,7 +503,6 @@ namespace LegendaryExplorer.Tools.PackageDumper
                 }
                 else
                 {
-
                     string[] acceptedExtensions = new string[] { ".pcc", ".u", ".upk", ".sfm" };
                     foreach (string filename in filenames)
                     {
@@ -485,6 +525,54 @@ namespace LegendaryExplorer.Tools.PackageDumper
                 e.Effects = DragDropEffects.None;
                 e.Handled = true;
             }
+        }
+    }
+
+    class BlankWriter : StreamWriter
+    {
+        public BlankWriter(Stream stream) : base(stream)
+        {
+        }
+
+        public BlankWriter(Stream stream, Encoding encoding) : base(stream, encoding)
+        {
+        }
+
+        public BlankWriter(Stream stream, Encoding encoding, int bufferSize) : base(stream, encoding, bufferSize)
+        {
+        }
+
+        public BlankWriter(Stream stream, Encoding encoding = null, int bufferSize = -1, bool leaveOpen = false) : base(stream, encoding, bufferSize, leaveOpen)
+        {
+        }
+
+        public BlankWriter(string path) : base(path)
+        {
+        }
+
+        public BlankWriter(string path, bool append) : base(path, append)
+        {
+        }
+
+        public BlankWriter(string path, bool append, Encoding encoding) : base(path, append, encoding)
+        {
+        }
+
+        public BlankWriter(string path, bool append, Encoding encoding, int bufferSize) : base(path, append, encoding, bufferSize)
+        {
+        }
+
+        public BlankWriter(string path, FileStreamOptions options) : base(path, options)
+        {
+        }
+
+        public BlankWriter(string path, Encoding encoding, FileStreamOptions options) : base(path, encoding, options)
+        {
+        }
+
+        public override void WriteLine(string str)
+        {
+            // DO NOTHING.
         }
     }
 
@@ -534,16 +622,13 @@ namespace LegendaryExplorer.Tools.PackageDumper
         /// <summary>
         /// Dumps data from a pcc file to a text file
         /// </summary>
-        public void DumpPackageFile()
+        public void DumpPackageFile(Func<MEGame, bool, TieredPackageCache> GetPackageCache)
         {
-            //if (GamePath == null)
-            //{
-            //    Console.Error.WriteLine("Game path not defined. Can't dump file file with undefined game System.IO.Path.");
-            //    return;
-            //}
             //try
             {
                 using IMEPackage pcc = MEPackageHandler.OpenMEPackage(_packageToDump);
+                UnrealScriptOptionsPackage usop = new UnrealScriptOptionsPackage() { Cache = GetPackageCache(pcc.Game, EntryImporter.IsPostLoadFile(pcc.FilePath, pcc.Game)) };
+
                 CurrentFileProgressMaximum = pcc.ExportCount;
                 string outfolder = OutputFolder ?? Directory.GetParent(_packageToDump).ToString();
 
@@ -558,6 +643,8 @@ namespace LegendaryExplorer.Tools.PackageDumper
                 Directory.CreateDirectory(Path.GetDirectoryName(savepath));
 
                 using StreamWriter stringoutput = new(savepath);
+                // For debugging:
+                //using StreamWriter stringoutput = new BlankWriter(new MemoryStream()); // Debug: Don't bother to disk
                 //if (imports)
                 //{
                 //writeVerboseLine("Getting Imports");
@@ -623,12 +710,10 @@ namespace LegendaryExplorer.Tools.PackageDumper
                     if (exp.Archetype != null)
                     {
                         stringoutput.Write($" (Archetype: {exp.Archetype?.InstancedFullPath})");
-
                     }
 
-
                     stringoutput.WriteLine(); // next line please
-                    
+
 
                     if (shouldUseDecompiledText)
                     {
@@ -638,7 +723,7 @@ namespace LegendaryExplorer.Tools.PackageDumper
                             fileLib = new FileLib(pcc);
                             try
                             {
-                                fileLib.Initialize();
+                                fileLib.Initialize(usop);
                             }
                             catch
                             {
@@ -648,7 +733,7 @@ namespace LegendaryExplorer.Tools.PackageDumper
                         }
                         stringoutput.WriteLine($"=============={exp.ClassName}==============");
 
-                        (_, string functionText) = UnrealScriptCompiler.DecompileExport(exp, fileLib);
+                        (_, string functionText) = UnrealScriptCompiler.DecompileExport(exp, fileLib, usop);
 
                         stringoutput.WriteLine(functionText);
                     }
@@ -679,7 +764,6 @@ namespace LegendaryExplorer.Tools.PackageDumper
                 }
                 numDone++;
                 stringoutput.WriteLine($"--End of {datasets}");
-
 
                 // writeVerboseLine("Gathering names");
                 stringoutput.WriteLine("--Start of Names");

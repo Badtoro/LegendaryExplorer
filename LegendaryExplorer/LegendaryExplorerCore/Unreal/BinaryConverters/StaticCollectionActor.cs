@@ -4,7 +4,6 @@ using System.Numerics;
 using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Packages;
-using LegendaryExplorerCore.Unreal.ObjectInfo;
 using UIndex = System.Int32;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters
@@ -17,7 +16,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
 
         public abstract string ComponentPropName { get; }
 
-        protected override void Serialize(SerializingContainer2 sc)
+        protected override void Serialize(SerializingContainer sc)
         {
             var components = Export.GetProperty<ArrayProperty<ObjectProperty>>(ComponentPropName);
             if (components == null || components.Count == 0)
@@ -57,7 +56,6 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             i = 0;
             staticCollectionActor = null;
             return false;
-
         }
 
         public (Vector3 translation, Vector3 scale, Rotator rotation) GetDecomposedTransformationForIndex(int index) => LocalToWorldTransforms[index].UnrealDecompose();
@@ -77,8 +75,8 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         {
             return new()
             {
-                Components = new List<UIndex>(),
-                LocalToWorldTransforms = new List<Matrix4x4>(),
+                Components = [],
+                LocalToWorldTransforms = [],
             };
         }
     }
@@ -90,29 +88,29 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         {
             return new()
             {
-                Components = new List<UIndex>(),
-                LocalToWorldTransforms = new List<Matrix4x4>(),
+                Components = [],
+                LocalToWorldTransforms = [],
             };
         }
     }
 
-    public static partial class SCExt
+    public partial class SerializingContainer
     {
-        public static void Serialize(this SerializingContainer2 sc, ref Matrix4x4 matrix)
+        public void Serialize(ref Matrix4x4 matrix)
         {
-            if (sc.IsLoading)
+            if (IsLoading)
             {
-                matrix = new Matrix4x4(sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat(),
-                    sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat(),
-                    sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat(),
-                    sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat(), sc.ms.ReadFloat());
+                matrix = new Matrix4x4(ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat(),
+                    ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat(),
+                    ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat(),
+                    ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat(), ms.ReadFloat());
             }
             else
             {
-                sc.ms.Writer.WriteFloat(matrix.M11); sc.ms.Writer.WriteFloat(matrix.M12); sc.ms.Writer.WriteFloat(matrix.M13); sc.ms.Writer.WriteFloat(matrix.M14);
-                sc.ms.Writer.WriteFloat(matrix.M21); sc.ms.Writer.WriteFloat(matrix.M22); sc.ms.Writer.WriteFloat(matrix.M23); sc.ms.Writer.WriteFloat(matrix.M24);
-                sc.ms.Writer.WriteFloat(matrix.M31); sc.ms.Writer.WriteFloat(matrix.M32); sc.ms.Writer.WriteFloat(matrix.M33); sc.ms.Writer.WriteFloat(matrix.M34);
-                sc.ms.Writer.WriteFloat(matrix.M41); sc.ms.Writer.WriteFloat(matrix.M42); sc.ms.Writer.WriteFloat(matrix.M43); sc.ms.Writer.WriteFloat(matrix.M44);
+                ms.Writer.WriteFloat(matrix.M11); ms.Writer.WriteFloat(matrix.M12); ms.Writer.WriteFloat(matrix.M13); ms.Writer.WriteFloat(matrix.M14);
+                ms.Writer.WriteFloat(matrix.M21); ms.Writer.WriteFloat(matrix.M22); ms.Writer.WriteFloat(matrix.M23); ms.Writer.WriteFloat(matrix.M24);
+                ms.Writer.WriteFloat(matrix.M31); ms.Writer.WriteFloat(matrix.M32); ms.Writer.WriteFloat(matrix.M33); ms.Writer.WriteFloat(matrix.M34);
+                ms.Writer.WriteFloat(matrix.M41); ms.Writer.WriteFloat(matrix.M42); ms.Writer.WriteFloat(matrix.M43); ms.Writer.WriteFloat(matrix.M44);
             }
         }
     }

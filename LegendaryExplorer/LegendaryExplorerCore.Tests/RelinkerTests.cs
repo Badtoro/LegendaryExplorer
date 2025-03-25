@@ -64,11 +64,11 @@ namespace LegendaryExplorerCore.Tests
             var sfxgame = MEPackageHandler.OpenMEPackage(Path.Combine(packagesPath, "SFXGame.pcc"));
             var expectedResults = new[]
             {
-                new ExpectedPortingResults(true, "Default__BioMusicVolume", "Default__BioMusicVolume", false, true),
-                new ExpectedPortingResults(false, null,"SFXGame.BioMusicVolume" , true),
-                new ExpectedPortingResults(false, null,"BioEngineResources", true),
-                new ExpectedPortingResults(false, null,"BioEngineResources.Default", true),
-                new ExpectedPortingResults(false, null,"BioEngineResources.Default.Default2DA" , true),
+                new ExpectedPortingResults(true, "Default__BioMusicVolume", "Default__BioMusicVolume", false, true), // should port the Defaults as Export, dependencies as imports.
+                new ExpectedPortingResults(false, null,"SFXGame.BioMusicVolume" , true), // Should be an import
+                new ExpectedPortingResults(false, null,"BioEngineResources", true), // Should be an import
+                new ExpectedPortingResults(false, null,"BioEngineResources.Default", true), // Should be an import
+                new ExpectedPortingResults(false, null,"BioEngineResources.Default.Default2DA" , true), // Should be an import
             };
             TestPorting(sfxgame, expectedResults);
 
@@ -93,7 +93,6 @@ namespace LegendaryExplorerCore.Tests
                 new ExpectedPortingResults(false, null,"Engine.Material" , true),
                 new ExpectedPortingResults(false, null,"Engine.Texture2D" , true),
                 new ExpectedPortingResults(false, null,"Engine.TextureCube" , true),
-
             };
             TestPorting(nor, expectedResults);
         }

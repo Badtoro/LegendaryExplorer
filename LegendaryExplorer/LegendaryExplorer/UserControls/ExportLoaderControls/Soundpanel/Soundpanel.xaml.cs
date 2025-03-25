@@ -68,7 +68,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
 
         public ISACTListBankChunk CurrentLoadedISACTEntry { get; private set; }
         public AFCFileEntry CurrentLoadedAFCFileEntry { get; private set; }
-        public WwiseBank CurrentLoadedWwisebank { get; private set; }
+        public WwiseBankParsed CurrentLoadedWwisebank { get; private set; }
 
         /// <summary>
         /// The cached stream source is used to determine if we should unload the current vorbis stream
@@ -151,7 +151,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             }
         }
 
-
         public bool MiniPlayerMode
         {
             get => (bool)GetValue(MiniPlayerModeProperty);
@@ -170,7 +169,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
         {
             if (d is Soundpanel sp)
             {
-
             }
         }
 
@@ -361,7 +359,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
         {
             // byte[] dataBefore = CurrentLoadedWwisebank.Export.Data;
             CurrentLoadedWwisebank.HIRCObjects.Empty(HIRCObjects.Count);
-            CurrentLoadedWwisebank.HIRCObjects.AddRange(HIRCObjects.Select(x => new KeyValuePair<uint, WwiseBank.HIRCObject>(x.ID, CreateHircObjectFromHex(x.Data))));
+            CurrentLoadedWwisebank.HIRCObjects.AddRange(HIRCObjects.Select(x => new KeyValuePair<uint, WwiseBankParsed.HIRCObject>(x.ID, CreateHircObjectFromHex(x.Data))));
 
             // We must restore the original wem datas. In preloading entries, the length on the RIFF is the actual full length. But the data on disk is only like .1s long. 
             // wwise does some trickery to load the rest of the audio later but we don't have that kind of code so we interally adjust it for local playback
@@ -491,7 +489,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
 
                 if (exportEntry.ClassName == "WwiseBank")
                 {
-                    WwiseBank wb = CurrentLoadedWwisebank = exportEntry.GetBinaryData<WwiseBank>();
+                    var wb = CurrentLoadedWwisebank = exportEntry.GetBinaryData<WwiseBankParsed>();
                     ExportInformationList.Add($"#{exportEntry.UIndex} {exportEntry.ClassName} : {exportEntry.ObjectName.Instanced} (Bank ID 0x{wb.ID:X8})");
 
                     HIRCObjects.Clear();
@@ -618,14 +616,15 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                                 return;
                             }
 
-                            var soundTracks = referencedSndeChunk.GetAllSubChunks().OfType<SoundEventSoundTracksFour>().FirstOrDefault();
+                            var soundTracks = referencedSndeChunk.GetAllSubChunks().OfType<SoundEventSoundTracksFour>().FirstOrDefault()?.SoundTracks;
+                            soundTracks ??= referencedSndeChunk.GetAllSubChunks().OfType<SoundEventSoundTracks>().FirstOrDefault()?.SoundTracks; // ISACT generated soundtracks
                             if (soundTracks == null)
                             {
                                 ExportInformationList.Add("Could not find sound track about this sound in the streaming data ICB");
                                 return;
                             }
 
-                            foreach (var soundTrack in soundTracks.SoundTracks)
+                            foreach (var soundTrack in soundTracks)
                             {
                                 var isbIndex = soundTrack.BufferIndex & 0xFFFF;
                                 var sampChunk = ibp.ISBBank.GetAllBankChunks().OfType<ISACTListBankChunk>().FirstOrDefault(x => x.ObjectType == "samp" && x.GetAllSubChunks().Any(a => a is IntBankChunk { ChunkName: "indx" } ac && ac.Value == isbIndex));
@@ -716,7 +715,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                     if (riffTag == "RIFF") endian = Endian.Little;
                     if (riffTag == "RIFX") endian = Endian.Big;
 
-
                     ExportInformationList.Add("0x00 RIFF tag: " + riffTag);
                     ExportInformationList.Add("0x04 File size: " + EndianReader.ToInt32(headerbytes, 4, endian) + " bytes");
                     ExportInformationList.Add("0x08 WAVE tag: " + ascii.GetString(headerbytes, 8, 4));
@@ -751,9 +749,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             }
             catch
             {
-
             }
-
         }
 
         internal void UnloadAFCEntry()
@@ -776,7 +772,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             }
             catch
             {
-
             }
         }
 
@@ -830,7 +825,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                         }
                         catch
                         {
-
                         }
                         return AudioStreamHelper.GetWaveStreamFromISBEntry(bankEntry, isbName: isbName, game: localCurrentExport.Game);
                     }
@@ -1010,7 +1004,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             }
         }
 
-
         public bool CanStartPlayback()
         {
             if (audioStream != null) return true; //looping
@@ -1059,7 +1052,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             UpdateSeekBarPos(null, null);
             if (_audioPlayer != null)
             {
-
                 _audioPlayer.PlaybackStopType = SoundpanelAudioPlayer.PlaybackStopTypes.PlaybackStoppedByUser;
                 _audioPlayer.Stop();
             }
@@ -1082,7 +1074,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 seekbarUpdateTimer.Stop();
                 if (_audioPlayer != null)
                 {
-
                     _audioPlayer.PlaybackStopType = SoundpanelAudioPlayer.PlaybackStopTypes.PlaybackSwitchedToNewFile;
                     _audioPlayer.Stop();
                 }
@@ -1309,7 +1300,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                     MessageBox.Show("Done.");
                 }
             }
-
         }
 
         private bool CanExportAudio(object p)
@@ -1614,7 +1604,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             {
                 var conversion = await WwiseCliHandler.RunWwiseConversion(Pcc.Game, sourceFile, conversionSettings);
                 ReplaceAudioFromWwiseEncodedFile(conversion, forcedExport, conversionSettings?.UpdateReferencedEvents ?? false, conversionSettings?.DestinationAFCFile);
-
             }).ContinueWithOnUIThread((a) =>
             {
                 UpdateAudioStream();
@@ -1757,9 +1746,9 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             }
         }
 
-        private WwiseBank.HIRCObject CreateHircObjectFromHex(byte[] bytes)
+        private WwiseBankParsed.HIRCObject CreateHircObjectFromHex(byte[] bytes)
         {
-            return WwiseBank.HIRCObject.Create(new SerializingContainer2(new MemoryStream(bytes), Pcc, true));
+            return WwiseBankParsed.HIRCObject.Create(new SerializingContainer(new MemoryStream(bytes), Pcc, true));
         }
 
         private bool CanSearchHIRCHex()
@@ -2046,7 +2035,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
         {
             if (HIRC_ListBox.SelectedItem is HIRCDisplayObject h)
             {
-                WwiseBank.HIRCObject clone = CreateHircObjectFromHex(h.Data).Clone();
+                WwiseBankParsed.HIRCObject clone = CreateHircObjectFromHex(h.Data).Clone();
                 HIRCObjects.Add(new HIRCDisplayObject(HIRCObjects.Count, clone, Pcc.Game)
                 {
                     DataChanged = true
@@ -2186,7 +2175,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             waveStream.Position = 0;
             var audioFileReader = new WaveFileReader(waveStream);
 
-
             // 1. Configure Providers
             MaxPeakProvider maxPeakProvider = new MaxPeakProvider();
             RmsPeakProvider rmsPeakProvider = new RmsPeakProvider(200); // e.g. 200
@@ -2221,8 +2209,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             PlayheadTime = position;
         }
     }
-
-
 
     public class ImportExportSoundEnabledConverter : IValueConverter
     {

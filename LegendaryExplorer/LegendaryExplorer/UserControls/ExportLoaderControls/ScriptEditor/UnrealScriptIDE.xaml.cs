@@ -65,6 +65,9 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
 
         public ICommand FindUsagesInFileCommand { get; set; }
         public ICommand GoToDefinitionCommand { get; set; }
+        public ICommand ToggleCommentCommand { get; set; }
+        public ICommand IncreaseFontSizeCommand { get; set; }
+        public ICommand DecreaseFontSizeCommand { get; set; }
 
         public UnrealScriptIDE() : base("UnrealScript IDE")
         {
@@ -82,6 +85,10 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
 
             FindUsagesInFileCommand = new GenericCommand(FindUsagesInFile, CanFindReferences);
             GoToDefinitionCommand = new GenericCommand(() => VisualLineDefinitionLinkText.GoToDefinition(contextMenuDefinitionNode, ScrollTo), () => contextMenuDefinitionNode is not null && CurrentFileLib.IsInitialized);
+            ToggleCommentCommand = new GenericCommand(ToggleComment, CanToggleComment);
+
+            IncreaseFontSizeCommand = new GenericCommand(() => textEditor.UpdateFontSize(true));
+            DecreaseFontSizeCommand = new GenericCommand(() => textEditor.UpdateFontSize(false));
         }
 
         public override bool CanParse(ExportEntry exportEntry) =>
@@ -102,6 +109,8 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
             {
                 UnloadExport();
             }
+
+            UnrealScriptOptionsPackage usop = new UnrealScriptOptionsPackage();
             CurrentLoadedExport = export;
             if (Pcc != CurrentFileLib?.Pcc)
             {
@@ -113,7 +122,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 CurrentFileLib.InitializationStatusChange += CurrentFileLibOnInitialized;
                 if (IsVisible)
                 {
-                    CurrentFileLib?.InitializeAsync();
+                    CurrentFileLib?.InitializeAsync(usop);
                 }
             }
             else if (CurrentFileLib?.IsInitialized == true)
@@ -127,7 +136,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 BusyText = "Recompiling local classes";
                 if (IsVisible)
                 {
-                    CurrentFileLib?.InitializeAsync();
+                    CurrentFileLib?.InitializeAsync(usop);
                 }
             }
             if (!IsBusy)
@@ -148,13 +157,19 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
         {
             if (CurrentLoadedExport != null)
             {
-                var elhw = new ExportLoaderHostedWindow(new UnrealScriptIDE(), CurrentLoadedExport)
+                var elhw = new ExportLoaderHostedWindow(new UnrealScriptIDE() { PreloadedText = ScriptText }, CurrentLoadedExport)
                 {
                     Title = $"Script Viewer - {CurrentLoadedExport.UIndex} {CurrentLoadedExport.InstancedFullPath} - {CurrentLoadedExport.FileRef.FilePath}"
                 };
+                // Todo: Transfer current content to the popped out window
                 elhw.Show();
             }
         }
+
+        /// <summary>
+        /// Text to set once everything has loaded, used during popout
+        /// </summary>
+        public string PreloadedText { get; set; }
 
         public override void Dispose()
         {
@@ -178,11 +193,10 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
             textEditor.TextArea.TextEntering -= TextAreaOnTextEntering;
         }
 
-
         private void ExportLoaderControl_Loaded(object sender, RoutedEventArgs e)
         {
             var window = Window.GetWindow(this);
-            if (window is { })
+            if (window is not null)
             {
                 window.Closed += (_, _) => UnloadFileLib();
             }
@@ -295,7 +309,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                                             "Functionality will be limited to script decompilation.\n\n\n" +
                                             "Do you want to see the compilation error log?", "Script Error", MessageBoxButton.YesNo))
                         {
-                            Dispatcher.Invoke(() => new ListDialog(CurrentFileLib.InitializationLog.AllErrors.Select(msg => msg.ToString()), 
+                            Dispatcher.Invoke(() => new ListDialog(CurrentFileLib.InitializationLog.AllErrors.Select(msg => msg.ToString()),
                                                                    "Initialization Log", "", Window.GetWindow(this)).Show());
                         }
                     }
@@ -316,7 +330,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 FullyInitialized = false;
                 if (IsVisible)
                 {
-                    CurrentFileLib?.InitializeAsync();
+                    CurrentFileLib?.InitializeAsync(new UnrealScriptOptionsPackage());
                 }
             }
         }
@@ -330,7 +344,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                     progressBarTimer.Start();
                 }
 
-                CurrentFileLib?.InitializeAsync();
+                CurrentFileLib?.InitializeAsync(new UnrealScriptOptionsPackage());
             }
             else
             {
@@ -342,7 +356,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
 
         private void outputListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (e.AddedItems?.Count == 1 && e.AddedItems[0] is PositionedMessage msg)
+            if (e.AddedItems is [PositionedMessage msg])
             {
                 ScrollTo(msg.Start, msg.End - msg.Start);
             }
@@ -377,22 +391,23 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                     return;
                 }
                 MessageLog log;
+                UnrealScriptOptionsPackage usop = new UnrealScriptOptionsPackage();
                 switch (CurrentLoadedExport.ClassName)
                 {
                     case "Class":
-                        (_, log) = UnrealScriptCompiler.CompileClass(Pcc, scriptText, CurrentFileLib, CurrentLoadedExport, CurrentLoadedExport.Parent);
+                        (_, log) = UnrealScriptCompiler.CompileClass(Pcc, scriptText, CurrentFileLib, usop, CurrentLoadedExport, CurrentLoadedExport.Parent);
                         break;
                     case "Function":
-                        (_, log) = UnrealScriptCompiler.CompileFunction(CurrentLoadedExport, scriptText, CurrentFileLib);
+                        (_, log) = UnrealScriptCompiler.CompileFunction(CurrentLoadedExport, scriptText, CurrentFileLib, usop);
                         break;
                     case "State":
-                        (_, log) = UnrealScriptCompiler.CompileState(CurrentLoadedExport, scriptText, CurrentFileLib);
+                        (_, log) = UnrealScriptCompiler.CompileState(CurrentLoadedExport, scriptText, CurrentFileLib, usop);
                         break;
                     case "ScriptStruct":
-                        (_, log) = UnrealScriptCompiler.CompileStruct(CurrentLoadedExport, scriptText, CurrentFileLib);
+                        (_, log) = UnrealScriptCompiler.CompileStruct(CurrentLoadedExport, scriptText, CurrentFileLib, usop);
                         break;
                     case "Enum":
-                        (_, log) = UnrealScriptCompiler.CompileEnum(CurrentLoadedExport, scriptText, CurrentFileLib);
+                        (_, log) = UnrealScriptCompiler.CompileEnum(CurrentLoadedExport, scriptText, CurrentFileLib, usop);
                         break;
                     case "Const":
                         OutputListBox.ItemsSource = new[] { "Cannot compile const declarations" };
@@ -416,7 +431,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                         OutputListBox.ItemsSource = new[] { "Cannot individually compile property declarations. You can edit them as part of the class." };
                         return;
                     default:
-                        (_, log) = UnrealScriptCompiler.CompileDefaultProperties(CurrentLoadedExport, scriptText, CurrentFileLib);
+                        (_, log) = UnrealScriptCompiler.CompileDefaultProperties(CurrentLoadedExport, scriptText, CurrentFileLib, usop);
                         break;
                 }
                 OutputListBox.ItemsSource = log?.Content;
@@ -437,7 +452,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
             {
                 try
                 {
-                    ASTNode ast = UnrealScriptCompiler.ExportToAstNode(CurrentLoadedExport, CurrentFileLib, null);
+                    ASTNode ast = UnrealScriptCompiler.ExportToAstNode(CurrentLoadedExport, CurrentFileLib, new UnrealScriptOptionsPackage());
                     if (ast is null)
                     {
                         ScriptText = "Could not decompile!";
@@ -448,8 +463,9 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                     {
                         var codeBuilder = new CodeBuilderVisitor<PlainTextCodeFormatter>();
                         ast.AcceptVisitor(codeBuilder);
-                        string source = codeBuilder.GetOutput();
+                        string source = PreloadedText ?? codeBuilder.GetOutput();
                         ScriptText = source;
+                        PreloadedText = null; // Do not use after first decompile
                         Parse(source);
                     }
                     else
@@ -461,11 +477,10 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                         textEditor.SyntaxHighlighting = syntaxInfo;
                     }
 
-
                 }
                 catch (Exception e) //when (!App.IsDebug)
                 {
-                    ScriptText = $"/*Error occured while decompiling {CurrentLoadedExport?.InstancedFullPath}:\n\n{e.FlattenException()}*/";
+                    ScriptText = $"/*Error occurred while decompiling {CurrentLoadedExport?.InstancedFullPath}:\n\n{e.FlattenException()}*/";
                 }
             });
         }
@@ -487,36 +502,37 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
 
                 if (AST != null && !log.HasErrors && FullyInitialized)
                 {
+                    UnrealScriptOptionsPackage usop = new UnrealScriptOptionsPackage();
                     log.Tokens = tokens;
                     switch (AST)
                     {
                         case Class cls:
-                            AST = UnrealScriptCompiler.CompileNewClassAST(Pcc, cls, log, CurrentFileLib, out bool vfTableChanged);
+                            AST = UnrealScriptCompiler.CompileNewClassAST(Pcc, cls, log, CurrentFileLib, out bool vfTableChanged, usop);
                             if (vfTableChanged)
                             {
                                 log.LogWarning("Compiling will cause Virtual Function Table to change! All classes that depend on this one will need recompilation to work properly!");
                             }
                             break;
                         case Function func when CurrentLoadedExport.Parent is ExportEntry funcParent:
-                            AST = UnrealScriptCompiler.CompileNewFunctionBodyAST(funcParent, func, log, CurrentFileLib);
+                            AST = UnrealScriptCompiler.CompileNewFunctionBodyAST(funcParent, func, log, CurrentFileLib, usop);
                             break;
                         case State state when CurrentLoadedExport.Parent is ExportEntry stateParent:
-                            AST = UnrealScriptCompiler.CompileNewStateBodyAST(stateParent, state, log, CurrentFileLib);
+                            AST = UnrealScriptCompiler.CompileNewStateBodyAST(stateParent, state, log, CurrentFileLib, usop);
                             break;
                         case Struct strct when CurrentLoadedExport.Parent is ExportEntry structParent:
-                            AST = UnrealScriptCompiler.CompileNewStructAST(structParent, strct, log, CurrentFileLib);
+                            AST = UnrealScriptCompiler.CompileNewStructAST(structParent, strct, log, CurrentFileLib, usop);
                             break;
                         case Enumeration enumeration when CurrentLoadedExport.Parent is ExportEntry enumParent:
-                            AST = UnrealScriptCompiler.CompileNewEnumAST(enumParent, enumeration, log, CurrentFileLib);
+                            AST = UnrealScriptCompiler.CompileNewEnumAST(enumParent, enumeration, log, CurrentFileLib, usop);
                             break;
                         case VariableDeclaration varDecl when CurrentLoadedExport.Parent is ExportEntry varParent:
-                            AST = UnrealScriptCompiler.CompileNewVarDeclAST(varParent, varDecl, log, CurrentFileLib);
+                            AST = UnrealScriptCompiler.CompileNewVarDeclAST(varParent, varDecl, log, CurrentFileLib, usop);
                             break;
                         case Const cnst:
                             //no additional processing needed for consts
                             break;
                         case DefaultPropertiesBlock propertiesBlock:
-                            AST = UnrealScriptCompiler.CompileDefaultPropertiesAST(propertiesBlock, log, CurrentFileLib, CurrentLoadedExport);
+                            AST = UnrealScriptCompiler.CompileDefaultPropertiesAST(propertiesBlock, log, CurrentFileLib, CurrentLoadedExport, usop);
                             break;
                         default:
                             return;
@@ -567,7 +583,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 int nextLine = lineLookup[i + 1];
 
                 lineToIndex.Add(j);
-                for (;j < tokensSpan.Length && tokensSpan[j].StartPos < nextLine; ++j)
+                for (; j < tokensSpan.Length && tokensSpan[j].StartPos < nextLine; ++j)
                 {
                     ScriptToken token = tokensSpan[j];
                     syntaxSpans.Add(new SyntaxSpan(token.SyntaxType, token.EndPos - token.StartPos, token.StartPos));
@@ -608,18 +624,17 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
             switch (currentToken.Type)
             {
                 case TokenType.Dot when currentTokenIdx > 0:
-                {
-                    DisplayCompletions(tokensSpan, currentTokenIdx);
-                    break;
-                }
-                //case TokenType.Word when currentToken.Value.Length == 1 && completionWindow is null:
-                //{
-                    
-                //    break;
-                //}
+                    {
+                        DisplayCompletions(tokensSpan, currentTokenIdx);
+                        break;
+                    }
+                    //case TokenType.Word when currentToken.Value.Length == 1 && completionWindow is null:
+                    //{
+
+                    //    break;
+                    //}
             }
 
-            
         }
 
         private void DisplayCompletions(ReadOnlySpan<ScriptToken> tokens, int currentTokenIdx)
@@ -636,44 +651,44 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
             switch (definitionOfPrevSymbol)
             {
                 case ObjectType objType:
-                {
-                    if (prevToken.Type is TokenType.NameLiteral)
                     {
-                        //this is a class literal
-                        completionData.Add(new KeywordCompletion("static"));
-                        completionData.Add(new KeywordCompletion("const"));
-                        completionData.Add(new KeywordCompletion("default"));
+                        if (prevToken.Type is TokenType.NameLiteral)
+                        {
+                            //this is a class literal
+                            completionData.Add(new KeywordCompletion("static"));
+                            completionData.Add(new KeywordCompletion("const"));
+                            completionData.Add(new KeywordCompletion("default"));
+                            break;
+                        }
+                        bool varsAccesible = !prevToken.Value.CaseInsensitiveEquals(Keywords.SUPER) && !prevToken.Value.CaseInsensitiveEquals(Keywords.GLOBAL);
+                        bool functionsAccesible = !prevToken.Value.CaseInsensitiveEquals(Keywords.DEFAULT);
+                        do
+                        {
+                            if (varsAccesible)
+                            {
+                                completionData.AddRange(VariableCompletion.GenerateCompletions(objType.VariableDeclarations));
+                            }
+                            if (objType is Class classType && functionsAccesible)
+                            {
+                                bool allowIterators = false;
+                                for (int i = currentTokenIdx - 1; i >= 0; i--)
+                                {
+                                    if (tokens[i].Type is TokenType.SemiColon or TokenType.LeftBracket or TokenType.RightBracket)
+                                    {
+                                        break;
+                                    }
+                                    if (tokens[i].Value.CaseInsensitiveEquals("foreach"))
+                                    {
+                                        allowIterators = true;
+                                        break;
+                                    }
+                                }
+                                completionData.AddRange(FunctionCompletion.GenerateCompletions(classType.Functions, currentClass, iterators: allowIterators));
+                            }
+                            objType = objType.Parent as ObjectType;
+                        } while (objType is not null);
                         break;
                     }
-                    bool varsAccesible = !prevToken.Value.CaseInsensitiveEquals(Keywords.SUPER) && !prevToken.Value.CaseInsensitiveEquals(Keywords.GLOBAL);
-                    bool functionsAccesible = !prevToken.Value.CaseInsensitiveEquals(Keywords.DEFAULT);
-                    do
-                    {
-                        if (varsAccesible)
-                        {
-                            completionData.AddRange(VariableCompletion.GenerateCompletions(objType.VariableDeclarations));
-                        }
-                        if (objType is Class classType && functionsAccesible)
-                        {
-                            bool allowIterators = false;
-                            for (int i = currentTokenIdx - 1; i >= 0; i--)
-                            {
-                                if (tokens[i].Type is TokenType.SemiColon or TokenType.LeftBracket or TokenType.RightBracket)
-                                {
-                                    break;
-                                }
-                                if (tokens[i].Value.CaseInsensitiveEquals("foreach"))
-                                {
-                                    allowIterators = true;
-                                    break;
-                                }
-                            }
-                            completionData.AddRange(FunctionCompletion.GenerateCompletions(classType.Functions, currentClass, iterators: allowIterators));
-                        }
-                        objType = objType.Parent as ObjectType;
-                    } while (objType is not null);
-                    break;
-                }
                 case Enumeration enumType:
                     completionData.AddRange(enumType.Values.Select(v => new CompletionData(v.Name, $"{v.IntVal}")));
                     break;
@@ -681,39 +696,39 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                     completionData.AddRange(ArrayFunctionCompletion.GenerateCompletions(Pcc.Game, dynArrType));
                     break;
                 case null:
-                {
-                    if (prevToken.Value.CaseInsensitiveEquals(Keywords.CONST))
                     {
-                        if (currentTokenIdx > 3)
+                        if (prevToken.Value.CaseInsensitiveEquals(Keywords.CONST))
                         {
-                            ScriptToken classNameToken = tokens[currentTokenIdx - 3];
-                            if (classNameToken.Type is TokenType.NameLiteral && GetDefinitionFromToken(classNameToken) is Class cls)
+                            if (currentTokenIdx > 3)
                             {
-                                do
+                                ScriptToken classNameToken = tokens[currentTokenIdx - 3];
+                                if (classNameToken.Type is TokenType.NameLiteral && GetDefinitionFromToken(classNameToken) is Class cls)
                                 {
-                                    completionData.AddRange(cls.TypeDeclarations.OfType<Const>().Select(c => new CompletionData(c.Name, $"{c.Literal?.ResolveType().DisplayName()} {c.Value}")));
-                                    cls = cls.Parent as Class;
-                                } while (cls is not null);
+                                    do
+                                    {
+                                        completionData.AddRange(cls.TypeDeclarations.OfType<Const>().Select(c => new CompletionData(c.Name, $"{c.Literal?.ResolveType().DisplayName()} {c.Value}")));
+                                        cls = cls.Parent as Class;
+                                    } while (cls is not null);
+                                }
                             }
                         }
-                    }
-                    else if (prevToken.Value.CaseInsensitiveEquals(Keywords.STATIC))
-                    {
-                        if (currentTokenIdx > 3)
+                        else if (prevToken.Value.CaseInsensitiveEquals(Keywords.STATIC))
                         {
-                            ScriptToken classNameToken = tokens[currentTokenIdx - 3];
-                            if (classNameToken.Type is TokenType.NameLiteral && GetDefinitionFromToken(classNameToken) is Class cls)
+                            if (currentTokenIdx > 3)
                             {
-                                do
+                                ScriptToken classNameToken = tokens[currentTokenIdx - 3];
+                                if (classNameToken.Type is TokenType.NameLiteral && GetDefinitionFromToken(classNameToken) is Class cls)
                                 {
-                                    completionData.AddRange(FunctionCompletion.GenerateCompletions(cls.Functions, currentClass, staticsOnly: true));
-                                    cls = cls.Parent as Class;
-                                } while (cls is not null);
+                                    do
+                                    {
+                                        completionData.AddRange(FunctionCompletion.GenerateCompletions(cls.Functions, currentClass, staticsOnly: true));
+                                        cls = cls.Parent as Class;
+                                    } while (cls is not null);
+                                }
                             }
                         }
+                        break;
                     }
-                    break;
-                }
             }
             if (completionData.Count > 0)
             {
@@ -748,13 +763,14 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 {
                     if (FullyInitialized)
                     {
+                        UnrealScriptOptionsPackage usop = new UnrealScriptOptionsPackage();
                         if (ast is DefaultPropertiesBlock propBlock)
                         {
-                            ast = UnrealScriptCompiler.CompileDefaultPropertiesAST(propBlock, log, CurrentFileLib, CurrentLoadedExport);
+                            ast = UnrealScriptCompiler.CompileDefaultPropertiesAST(propBlock, log, CurrentFileLib, CurrentLoadedExport, usop);
                         }
                         else if (ast is Class cls)
                         {
-                            ast = UnrealScriptCompiler.CompileNewClassAST(Pcc, cls, log, CurrentFileLib, out bool vfTableChanged);
+                            ast = UnrealScriptCompiler.CompileNewClassAST(Pcc, cls, log, CurrentFileLib, out bool vfTableChanged, usop);
                             if (vfTableChanged)
                             {
                                 log.LogWarning("Virtual function table changed!");
@@ -764,11 +780,11 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                         {
                             ast = ast switch
                             {
-                                Function func => UnrealScriptCompiler.CompileNewFunctionBodyAST(parentExport, func, log, CurrentFileLib),
-                                State state => UnrealScriptCompiler.CompileNewStateBodyAST(parentExport, state, log, CurrentFileLib),
-                                Struct strct => UnrealScriptCompiler.CompileNewStructAST(parentExport, strct, log, CurrentFileLib),
-                                Enumeration enumeration => UnrealScriptCompiler.CompileNewEnumAST(parentExport, enumeration, log, CurrentFileLib),
-                                VariableDeclaration varDecl => UnrealScriptCompiler.CompileNewVarDeclAST(parentExport, varDecl, log, CurrentFileLib),
+                                Function func => UnrealScriptCompiler.CompileNewFunctionBodyAST(parentExport, func, log, CurrentFileLib, usop),
+                                State state => UnrealScriptCompiler.CompileNewStateBodyAST(parentExport, state, log, CurrentFileLib, usop),
+                                Struct strct => UnrealScriptCompiler.CompileNewStructAST(parentExport, strct, log, CurrentFileLib, usop),
+                                Enumeration enumeration => UnrealScriptCompiler.CompileNewEnumAST(parentExport, enumeration, log, CurrentFileLib, usop),
+                                VariableDeclaration varDecl => UnrealScriptCompiler.CompileNewVarDeclAST(parentExport, varDecl, log, CurrentFileLib, usop),
                                 _ => ast
                             };
                         }
@@ -783,8 +799,6 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 OutputListBox.ItemsSource = log.Content;
             }
         }
-
-
 
         #region AvalonEditor
 
@@ -827,7 +841,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
         }
         private void TextEditor_OnContextMenuClosing(object sender, ContextMenuEventArgs e) => contextMenuDefinitionNode = null;
 
-        private bool CanFindReferences() => contextMenuDefinitionNode is Function or VariableDeclaration {Outer: ObjectType} or VariableType && CurrentFileLib.IsInitialized;
+        private bool CanFindReferences() => contextMenuDefinitionNode is Function or VariableDeclaration { Outer: ObjectType } or VariableType && CurrentFileLib.IsInitialized;
 
         private void FindUsagesInFile()
         {
@@ -858,14 +872,15 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
             {
                 try
                 {
+                    UnrealScriptOptionsPackage usop = new UnrealScriptOptionsPackage();
                     switch (definitonNode)
                     {
                         case Function func:
-                            return UnrealScriptLookup.FindUsagesInFile(func, CurrentFileLib);
+                            return UnrealScriptLookup.FindUsagesInFile(func, CurrentFileLib, usop);
                         case VariableDeclaration varDecl:
-                            return UnrealScriptLookup.FindUsagesInFile(varDecl, CurrentFileLib);
+                            return UnrealScriptLookup.FindUsagesInFile(varDecl, CurrentFileLib, usop);
                         case VariableType varType:
-                            return UnrealScriptLookup.FindUsagesInFile(varType, CurrentFileLib);
+                            return UnrealScriptLookup.FindUsagesInFile(varType, CurrentFileLib, usop);
                         case EnumValue enumValue:
                             break;
                     }
@@ -873,7 +888,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 }
                 catch (Exception e)
                 {
-                    return new List<EntryStringPair> { new EntryStringPair($"Error occured: {e.FlattenException()}") };
+                    return [new EntryStringPair($"Error occured: {e.FlattenException()}")];
                 }
             }).ContinueWithOnUIThread(prevTask =>
             {
@@ -901,6 +916,87 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                     }
                 }.Show();
             });
+        }
+
+        private bool CanToggleComment() => Document is not null;
+
+        private void ToggleComment()
+        {
+            TextArea textArea = textEditor.TextArea;
+            Selection selection = textArea.Selection;
+            if (!selection.IsEmpty)
+            {
+                int startLineNum = selection.StartPosition.Line;
+                int endLineNum = selection.EndPosition.Line;
+                //if the selection was made by dragging up, these must be swapped
+                if (startLineNum > endLineNum)
+                {
+                    (startLineNum, endLineNum) = (endLineNum, startLineNum);
+                }
+                DocumentLine startLine = Document.GetLineByNumber(startLineNum);
+                DocumentLine endLine = Document.GetLineByNumber(endLineNum);
+                textArea.Selection = selection = Selection.Create(textArea, startLine.Offset, endLine.EndOffset);
+                string text = selection.GetText();
+                string[] lines = text.Split('\n');
+                int commentCollumn = -1;
+                bool hasNonCommentedLines = false;
+                foreach (string line in lines)
+                {
+                    int whitespaceCount = line.CountLeadingWhitespace();
+                    if (whitespaceCount < line.Length)
+                    {
+                        //cast to uint so that -1 is "greater" than all positive numbers
+                        commentCollumn = (int)Math.Min((uint)whitespaceCount, (uint)commentCollumn);
+                        if (line[whitespaceCount] != '/' || line.Length > whitespaceCount + 1 && line[whitespaceCount + 1] != '/')
+                        {
+                            hasNonCommentedLines = true;
+                        }
+                    }
+                }
+                if (commentCollumn is -1)
+                {
+                    //oops, all whitespace!
+                    return;
+                }
+                if (hasNonCommentedLines)
+                {
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        string lineText = lines[i];
+                        if (lineText.Length > commentCollumn && !string.IsNullOrWhiteSpace(lineText))
+                        {
+                            lines[i] = $"{lineText.AsSpan(0, commentCollumn)}//{lineText.AsSpan(commentCollumn)}";
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        string lineText = lines[i];
+                        if (lineText.IndexOf("//", StringComparison.Ordinal) is var commentStart and > 0)
+                        {
+                            lines[i] = $"{lineText.AsSpan(0, commentStart)}{lineText.AsSpan(commentStart + 2)}";
+                        }
+                    }
+                }
+                textArea.PerformTextInput(string.Join('\n', lines));
+            }
+            else
+            {
+                DocumentLine line = Document.GetLineByNumber(textArea.Caret.Line);
+                string lineText = Document.GetText(line);
+                ReadOnlySpan<char> indentation = lineText.AsSpan(0, lineText.CountLeadingWhitespace());
+                textArea.Selection = Selection.Create(textArea, line.Offset, line.EndOffset);
+                if (lineText.Length >= indentation.Length + 2 && lineText.AsSpan(indentation.Length, 2) is "//")
+                {
+                    textArea.PerformTextInput($"{indentation}{lineText.AsSpan(indentation.Length + 2)}");
+                }
+                else
+                {
+                    textArea.PerformTextInput($"{indentation}//{lineText.AsSpan(indentation.Length)}");
+                }
+            }
         }
 
         private readonly ToolTip _hoverToolTip = new();
@@ -953,12 +1049,11 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
 
             void SetStringTooltip(string text)
             {
-                SetInlinesTooltip(new Inline[] { new Run(text) { Foreground = SyntaxInfo.ColorBrushes[EF.None] } });
+                SetInlinesTooltip([new Run(text) { Foreground = SyntaxInfo.ColorBrushes[EF.None] }]);
             }
 
             void SetTooltip(TextBlock content)
             {
-
                 content.Background = ToolTipBackgroundBrush;
                 _hoverToolTip.Content = content;
                 _hoverToolTip.Background = ToolTipBackgroundBrush;
@@ -981,7 +1076,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
             TokenStream tokens = _definitionLinkGenerator.Tokens;
             int currentTokenIdx = tokens.GetIndexOfTokenAtOffset(caretOffset);
             ScriptToken currentToken = currentTokenIdx >= 0 ? tokens.TokensSpan[currentTokenIdx] : null;
-            
+
             switch (e.Text)
             {
                 case "\"":
@@ -1045,7 +1140,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                 case "\n":
                     if (currentToken?.Type is TokenType.RightBracket)
                     {
-                        if (currentTokenIdx > 0 && tokens.TokensSpan[currentTokenIdx - 1] is {Type: TokenType.LeftBracket} prevToken)
+                        if (currentTokenIdx > 0 && tokens.TokensSpan[currentTokenIdx - 1] is { Type: TokenType.LeftBracket } prevToken)
                         {
                             string inBetweenText = Document.GetText(prevToken.EndPos, currentToken.StartPos - prevToken.EndPos);
                             if (!inBetweenText.Contains('\n'))
@@ -1061,6 +1156,11 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls.ScriptEditor
                     }
                     break;
             }
+        }
+
+        private void ThemePicker_OnClick(object sender, RoutedEventArgs e)
+        {
+            new IdeThemePicker(Window.GetWindow(this)).Show();
         }
     }
 }

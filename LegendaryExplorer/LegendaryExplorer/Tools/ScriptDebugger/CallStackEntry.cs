@@ -46,9 +46,9 @@ namespace LegendaryExplorer.Tools.ScriptDebugger
             }
             DisplayText += FunctionFullPath;
             
-            if (debugger.ReadObject(frame.Node).Linker is NLinker linker)
+            if (debugger.ReadObject(frame.Node).Linker is NLinker { Filename: string filename } && !string.IsNullOrWhiteSpace(filename))
             {
-                FunctionFilePath = Path.GetFullPath(linker.Filename, MEDirectories.GetExecutableFolderPath(debugger.Game));
+                FunctionFilePath = Path.GetFullPath(filename, MEDirectories.GetExecutableFolderPath(debugger.Game));
             }
             else if (frame.FileName != IntPtr.Zero)
             {

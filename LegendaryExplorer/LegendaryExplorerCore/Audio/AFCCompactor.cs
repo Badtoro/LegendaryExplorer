@@ -49,7 +49,6 @@ namespace LegendaryExplorerCore.Audio
                 var inventory = new AFCInventory();
                 inventory.LocalFolderAFCFiles.ReplaceAll(Directory.GetFiles(inputPath, "*.afc", SearchOption.AllDirectories));
 
-
                 debugOut?.Invoke($"Beginning AFC references scan. Input path: {inputPath}, game {game}");
                 inventory.BasegameAFCFiles.ReplaceAll(MELoadedFiles.GetCookedFiles(game, GameFilesystem.MEDirectories.GetBioGamePath(game), includeAFCs: true).Where(x => Path.GetExtension(x) == ".afc"));
                 foreach (var oafc in inventory.BasegameAFCFiles)
@@ -92,7 +91,7 @@ namespace LegendaryExplorerCore.Audio
         /// <summary>
         /// Represents a reference to a piece of audio in an AFC
         /// </summary>
-        [DebuggerDisplay("RA {afcName} @ 0x{audioOffset.ToString(\"X8\")}")]
+        [DebuggerDisplay("RA {AFCName} @ 0x{AudioOffset.ToString(\"X8\")}")]
         public class ReferencedAudio
         {
             /// <summary>The name of the AFC containing this audio</summary>
@@ -198,7 +197,6 @@ namespace LegendaryExplorerCore.Audio
                                 debugOut?.Invoke($@" >>>> AFC found in basegame: {afcFile}");
                                 logged = true;
                             }
-
 
                             if (afcFile == null)
                             {
@@ -455,7 +453,6 @@ namespace LegendaryExplorerCore.Audio
             {
                 return File.OpenRead(localAFCFile);
             }
-
 
             var basegameAFCFile = inventory.BasegameAFCFiles.FirstOrDefault(x => Path.GetFileName(x).ToLower() == fname);
             if (basegameAFCFile != null)

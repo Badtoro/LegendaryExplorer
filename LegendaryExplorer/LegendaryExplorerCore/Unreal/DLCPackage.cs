@@ -42,7 +42,6 @@ namespace LegendaryExplorerCore.Unreal
                     MaxBlockSize != 0x00010000)
                     throw new Exception("Not supported DLC file!");
             }
-
         }
         public struct FileEntryStruct
         {
@@ -113,7 +112,7 @@ namespace LegendaryExplorerCore.Unreal
                     {
                         BlockOffsets[0] = RealDataOffset;
                         long pos = con.Memory.Position;
-                        con.Seek((int)getBlockOffset((int)BlockSizeTableIndex, header.EntryOffset, header.FileCount), SeekOrigin.Begin);
+                        con.Seek((int)GetBlockOffset((int)BlockSizeTableIndex, header.EntryOffset, header.FileCount), SeekOrigin.Begin);
                         BlockTableOffset = con.Memory.Position;
                         BlockSizes[0] = con + BlockSizes[0];
                         for (int i = 1; i < numBlocks; i++) //read any further blocks
@@ -127,16 +126,16 @@ namespace LegendaryExplorerCore.Unreal
                 }
             }
 
-            private long getBlockOffset(int blockIndex, uint entryOffset, uint numEntries)
+            private static long GetBlockOffset(int blockIndex, uint entryOffset, uint numEntries)
             {
                 return entryOffset + (numEntries * 0x1E) + (blockIndex * 2);
             }
         }
 
-        public static readonly byte[] TOCHash = { 0xB5, 0x50, 0x19, 0xCB, 0xF9, 0xD3, 0xDA, 0x65, 0xD5, 0x5B, 0x32, 0x1C, 0x00, 0x19, 0x69, 0x7C };
+        public static ReadOnlySpan<byte> TOCHash => [0xB5, 0x50, 0x19, 0xCB, 0xF9, 0xD3, 0xDA, 0x65, 0xD5, 0x5B, 0x32, 0x1C, 0x00, 0x19, 0x69, 0x7C];
 
         public HeaderStruct Header;
-        public ObservableCollectionExtended<FileEntryStruct> Files { get; } = new ObservableCollectionExtended<FileEntryStruct>();
+        public ObservableCollectionExtended<FileEntryStruct> Files { get; } = [];
 
         public long UncompressedSize
         {
@@ -242,7 +241,7 @@ namespace LegendaryExplorerCore.Unreal
 
         public List<byte[]> GetBlocks(int Index)
         {
-            List<byte[]> res = new List<byte[]>();
+            List<byte[]> res = [];
             FileEntryStruct e = Files[Index];
             uint count = 0;
             byte[] inputBlock;
@@ -300,47 +299,48 @@ namespace LegendaryExplorerCore.Unreal
         public MemoryStream DecompressEntry(FileEntryStruct e)
         {
             //Debug.WriteLine("Decompressing " + e.FileName);
-            MemoryStream result = MemoryManager.GetMemoryStream();
+            MemoryStream result;
             uint count = 0;
-            byte[] inputBlock;
             long left = e.RealUncompressedSize;
-            FileStream fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
+            var fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
             fs.Seek(e.BlockOffsets[0], SeekOrigin.Begin);
-            byte[] buff;
+            
             if (e.BlockSizeTableIndex == 0xFFFFFFFF)
             {
-                buff = new byte[e.RealUncompressedSize];
+                byte[] buff = new byte[(int)e.RealUncompressedSize];
                 fs.Read(buff, 0, buff.Length);
-                result.Write(buff, 0, buff.Length);
+                result = MEPackageHandler.CreateOptimizedLoadingMemoryStream(buff);
             }
             else
             {
+                byte[] buffer = new byte[(int)e.RealUncompressedSize];
+                int maxCompressedBlockSize = e.BlockSizes.Max();
+                byte[] inputBlock = new byte[maxCompressedBlockSize];
+                int pos = 0;
                 while (left > 0)
                 {
-                    uint compressedBlockSize = e.BlockSizes[count];
+                    int compressedBlockSize = e.BlockSizes[count];
                     if (compressedBlockSize == 0)
-                        compressedBlockSize = Header.MaxBlockSize;
+                        compressedBlockSize = (int)Header.MaxBlockSize;
                     if (compressedBlockSize == Header.MaxBlockSize || compressedBlockSize == left)
                     {
                         //uncompressed?
-                        buff = new byte[compressedBlockSize];
-                        fs.Read(buff, 0, buff.Length);
-
-                        result.Write(buff, 0, buff.Length);
+                        fs.Read(buffer.AsSpan(pos, compressedBlockSize));
+                        pos += compressedBlockSize;
                         left -= compressedBlockSize;
                     }
                     else
                     {
-                        var uncompressedBlockSize = (uint)Math.Min(left, Header.MaxBlockSize);
+                        int uncompressedBlockSize = (int)Math.Min(left, Header.MaxBlockSize);
                         if (compressedBlockSize < 5)
                         {
                             throw new Exception("compressed block size smaller than 5");
                         }
 
-                        inputBlock = new byte[compressedBlockSize];
                         //Debug.WriteLine($"Decompressing at 0x{fs.Position:X8}");
-                        fs.Read(inputBlock, 0, (int)compressedBlockSize);
-                        uint actualUncompressedBlockSize = uncompressedBlockSize;
+                        Span<byte> inputSpan = inputBlock.AsSpan(0, compressedBlockSize);
+                        Span<byte> outputSpan = buffer.AsSpan(pos, uncompressedBlockSize);
+                        fs.Read(inputSpan);
                         if (Header.CompressionScheme == "amzl"  /* PC */|| Header.CompressionScheme == "lzma" /* PS3 (it doesn't appear to actually be LZMA!), WiiU */)
                         {
                             //if (Header.CompressionScheme == "lzma")
@@ -359,27 +359,23 @@ namespace LegendaryExplorerCore.Unreal
                             //Buffer.BlockCopy(inputBlock,0,attachedHeader,5, inputBlock.Length);
                             //inputBlock = attachedHeader;
                             //}
-
-                            var outputBlock = LZMA.Decompress(inputBlock, actualUncompressedBlockSize);
-                            if (outputBlock.Length != actualUncompressedBlockSize)
+                            ;
+                            var decompResult = LZMA.Decompress(inputSpan, outputSpan);
+                            if (decompResult != 0)
                                 throw new Exception("SFAR LZMA Decompression Error");
-                            result.Write(outputBlock, 0, (int)actualUncompressedBlockSize);
-                            left -= uncompressedBlockSize;
-                            //continue;
                         }
-
-                        if (Header.CompressionScheme == "lzx") //Xbox
+                        else if (Header.CompressionScheme == "lzx") //Xbox
                         {
-                            var outputBlock = new byte[actualUncompressedBlockSize];
-                            var decompResult = LZX.Decompress(inputBlock, (uint)inputBlock.Length, outputBlock);
+                            var decompResult = LZX.Decompress(inputSpan, outputSpan);
                             if (decompResult != 0)
                                 throw new Exception("SFAR LZX Decompression Error");
-                            result.Write(outputBlock, 0, (int)actualUncompressedBlockSize);
-                            left -= uncompressedBlockSize;
                         }
+                        pos += uncompressedBlockSize;
+                        left -= uncompressedBlockSize;
                     }
                     count++;
                 }
+                result = MEPackageHandler.CreateOptimizedLoadingMemoryStream(buffer);
             }
             fs.Close();
             result.Position = 0;
@@ -466,8 +462,7 @@ namespace LegendaryExplorerCore.Unreal
             byte[] bytes = new byte[input.Length];
             for (int i = 0; i < input.Length; i++)
                 bytes[i] = (byte)Sanitize(input[i]);
-            var md5 = System.Security.Cryptography.MD5.Create();
-            return md5.ComputeHash(bytes);
+            return System.Security.Cryptography.MD5.HashData(bytes);
         }
 
         public static char Sanitize(char c)
@@ -494,7 +489,7 @@ namespace LegendaryExplorerCore.Unreal
 
         public static string BytesToString(long byteCount)
         {
-            string[] suf = { "B", "KB", "MB", "GB", "TB", "PB", "EB" }; //Longs run out around EB
+            ReadOnlySpan<string> suf = ["B", "KB", "MB", "GB", "TB", "PB", "EB"]; //Longs run out around EB
             if (byteCount == 0)
                 return "0" + suf[0];
             long bytes = Math.Abs(byteCount);
@@ -618,8 +613,7 @@ namespace LegendaryExplorerCore.Unreal
                 Debug.WriteLine("Replacing TOC...");
                 ReplaceEntry(Encoding.ASCII.GetBytes(toc), f);
                 Debug.WriteLine("Deleting Entry from Filelist...");
-                List<FileEntryStruct> l = new List<FileEntryStruct>();
-                l.AddRange(Files);
+                List<FileEntryStruct> l = [.. Files];
                 l.RemoveAt(Index);
                 Files.ReplaceAll(l);
                 Header.FileCount--;
@@ -657,8 +651,7 @@ namespace LegendaryExplorerCore.Unreal
                 Debug.WriteLine("Replacing TOC...");
                 ReplaceEntry(Encoding.ASCII.GetBytes(toc), f);
                 Debug.WriteLine("Deleting Entry from Filelist...");
-                List<FileEntryStruct> l = new List<FileEntryStruct>();
-                l.AddRange(Files);
+                List<FileEntryStruct> l = [.. Files];
                 for (int i = 0; i < Index.Count; i++)
                 {
                     l.RemoveAt(Index[i]);
@@ -677,19 +670,20 @@ namespace LegendaryExplorerCore.Unreal
 
         public void AddFileQuick(string filein, string path)
         {
-
             string DLCPath = FileName;
             FileStream fs = new FileStream(DLCPath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
             byte[] FileIN = File.ReadAllBytes(filein);
             //Create Entry
             List<FileEntryStruct> tmp = new List<FileEntryStruct>(Files);
-            FileEntryStruct e = new FileEntryStruct();
-            e.FileName = path;
-            e.BlockOffsets = new long[0];
-            e.Hash = ComputeHash(path);
-            e.BlockSizeTableIndex = 0xFFFFFFFF;
-            e.UncompressedSize = (uint)FileIN.Length;
-            e.UncompressedSizeAdder = 0;
+            FileEntryStruct e = new FileEntryStruct
+            {
+                FileName = path,
+                BlockOffsets = [],
+                Hash = ComputeHash(path),
+                BlockSizeTableIndex = 0xFFFFFFFF,
+                UncompressedSize = (uint)FileIN.Length,
+                UncompressedSizeAdder = 0
+            };
             tmp.Add(e);
             e = new FileEntryStruct();
             Files.ReplaceAll(tmp);
@@ -797,11 +791,10 @@ namespace LegendaryExplorerCore.Unreal
             fs.Close();
         }
 
-
         public void ReplaceEntry(string sourceFileOnDisk, int entryIndex)
         {
             byte[] fileBytes;
-            if (Path.GetExtension(sourceFileOnDisk).ToLower() == ".pcc" && FileName.EndsWith("Patch_001.sfar", StringComparison.InvariantCultureIgnoreCase))
+            if (string.Equals(Path.GetExtension(sourceFileOnDisk), ".pcc", StringComparison.OrdinalIgnoreCase) && FileName.EndsWith("Patch_001.sfar", StringComparison.InvariantCultureIgnoreCase))
             {
                 //if (FileName.Contains("Patch_001")) Debugger.Break();
                 //Use the decompressed bytes - SFARs can't store compressed packages apparently!
@@ -824,7 +817,6 @@ namespace LegendaryExplorerCore.Unreal
 
         public void ReplaceEntry(byte[] newData, int entryIndex)
         {
-
             FileStream fs = new FileStream(FileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
             FileEntryStruct e = Files[entryIndex];
             if (e.BlockSizeTableIndex == 0xFFFFFFFF && e.RealUncompressedSize == newData.Length)
@@ -843,7 +835,7 @@ namespace LegendaryExplorerCore.Unreal
             fs.Write(newData, 0, newData.Length);
 
             //uncompressed entry
-            e.BlockSizes = new ushort[0];
+            e.BlockSizes = [];
             e.BlockOffsets = new long[1];
             e.BlockOffsets[0] = offset;
             e.BlockSizeTableIndex = 0xFFFFFFFF;
@@ -948,7 +940,6 @@ namespace LegendaryExplorerCore.Unreal
 
                 if (newmem.Length == 0) Debugger.Break();
                 ReplaceEntry(newmem, archiveFileIndex);
-
             }
             else
             {
@@ -1087,7 +1078,6 @@ namespace LegendaryExplorerCore.Unreal
                 return decompressedData.ReadToBuffer(uncompressedAmountToRead);
             }
         }
-
     }
 
     /// <summary>
@@ -1096,7 +1086,7 @@ namespace LegendaryExplorerCore.Unreal
     /// </summary>
     public class SFAREntryReader
     {
-        private DLCPackage dpackage;
+        private readonly DLCPackage dpackage;
         private DLCPackage.FileEntryStruct entry;
         public byte[] ReadUncompressedSize(int uncompressedOffsetInEntry, int uncompressedAmountToRead)
         {
