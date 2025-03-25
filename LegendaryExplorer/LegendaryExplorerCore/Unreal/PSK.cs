@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using LegendaryExplorerCore.Unreal.BinaryConverters;
 
@@ -115,17 +116,22 @@ namespace LegendaryExplorerCore.Unreal
             foreach (SkelMeshSection section in lod.Sections)
             {
                 numTriangles += section.NumTriangles;
-                for (int i = 0; i < section.NumTriangles * 3; i++)
+                for (uint t = 0; t < section.NumTriangles; t++)
                 {
                     uint baseIndex = section.BaseIndex;
+                    int i1 = lod.IndexBuffer[baseIndex + t * 3];
+                    int i2 = lod.IndexBuffer[baseIndex + t * 3 + 1];
+                    int i3 = lod.IndexBuffer[baseIndex + t * 3 + 2];
                     byte materialIndex = (byte)section.MaterialIndex;
-                    matIndices[lod.IndexBuffer[baseIndex + i]] = materialIndex;
+                    matIndices[i1] = materialIndex;
+                    matIndices[i2] = materialIndex;
+                    matIndices[i3] = materialIndex;
                     psk.Faces.Add(new PSKTriangle
                     {
                         //intentionally flipped
-                        WedgeIdx1 = (ushort)(baseIndex + i * 3 + 0),
-                        WedgeIdx0 = (ushort)(baseIndex + i * 3 + 1),
-                        WedgeIdx2 = (ushort)(baseIndex + i * 3 + 2),
+                        WedgeIdx1 = (ushort)i2,
+                        WedgeIdx0 = (ushort)i1,
+                        WedgeIdx2 = (ushort)i3,
                         MatIndex = materialIndex
                     });
                 }
@@ -174,7 +180,7 @@ namespace LegendaryExplorerCore.Unreal
                 for (int i = 0; i < lod.VertexBufferGPUSkin.VertexData.Length; i++)
                 {
                     GPUSkinVertex vertex = lod.VertexBufferGPUSkin.VertexData[i];
-                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z * -1));
+                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z));
                     psk.Wedges.Add(new PSKWedge
                     {
                         MatIndex = matIndices[i],
@@ -184,14 +190,18 @@ namespace LegendaryExplorerCore.Unreal
                     });
                     for (int j = 0; j < 4; j++)
                     {
-                        if (vertex.InfluenceBones[j] == 0)
+                        if (vertex.InfluenceWeights[j] == 0)
                         {
                             break;
                         }
 
+                        // first, we need to find the chunk containing this vertex:
+                        var chunk = lod.Chunks.Last(x => x.BaseVertexIndex <= i);
+
+
                         psk.Weights.Add(new PSKWeight
                         {
-                            Bone = vertex.InfluenceBones[j],
+                            Bone = chunk.BoneMap[vertex.InfluenceBones[j]],
                             Weight = vertex.InfluenceWeights[j] * weightUnpackScale,
                             Point = i
                         });
@@ -207,7 +217,7 @@ namespace LegendaryExplorerCore.Unreal
                     ParentIndex = meshBone.ParentIndex,
                     NumChildren = meshBone.NumChildren,
                     Position = new Vector3(meshBone.Position.X, meshBone.Position.Y * -1, meshBone.Position.Z),
-                    Rotation = new Quaternion(meshBone.Orientation.X, meshBone.Orientation.Y * -1, meshBone.Orientation.Z, meshBone.Orientation.W * -1)
+                    Rotation = new Quaternion(meshBone.Orientation.X, meshBone.Orientation.Y * -1, meshBone.Orientation.Z, meshBone.Orientation.W)
                 });
             }
 
