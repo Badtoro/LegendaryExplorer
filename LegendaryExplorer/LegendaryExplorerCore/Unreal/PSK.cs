@@ -129,8 +129,8 @@ namespace LegendaryExplorerCore.Unreal
                     psk.Faces.Add(new PSKTriangle
                     {
                         //intentionally flipped
-                        WedgeIdx1 = (ushort)i2,
-                        WedgeIdx0 = (ushort)i1,
+                        WedgeIdx1 = (ushort)i1,
+                        WedgeIdx0 = (ushort)i2,
                         WedgeIdx2 = (ushort)i3,
                         MatIndex = materialIndex
                     });
