@@ -1345,6 +1345,16 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.ReplaceMeshDataFromPsk(GetPEWindow());
         }
 
+        private void AddNewMorphTargetFromPsk_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ImportPskAsMorphTarget(GetPEWindow());
+        }
+
+        private void ExportMorphTargetSetToBlender_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ExportMorphTargetSetToBlender(GetPEWindow());
+        }
+
         // EXPERIMENTS: OTHER PEOPLE ------------------------------------------------------------
         #region Other people's experiments
         private void ExportLevelToT3D_Click(object sender, RoutedEventArgs e)

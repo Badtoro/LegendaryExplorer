@@ -174,8 +174,8 @@
         <MenuItem Header="Make Custom Morph Target Set" Click="MakeCustomMorphTargetSet_Click" ToolTip="Makes a new CustomMorphTargetSet and BioMorphFace for use in mods that dynamically change appearance from MorphTargetSet or SkeletalMesh"/>
         <MenuItem Header="Convert Head Mesh to Have Separate Eye Materials" Click="MakeHeterochromia_Click" ToolTip="Converts a head mesh to have separate eye materials. This will affect all LODs. Make sure the materials are properly mapped and show up correctly in preview."/>
         <MenuItem Header="Replace mesh data from psk" Click="ReplaceMeshFromPSK_Click" ToolTip="Replaces some of the mesh data from a psk to avoid needing to go through UModel, which  messes up vertex count and order. only use if you need it."/>
-        <!--<MenuItem Header="Separate the teeth into a new material" Click="SplitTeeth_Click" ToolTip="Splits the mouthbox of a head into a separate material slot using the teeth mask green channel. "/>-->
-        <!--<MenuItem Header="Compare some meshes" Click="CompareMeshes_Click" ToolTip="Compares two skeletal meshes to determine if they differ, and if so, how."/>-->
+        <MenuItem Header="Add a new MorphTarget from a psk" Click="AddNewMorphTargetFromPsk_Click" ToolTip="Converts a psk to a morph target as a delta to the base mesh. select a morphTargetSet to use this. "/>
+        <MenuItem Header="Export MorphTargetSet to psk" Click="ExportMorphTargetSetToBlender_Click" ToolTip="Exports a MorphTargetSet to a psk that can be imported to Blender as the base mesh with shape keys. select a morphTargetSet to use this. "/>
     </MenuItem>
     <MenuItem Header="Other people's box of Legos">
         <MenuItem Header="Export level to T3D" Click="ExportLevelToT3D_Click"/>

@@ -16,6 +16,8 @@ using LegendaryExplorer.Misc.ExperimentsTools;
 //using LegendaryExplorer.Misc;
 using LegendaryExplorerCore.Helpers;
 using Microsoft.Win32;
+using System.IO;
+using System.Numerics;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -793,6 +795,159 @@ defaultproperties
                     meshExport.WriteBinary(meshBin);
                 }
             }
+        }
+
+        public static void ImportPskAsMorphTarget(PackageEditorWindow pew)
+        {
+            if (!GetSelectedItem(pew, "MorphTargetSet", out var morphTargetSet))
+            {
+                ShowError("you must select a morphTargetSet export for this experiment");
+                return;
+            }
+
+            var baseMesh = SharedMethods.ResolveEntryToExport(pew.Pcc.GetEntry(morphTargetSet.GetProperty<ObjectProperty>("BaseSkelMesh").Value), new PackageCache());
+            
+            if (baseMesh == null || baseMesh.ClassName != "SkeletalMesh")
+            {
+                ShowError("selected MorphTargetSet must have a base mesh");
+                return;
+            }
+
+            var baseMeshBinary = baseMesh.GetBinaryData<SkeletalMesh>();
+
+            var d = new OpenFileDialog
+            {
+                Filter = "PSK|*.psk",
+                Title = "Select a psk file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                var psk = PSK.FromFile(d.FileName);
+
+                if (psk.Points.Count != baseMeshBinary.LODModels[0].NumVertices)
+                {
+                    ShowError("the number of vertices in the base mesh (LOD 0) and the psk must match.");
+                    return;
+                }
+
+                if (psk.Points.Count != psk.Wedges.Count)
+                {
+                    ShowError("Can't use this psk; number of points and wedges differ.");
+                    return;
+                }
+
+                // now make a new MorphTarget with the name of the psk
+                var newMorphTarget = ExportCreator.CreateExport(pew.Pcc, Path.GetFileNameWithoutExtension(d.FileName), "MorphTarget", morphTargetSet, indexed: false);
+                var newMorphTargetBin = new MorphTarget
+                {
+                    MorphLODModels = [new MorphTarget.MorphLODModel()]
+                };
+                newMorphTargetBin.MorphLODModels[0].NumBaseMeshVerts = psk.Points.Count;
+
+                List<MorphTarget.MorphVertex> vertDeltas = [];
+
+                for (int i = 0; i < psk.Points.Count; i++)
+                {
+                    // gotta flip the y part of the position
+                    psk.Points[i] = new Vector3(psk.Points[i].X, psk.Points[i].Y * -1, psk.Points[i].Z);
+
+                    if (!ApproximatelyEqual(baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position, psk.Points[i]))
+                    {
+                        vertDeltas.Add(new MorphTarget.MorphVertex()
+                        {
+                            SourceIdx = (ushort)i,
+                            PositionDelta = psk.Points[i] - baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position
+                            // TODO anything with the tangent deltas?
+                            // TODO anything with the bone offsets?
+                        });
+                    }
+                }
+
+                newMorphTargetBin.MorphLODModels[0].Vertices = [.. vertDeltas];
+
+                newMorphTarget.WriteBinary(newMorphTargetBin);
+                var targets = morphTargetSet.GetProperty<ArrayProperty<ObjectProperty>>("Targets");
+                targets.Add(new ObjectProperty(newMorphTarget.UIndex));
+                morphTargetSet.WriteProperty(targets);
+            }
+        }
+
+        private static bool ApproximatelyEqual(Vector3 first, Vector3 second)
+        {
+            var acceptabledelta = 0.0001;
+            if (Math.Abs(first.X - second.X) < acceptabledelta
+                && Math.Abs(first.Y - second.Y) < acceptabledelta
+                && Math.Abs(first.Z - second.Z) < acceptabledelta)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static void ExportMorphTargetSetToBlender(PackageEditorWindow pew)
+        {
+            if (!GetSelectedItem(pew, "MorphTargetSet", out var morphTargetSet))
+            {
+                ShowError("you must select a morphTargetSet export for this experiment");
+                return;
+            }
+
+            var baseMesh = SharedMethods.ResolveEntryToExport(pew.Pcc.GetEntry(morphTargetSet.GetProperty<ObjectProperty>("BaseSkelMesh").Value), new PackageCache());
+
+            if (baseMesh == null || baseMesh.ClassName != "SkeletalMesh")
+            {
+                ShowError("selected MorphTargetSet must have a base mesh");
+                return;
+            }
+
+            var d = new SaveFileDialog { Filter = "PSK|*.psk" };
+            if (d.ShowDialog() == true)
+            {
+                // make most of the psk from the base skeletal mesh
+                var psk = PSK.CreateFromSkeletalMesh(baseMesh.GetBinaryData<SkeletalMesh>());
+
+                var targets = morphTargetSet.GetProperty<ArrayProperty<ObjectProperty>>("Targets");
+
+                foreach (var target in targets)
+                {
+                    var targetExport = SharedMethods.ResolveEntryToExport(pew.Pcc.GetEntry(target.Value), new PackageCache());
+                    var targetBin = targetExport.GetBinaryData<MorphTarget>();
+                    psk.Morphs.Add(new PSK.MorphInfo
+                    {
+                        Name = targetExport.ObjectNameString,
+                        VertexCount = targetBin.MorphLODModels[0].Vertices.Length
+                    });
+
+                    foreach (var vertex in targetBin.MorphLODModels[0].Vertices)
+                    {
+                        var newDelta = new Vector3(vertex.PositionDelta.X, vertex.PositionDelta.Y * -1, vertex.PositionDelta.Z);
+                        psk.MorphData.Add(new PSK.MorphDelta
+                        {
+                            PointIndex = vertex.SourceIdx,
+                            PositionDelta = newDelta,
+                            // this gets ignored on import to Blender anyway
+                            //TangentZDelta = vertex.TangentZDelta
+                        });
+                    }
+                }
+
+                psk.ToFile(d.FileName);
+            }
+        }
+
+        private static bool GetSelectedItem(PackageEditorWindow pew, string expectedType, out ExportEntry entry)
+        {
+            entry = null;
+            if (pew.SelectedItem == null || pew.SelectedItem.Entry == null || pew.Pcc == null) { return false; }
+
+            if (pew.SelectedItem.Entry.ClassName != expectedType)
+            {
+                return false;
+            }
+
+            entry = (ExportEntry)pew.SelectedItem.Entry;
+
+            return entry != null;
         }
 
         //public static void CompareMeshes(PackageEditorWindow pew)

@@ -15,6 +15,8 @@ namespace LegendaryExplorerCore.Unreal
         public List<PSKMaterial> Materials;
         public List<PSA.PSABone> Bones;
         public List<PSKWeight> Weights;
+        public List<MorphInfo> Morphs;
+        public List<MorphDelta> MorphData;
 
         private const int version = 1999801;
 
@@ -81,6 +83,28 @@ namespace LegendaryExplorerCore.Unreal
             };
             sc.Serialize(ref weightsHeader);
             sc.Serialize(ref Weights, weightsHeader.DataCount, sc.Serialize);
+            if (Morphs.Count != 0)
+            {
+                var morphsHeader = new PSA.ChunkHeader
+                {
+                    ChunkID = "MRPHINFO",
+                    Version = version,
+                    DataSize = 0x44,
+                    DataCount = Morphs.Count
+                };
+                sc.Serialize(ref morphsHeader);
+                sc.Serialize(ref Morphs, morphsHeader.DataCount, sc.Serialize);
+
+                var morphDataHeader = new PSA.ChunkHeader
+                {
+                    ChunkID = "MRPHDATA",
+                    Version = version,
+                    DataSize = 0x1c,
+                    DataCount = MorphData.Count
+                };
+                sc.Serialize(ref morphDataHeader);
+                sc.Serialize(ref MorphData, morphDataHeader.DataCount, sc.Serialize);
+            }
         }
 
         public void ToFile(string filePath)
@@ -109,7 +133,9 @@ namespace LegendaryExplorerCore.Unreal
                 Faces = [],
                 Materials = [],
                 Bones = [],
-                Weights = []
+                Weights = [],
+                Morphs = [],
+                MorphData = []
             };
             int numTriangles = 0;
             var matIndices = new byte[numVertices];
@@ -256,6 +282,19 @@ namespace LegendaryExplorerCore.Unreal
             public int Point;
             public int Bone;
         }
+
+        public class MorphInfo
+        {
+            public string Name;
+            public int VertexCount;
+        }
+
+        public class MorphDelta
+        {
+            public Vector3 PositionDelta;
+            public Vector3 TangentZDelta;
+            public int PointIndex;
+        }
     }
 }
 
@@ -313,6 +352,27 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             Serialize(ref w.Weight);
             Serialize(ref w.Point);
             Serialize(ref w.Bone);
+        }
+
+        public void Serialize(ref PSK.MorphInfo m)
+        {
+            if (IsLoading)
+            {
+                m = new PSK.MorphInfo();
+            }
+            SerializeFixedSizeString(ref m.Name, 64);
+            Serialize(ref m.VertexCount);
+        }
+
+        public void Serialize(ref PSK.MorphDelta m)
+        {
+            if (IsLoading)
+            {
+                m = new PSK.MorphDelta();
+            }
+            Serialize(ref m.PositionDelta);
+            Serialize(ref m.TangentZDelta);
+            Serialize(ref m.PointIndex);
         }
     }
 }
