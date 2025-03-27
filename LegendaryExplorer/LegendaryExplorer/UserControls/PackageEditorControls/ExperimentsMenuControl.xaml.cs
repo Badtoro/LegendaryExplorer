@@ -1335,20 +1335,15 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.GetMeshMaterials(GetPEWindow());
         }
 
-        private void SplitTeeth_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.SplitTeethFromScalp(GetPEWindow());
-        }
-
         private void MorphFaceToMesh_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.BioMorphFaceToMesh(GetPEWindow());
         }
 
-        //private void CompareMeshes_Click(object sender, RoutedEventArgs e)
-        //{
-        //    PackageEditorExperimentsSquid.CompareMeshes(GetPEWindow());
-        //}
+        private void ReplaceMeshFromPSK_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ReplaceMeshDataFromPsk(GetPEWindow());
+        }
 
         // EXPERIMENTS: OTHER PEOPLE ------------------------------------------------------------
         #region Other people's experiments

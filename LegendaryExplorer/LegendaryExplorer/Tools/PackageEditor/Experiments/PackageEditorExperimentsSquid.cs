@@ -9,11 +9,13 @@ using System.Windows;
 using System.Linq;
 using System.Collections.Generic;
 using System;
-using Tex2D = LegendaryExplorerCore.Unreal.Classes.Texture2D;
-using SixLabors.ImageSharp.PixelFormats;
+//using Tex2D = LegendaryExplorerCore.Unreal.Classes.Texture2D;
+//using SixLabors.ImageSharp.PixelFormats;
 using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
-using LegendaryExplorerCore.Unreal.Classes;
 using LegendaryExplorer.Misc.ExperimentsTools;
+//using LegendaryExplorer.Misc;
+using LegendaryExplorerCore.Helpers;
+using Microsoft.Win32;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -367,84 +369,84 @@ defaultproperties
             }
         }
 
-        public static void SplitTeethFromScalp(PackageEditorWindow pew)
-        {
-            // get the export and binary of the Skeletal Mesh that is currently selected, if any
-            if (GetSelectedMeshBinary(pew, out var headMesh, out var meshBinary))
-            {
-                // ask the user to pick which material they want to split (usually scalp material)
-                var chosenMaterialIndex = ChooseMaterial(pew, meshBinary, "Which material contains the mouthbox?");
-                if (chosenMaterialIndex == -1)
-                {
-                    return;
-                }
-                // add a new material slot to split the mouthbox into
-                var newMaterialIndex = AddMaterialSlot(meshBinary);
+        //public static void SplitTeethFromScalp(PackageEditorWindow pew)
+        //{
+        //    // get the export and binary of the Skeletal Mesh that is currently selected, if any
+        //    if (GetSelectedMeshBinary(pew, out var headMesh, out var meshBinary))
+        //    {
+        //        // ask the user to pick which material they want to split (usually scalp material)
+        //        var chosenMaterialIndex = ChooseMaterial(pew, meshBinary, "Which material contains the mouthbox?");
+        //        if (chosenMaterialIndex == -1)
+        //        {
+        //            return;
+        //        }
+        //        // add a new material slot to split the mouthbox into
+        //        var newMaterialIndex = AddMaterialSlot(meshBinary);
 
-                // now, for an annoying part: look up the teeth mask texture from that material
-                var scalpMICUIndex = meshBinary.Materials[chosenMaterialIndex];
+        //        // now, for an annoying part: look up the teeth mask texture from that material
+        //        var scalpMICUIndex = meshBinary.Materials[chosenMaterialIndex];
 
-                if (!pew.Pcc.TryGetUExport(scalpMICUIndex, out var scalpMIC))
-                {
-                    ShowError("invalid material export; try porting it in instead of using an import");
-                    return;
-                }
+        //        if (!pew.Pcc.TryGetUExport(scalpMICUIndex, out var scalpMIC))
+        //        {
+        //            ShowError("invalid material export; try porting it in instead of using an import");
+        //            return;
+        //        }
 
-                var teethMaskTexExport = pew.Pcc.FindExport("BRT.HMM_BRT_MED_Spwr_Stack");
+        //        var teethMaskTexExport = pew.Pcc.FindExport("BRT.HMM_BRT_MED_Spwr_Stack");
 
-                //var textureParams = scalpMIC.GetProperty<ArrayProperty<StructProperty>>("TextureParameterValues");
-                //if (textureParams == null)
-                //{
-                //    ShowError("could not find teeth mask");
-                //    return;
-                //}
+        //        //var textureParams = scalpMIC.GetProperty<ArrayProperty<StructProperty>>("TextureParameterValues");
+        //        //if (textureParams == null)
+        //        //{
+        //        //    ShowError("could not find teeth mask");
+        //        //    return;
+        //        //}
 
-                //var teethMaskParam = textureParams.FirstOrDefault(x => x.GetProp<NameProperty>("ParameterName")?.Value.ToString() == "HED_Teeth_Diff");
-                //if (teethMaskParam == null)
-                //{
-                //    ShowError("could not find teeth mask");
-                //    return;
-                //}
+        //        //var teethMaskParam = textureParams.FirstOrDefault(x => x.GetProp<NameProperty>("ParameterName")?.Value.ToString() == "HED_Teeth_Diff");
+        //        //if (teethMaskParam == null)
+        //        //{
+        //        //    ShowError("could not find teeth mask");
+        //        //    return;
+        //        //}
 
-                //if (!pew.Pcc.TryGetUExport(teethMaskParam.GetProp<ObjectProperty>("ParameterValue").Value, out var teethMaskTexExport))
-                //{
-                //    ShowError("could not find teeth mask");
-                //    return;
-                //}
+        //        //if (!pew.Pcc.TryGetUExport(teethMaskParam.GetProp<ObjectProperty>("ParameterValue").Value, out var teethMaskTexExport))
+        //        //{
+        //        //    ShowError("could not find teeth mask");
+        //        //    return;
+        //        //}
 
-                var teethMaskImg = ToIsImage(new Tex2D(teethMaskTexExport));
+        //        var teethMaskImg = ToIsImage(new Tex2D(teethMaskTexExport));
 
-                bool IsMouthBoxTriangle(StaticLODModel lod, int triangleIndex)
-                {
-                    var (v1, v2, v3) = GetTriangle(lod, triangleIndex);
+        //        bool IsMouthBoxTriangle(StaticLODModel lod, int triangleIndex)
+        //        {
+        //            var (v1, v2, v3) = GetTriangle(lod, triangleIndex);
 
-                    var uvCentroidX = (GetVertex(lod, v1).UV.X + GetVertex(lod, v2).UV.X + GetVertex(lod, v3).UV.X) / 3;
-                    var uvCentroidY = (GetVertex(lod, v1).UV.Y+ GetVertex(lod, v2).UV.Y + GetVertex(lod, v3).UV.Y) / 3;
+        //            var uvCentroidX = (GetVertex(lod, v1).UV.X + GetVertex(lod, v2).UV.X + GetVertex(lod, v3).UV.X) / 3;
+        //            var uvCentroidY = (GetVertex(lod, v1).UV.Y+ GetVertex(lod, v2).UV.Y + GetVertex(lod, v3).UV.Y) / 3;
 
-                    var centroidPixel = GetPixel(teethMaskImg, uvCentroidX, uvCentroidY);
+        //            var centroidPixel = GetPixel(teethMaskImg, uvCentroidX, uvCentroidY);
 
-                    return centroidPixel.B > 0;
-                }
+        //            return centroidPixel.B > 0;
+        //        }
 
-                // from there, find the section we need to modify
-                SplitMaterial(meshBinary.LODModels.First(), chosenMaterialIndex, newMaterialIndex, IsMouthBoxTriangle);
+        //        // from there, find the section we need to modify
+        //        SplitMaterial(meshBinary.LODModels.First(), chosenMaterialIndex, newMaterialIndex, IsMouthBoxTriangle);
 
-                headMesh.WriteBinary(meshBinary);
-            }
-        }
+        //        headMesh.WriteBinary(meshBinary);
+        //    }
+        //}
 
-        private static Bgra32 GetPixel(SixLabors.ImageSharp.Image<Bgra32> img, float x, float y)
-        {
-            x = x % 1;
-            y = y % 1;
-            return img[(int)(img.Width * x), (int)(img.Height * y)];
-        }
+        //private static Bgra32 GetPixel(SixLabors.ImageSharp.Image<Bgra32> img, float x, float y)
+        //{
+        //    x = x % 1;
+        //    y = y % 1;
+        //    return img[(int)(img.Width * x), (int)(img.Height * y)];
+        //}
 
-        private static SixLabors.ImageSharp.Image<Bgra32> ToIsImage(Tex2D tex)
-        {
-            var rawPng = tex.GetPNG(tex.GetTopMip());
-            return SixLabors.ImageSharp.Image.Load<Bgra32>(rawPng);
-        }
+        //private static SixLabors.ImageSharp.Image<Bgra32> ToIsImage(Tex2D tex)
+        //{
+        //    var rawPng = tex.GetPNG(tex.GetTopMip());
+        //    return SixLabors.ImageSharp.Image.Load<Bgra32>(rawPng);
+        //}
 
         //public static byte[] GetPNG(LegendaryExplorerCore.Unreal.Classes.Texture2DMipInfo info, Tex2D tex)
         //{
@@ -752,7 +754,46 @@ defaultproperties
 
             if (sourceTextures != null) { targetExport.WriteProperty(targetTextures); }
             if (sourceVectors != null) { targetExport.WriteProperty(targetVectors); }
-            if (sourceScalars != null) { targetExport.WriteProperty(targetScalars); }        }
+            if (sourceScalars != null) { targetExport.WriteProperty(targetScalars); }
+        }
+
+        public static void ReplaceMeshDataFromPsk(PackageEditorWindow pew)
+        {
+            if (GetSelectedMeshBinary(pew, out var meshExport, out var meshBin))
+            {
+                var d = new OpenFileDialog
+                {
+                    Filter = "PSK|*.psk",
+                    Title = "Select a psk file"
+                };
+                if (d.ShowDialog() == true)
+                {
+                    var psk = PSK.FromFile(d.FileName);
+
+                    if (psk.Points.Count != meshBin.LODModels[0].NumVertices)
+                    {
+                        ShowError("the number of vertices in the mesh (LOD 0) and the psk must match.");
+                        return;
+                    }
+
+                    if (psk.Points.Count != psk.Wedges.Count)
+                    {
+                        ShowError("Can't import this psk; number of points and wedges differ.");
+                        return;
+                    }
+
+                    for (int i = 0; i < psk.Points.Count; i++) {
+                        // replace the position data with that of the psk
+                        meshBin.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i];
+                        // gotta invert that Y for whatever reason, like it got inverted on export
+                        meshBin.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position.Y *= -1;
+                        // TODO also replace the UVs and material slot in the future?
+                    }
+
+                    meshExport.WriteBinary(meshBin);
+                }
+            }
+        }
 
         //public static void CompareMeshes(PackageEditorWindow pew)
         //{
