@@ -622,7 +622,7 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Symbols
                 {
                     string functionName = delegateType.DefaultFunction.Name;
                     string scope;
-                    if (functionName.Contains("."))
+                    if (functionName.Contains('.'))
                     {
                         var parts = functionName.Split('.');
                         functionName = parts[^1];
@@ -889,7 +889,7 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Symbols
                         PushScope(childConType.Name);
                             AddSymbol("Parent", childConType.VariableDeclarations[0]);
                         PopScope();
-                        netConType.VariableDeclarations.Add(new VariableDeclaration(new DynamicArrayType(childConType), default, "Children"));
+                        netConType.VariableDeclarations.Add(new VariableDeclaration(new DynamicArrayType(new VariableType("ChildConnection")), default, "Children"));
                         AddSymbol("Children", netConType.VariableDeclarations[0]);
                     PopScope();
                     break;
@@ -929,7 +929,9 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Symbols
                     var matClass = (Class)node;
                     if (matClass.VariableDeclarations.All(varDecl => varDecl.Name != "ReferencedTextureGuids"))
                     {
-                        matClass.VariableDeclarations.Add(new VariableDeclaration(new DynamicArrayType(TypeDict["Guid"]), EPropertyFlags.Transient | EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "ReferencedTextureGuids"));
+                        //MUST USE STUB FOR GUID TYPE! The linker (ClassValidationVisitor) expects a DynamicArrayType to have either a primitive type or a stub.
+                        //Using the real guid type will cause it to become corrupted 
+                        matClass.VariableDeclarations.Add(new VariableDeclaration(new DynamicArrayType(new VariableType("Guid")), EPropertyFlags.Transient | EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "ReferencedTextureGuids"));
                     }
                     if (matClass.VariableDeclarations.All(varDecl => varDecl.Name != "EditorComments"))
                     {
