@@ -874,7 +874,7 @@ defaultproperties
 
         private static bool ApproximatelyEqual(Vector3 first, Vector3 second)
         {
-            var acceptabledelta = 0.0001;
+            var acceptabledelta = 0.01;
             if (Math.Abs(first.X - second.X) < acceptabledelta
                 && Math.Abs(first.Y - second.Y) < acceptabledelta
                 && Math.Abs(first.Z - second.Z) < acceptabledelta)
@@ -920,11 +920,10 @@ defaultproperties
 
                     foreach (var vertex in targetBin.MorphLODModels[0].Vertices)
                     {
-                        var newDelta = new Vector3(vertex.PositionDelta.X, vertex.PositionDelta.Y * -1, vertex.PositionDelta.Z);
                         psk.MorphData.Add(new PSK.MorphDelta
                         {
                             PointIndex = vertex.SourceIdx,
-                            PositionDelta = newDelta,
+                            PositionDelta = vertex.PositionDelta,
                             // this gets ignored on import to Blender anyway
                             //TangentZDelta = vertex.TangentZDelta
                         });

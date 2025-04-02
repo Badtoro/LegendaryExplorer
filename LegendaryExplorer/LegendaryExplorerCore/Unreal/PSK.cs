@@ -83,7 +83,7 @@ namespace LegendaryExplorerCore.Unreal
             };
             sc.Serialize(ref weightsHeader);
             sc.Serialize(ref Weights, weightsHeader.DataCount, sc.Serialize);
-            if (Morphs.Count != 0)
+            if (Morphs != null && Morphs.Count != 0)
             {
                 var morphsHeader = new PSA.ChunkHeader
                 {
@@ -128,7 +128,7 @@ namespace LegendaryExplorerCore.Unreal
             int numVertices = (int)lod.NumVertices;
             var psk = new PSK
             {
-                Points = new List<Vector3>(numVertices),
+                Points = [],
                 Wedges = [],
                 Faces = [],
                 Materials = [],
@@ -177,7 +177,7 @@ namespace LegendaryExplorerCore.Unreal
                 for (int i = 0; i < lod.ME1VertexBufferGPUSkin.Length; i++)
                 {
                     SoftSkinVertex vertex = lod.ME1VertexBufferGPUSkin[i];
-                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z * -1));
+                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z));
                     psk.Wedges.Add(new PSKWedge
                     {
                         MatIndex = matIndices[i],
@@ -187,14 +187,17 @@ namespace LegendaryExplorerCore.Unreal
                     });
                     for (int j = 0; j < 4; j++)
                     {
-                        if (vertex.InfluenceBones[j] == 0)
+                        if (vertex.InfluenceWeights[j] == 0)
                         {
                             break;
                         }
 
+                        // first, we need to find the chunk containing this vertex:
+                        var chunk = lod.Chunks.Last(x => x.BaseVertexIndex <= i);
+
                         psk.Weights.Add(new PSKWeight
                         {
-                            Bone = vertex.InfluenceBones[j],
+                            Bone = chunk.BoneMap[vertex.InfluenceBones[j]],
                             Weight = vertex.InfluenceWeights[j] * weightUnpackScale,
                             Point = i
                         });
