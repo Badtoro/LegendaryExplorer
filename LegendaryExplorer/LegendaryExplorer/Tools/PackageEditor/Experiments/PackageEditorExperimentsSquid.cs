@@ -18,6 +18,7 @@ using LegendaryExplorerCore.Helpers;
 using Microsoft.Win32;
 using System.IO;
 using System.Numerics;
+using static LegendaryExplorerCore.Unreal.PSA;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -900,13 +901,22 @@ defaultproperties
                 return;
             }
 
-            var d = new SaveFileDialog { Filter = "PSK|*.psk" };
-            if (d.ShowDialog() == true)
-            {
-                // make most of the psk from the base skeletal mesh
-                var psk = PSK.CreateFromSkeletalMesh(baseMesh.GetBinaryData<SkeletalMesh>());
+            var baseMeshBin = baseMesh.GetBinaryData<SkeletalMesh>();
+            var targets = morphTargetSet.GetProperty<ArrayProperty<ObjectProperty>>("Targets");
 
-                var targets = morphTargetSet.GetProperty<ArrayProperty<ObjectProperty>>("Targets");
+            var folderDialog = new OpenFolderDialog()
+            {
+                Multiselect = false,
+                Title = "Choose a folder for the output"
+            };
+
+            if (folderDialog.ShowDialog() == true)
+            {
+                var folder = folderDialog.FolderName;
+
+                // output the special psk into a file with the name of the base head
+                // make most of the psk from the base skeletal mesh
+                var psk = PSK.CreateFromSkeletalMesh(baseMeshBin);
 
                 foreach (var target in targets)
                 {
@@ -930,8 +940,88 @@ defaultproperties
                     }
                 }
 
-                psk.ToFile(d.FileName);
+                psk.ToFile(Path.Combine(folder, morphTargetSet.ObjectName + ".psk"));
+
+                // now, output the psa file and config file
+                var config = new StringBuilder();
+                config.AppendLine("[RemoveTracks]");
+                var psa = new PSA
+                {
+                    Bones = [],
+                    Infos = [],
+                    Keys = []
+                };
+
+                foreach (var bone in baseMeshBin.RefSkeleton)
+                {
+                    psa.Bones.Add(new PSABone
+                    {
+                        Name = bone.Name,
+                        ParentIndex = bone.ParentIndex,
+                    });
+                }
+
+                var frameNum = 0;
+                foreach (var target in targets)
+                {
+                    var targetExport = SharedMethods.ResolveEntryToExport(pew.Pcc.GetEntry(target.Value), new PackageCache());
+                    var targetBin = targetExport.GetBinaryData<MorphTarget>();
+
+                    if (targetBin.BoneOffsets.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    psa.Infos.Add(new PSAAnimInfo
+                    {
+                        Name = targetExport.ObjectNameString,
+                        Group = "None",
+                        TotalBones = baseMeshBin.RefSkeleton.Length,
+                        KeyQuotum = baseMeshBin.RefSkeleton.Length, // this would be multiplied by the number of frames, but there is just one frame
+                        TrackTime = 1,
+                        AnimRate = 1,
+                        FirstRawFrame = frameNum,
+                        NumRawFrames = 1
+                    });
+                    frameNum += 1;
+
+                    for (int i = 0; i < baseMeshBin.RefSkeleton.Length; i++)
+                    {
+                        var refBone = baseMeshBin.RefSkeleton[i];
+                        // does this bone get influenced by this morph target?
+                        var influence = targetBin.BoneOffsets.FirstOrDefault(x => x.Bone == refBone.Name);
+                        //var rotQuat = new Quaternion(refBone.Orientation.X, refBone.Orientation.Y, refBone.Orientation.Z, refBone.Orientation.W);
+                        var rotQuat = new Quaternion(0, 0, 0, 1);
+                        //var posVec = refBone.Position with { Y = refBone.Position.Y * -1 };
+                        var posVec = new Vector3(0,0,0);
+                        if (influence != null)
+                        {
+                            posVec = new Vector3(refBone.Position.X + influence.Offset.X, -refBone.Position.Y - influence.Offset.Y, refBone.Position.Z + influence.Offset.Z);
+                            // do not output rotation when you import this one
+                            config.AppendLine($"{targetExport.ObjectName}.{i}=rot");
+                        }
+                        else
+                        {
+                            // do not output anything when you import this one
+                            config.AppendLine($"{targetExport.ObjectName}.{i}=all");
+                        }
+
+                        psa.Keys.Add(new PSAAnimKeys
+                        {
+                            Position = posVec,
+                            Rotation = rotQuat,
+                            Time = 30
+                        });
+                    }
+                }
+
+                psa.ToFile(Path.Combine(folder, morphTargetSet.ObjectName + ".psa"));
+
+                // also output a config file next to this to tell it to skip rotations for every sequence and every bone
+                File.WriteAllText(Path.Combine(folder, morphTargetSet.ObjectName + ".config"), config.ToString());
             }
+
+            //MessageBox.Show("Done.");
         }
 
         private static bool GetSelectedItem(PackageEditorWindow pew, string expectedType, out ExportEntry entry)
