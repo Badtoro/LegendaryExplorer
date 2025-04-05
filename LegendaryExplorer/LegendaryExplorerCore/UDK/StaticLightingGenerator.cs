@@ -14,7 +14,6 @@ using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Textures;
 using LegendaryExplorerCore.Unreal.Classes;
 using LegendaryExplorerCore.Unreal.ObjectInfo;
-using System.Threading;
 using LegendaryExplorerCore.Gammtek.Extensions;
 using LegendaryExplorerCore.Localization;
 

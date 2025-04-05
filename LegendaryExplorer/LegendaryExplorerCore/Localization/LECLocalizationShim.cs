@@ -24,6 +24,12 @@ namespace LegendaryExplorerCore.Localization
 
         public delegate string GetLocalizedStringDelegate(string str, params object[] parms);
 
+        /// <summary>
+        /// Non-localized string fetch.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="parms"></param>
+        /// <returns></returns>
         public static string GetString(string key, params object[] parms)
         {
             // Basic non-localized converter

@@ -86,7 +86,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             }));
         }
 
-        public static Material JsonDeserialize(Stream inStream, IMEPackage pcc, Func<IMEPackage, string, IEntry> missingObjectResolver = null)
+        public static Material JsonDeserialize(Stream inStream, IMEPackage pcc, Func<IMEPackage, string, string, IEntry> missingObjectResolver = null)
         {
             return JsonSerializer.Deserialize<Material>(inStream, LEXJSONState.CreateSerializerOptions(pcc, missingObjectResolver, new JsonSerializerOptions
             {

@@ -31,6 +31,11 @@ namespace LegendaryExplorerCore.Packages
         /// MemoryFullPath - The path as the object will appear in game-memory, taking ForceExport into account.
         /// </summary>
         string MemoryFullPath { get; }
+
+        /// <summary>
+        /// Returns InstancedFullPath without the linker; used for finding Non-ForcedExport versions of objects when within a package file that has the same name as the linker
+        /// </summary>
+        string NonForcedExportInstancedFullPath { get; }
         string ObjectNameString { get; set; }
         NameReference ObjectName { get; set; }
         string ParentFullPath { get; }

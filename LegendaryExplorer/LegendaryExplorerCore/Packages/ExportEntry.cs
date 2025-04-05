@@ -748,6 +748,19 @@ namespace LegendaryExplorerCore.Packages
 
         public string MemoryFullPath => IsForcedExport ? InstancedFullPath : $"{FileRef.FileNameNoExtension.StripUnrealLocalization()}.{InstancedFullPath}";
 
+
+        /// <summary>
+        /// Returns the InstancedFullPath of this object, without the linker. Used to non-forced export items in a package.
+        /// </summary>
+        public string NonForcedExportInstancedFullPath
+        {
+            get
+            {
+                // Todo: Verify this
+                return MemoryFullPath.Substring(GetLinker().Length + 1);
+            }
+        }
+
         public bool HasParent => _fileRef.IsEntry(_commonHeaderFields._idxLink);
 
         public IEntry Parent

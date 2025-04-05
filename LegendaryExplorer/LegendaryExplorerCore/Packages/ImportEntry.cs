@@ -383,6 +383,30 @@ namespace LegendaryExplorerCore.Packages
         }
         public string MemoryFullPath => InstancedFullPath; // Imports will always be nested under their root package file
 
+        /// <summary>
+        /// Returns the InstancedFullPath of this object, without the linker. Used to find non-forced export items in a package.
+        /// </summary>
+        public string NonForcedExportInstancedFullPath
+        {
+            get
+            {
+                // Todo: Implement this.
+                if (GetRoot() is ExportEntry ex)
+                {
+                    if (ex.IsForcedExport)
+                    {
+
+                    }
+                    else
+                    {
+
+                    }
+                }
+
+                return InstancedFullPath;
+            }
+        }
+
         bool headerChanged;
         public bool HeaderChanged
         {

@@ -163,6 +163,13 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
         /// Provides a way to override relinkUIndex() behavior. If not provided, the default implementation is used.
         /// </summary>
         public CustomRelinkUIndexDelegate CustomRelinkUIndex { get; set; }
+
+        public delegate bool CustomImportDependencyDelegate(ExportEntry sourceExport, IMEPackage targetPackage, RelinkerOptionsPackage customRop, out List<EntryStringPair> entryStringPairs);
+
+        /// <summary>
+        /// Method for overriding dependencies being imported by <see cref="EntryExporter.ExportExportToPackage"/>
+        /// </summary>
+        public CustomImportDependencyDelegate CustomImportDependency { get; set; }
     }
 
     public static class Relinker
@@ -371,7 +378,9 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 
             //Relink Properties
             // NOTES: this used to be relinkingExport, not source, Changed near end of jan 2021 - Mgamerz - Due to ported items possibly not having way to reference original items
-            PropertyCollection props = sourceExport.GetProperties();
+            
+            // 01/19/2025 - If classes have changed, we take dest, not source, as otherwise we will bring across wrong properties.
+            PropertyCollection props = relinkingExport.ClassName.CaseInsensitiveEquals(sourceExport.ClassName) ? sourceExport.GetProperties() : relinkingExport.GetProperties();
             bool removedProperties = false;
             if (sourcePcc.Game != relinkingExport.Game && props.Count > 0)
             {
@@ -1050,6 +1059,28 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
         {
             IEntry existingEntry = relinkingExport.FileRef.FindEntry(instancedFullPath);
 
+            // 01/09/2025 - Find ForcedExport/NonForced export version ===
+            if (existingEntry == null)
+            {
+                if (sourceExport.IsForcedExport
+                    && relinkingExport.FileRef.FileNameNoExtension.CaseInsensitiveEquals(sourceExport.GetLinker())
+                    && sourceExport.HasParent) // HasParent ensures it has a . in the name
+                {
+                    // Forced Export -> Non Forced Export (maybe building new package? or merging a package with edits)
+                    existingEntry = relinkingExport.FileRef.FindEntry(instancedFullPath.Substring(instancedFullPath.IndexOf('.') + 1));
+                }
+            }
+
+            if (existingEntry == null)
+            {
+                // If it is not forced export, look for forced export object in package
+                if (!sourceExport.IsForcedExport)
+                {
+                    existingEntry = relinkingExport.FileRef.FindEntry(sourceExport.GetLinker() + '.' + instancedFullPath);
+                }
+            }
+            // End 01/09/2025 ====
+
             if (existingEntry != null)
             {
                 if (!existingEntry.ClassName.CaseInsensitiveEquals(sourceExport.ClassName) && !rop.RelinkAllowDifferingClassesInRelink)
@@ -1157,7 +1188,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                 relinkMap.TryAdd(imp, imp);
             }
 
-            Relinker.RelinkAll(new RelinkerOptionsPackage() { CrossPackageMap = relinkMap, ForceSamePackageImportRelink = true});
+            Relinker.RelinkAll(new RelinkerOptionsPackage() { CrossPackageMap = relinkMap, ForceSamePackageImportRelink = true });
         }
     }
 }
