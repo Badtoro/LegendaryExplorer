@@ -14,12 +14,11 @@ namespace LegendaryExplorerCore.Unreal.Classes
         //public IMEPackage pcc;
         public byte[] memory;
         public byte[] script;
-        public int memsize;
         public int NextItemInLoadingChain;
         public int FunctionSuperclass;
         public int ChildProbeStart;
-        public int DiskSize;
-        public int MemorySize;
+        public int SizeInMemory; //ME3 and LE only
+        public int SizeOnDisk;
         public int flagint;
         private FlagValues flags;
         public int nativeindex;
@@ -59,7 +58,7 @@ namespace LegendaryExplorerCore.Unreal.Classes
             }
             
             memory = raw;
-            memsize = raw.Length;
+            SizeOnDisk = raw.Length;
             flagint = (int)((objBin as UFunction)?.FunctionFlags ?? 0);
             flags = new FlagValues(flagint, export.Game == MEGame.ME3 || export.Game.IsLEGame()  ? _me3flags : _flags);
             nativeindex = (objBin as UFunction)?.NativeIndex ?? 0;
@@ -239,10 +238,17 @@ namespace LegendaryExplorerCore.Unreal.Classes
             pos += 4;
             ChildProbeStart = EndianReader.ToInt32(memory, pos, export.FileRef.Endian);
             pos += 4;
-            DiskSize = EndianReader.ToInt32(memory, pos, export.FileRef.Endian);
+            if (export.Game is not (MEGame.ME1 or MEGame.ME2))
+            {
+                SizeInMemory = EndianReader.ToInt32(memory, pos, export.FileRef.Endian);
+                pos += 4;
+            }
+            SizeOnDisk = EndianReader.ToInt32(memory, pos, export.FileRef.Endian);
             pos += 4;
-            MemorySize = EndianReader.ToInt32(memory, pos, export.FileRef.Endian);
-            pos += 4;
+            if (export.Game is MEGame.ME1 or MEGame.ME2)
+            {
+                SizeInMemory = SizeOnDisk;
+            }
         }
 
         public void ParseFunction()
@@ -256,9 +262,9 @@ namespace LegendaryExplorerCore.Unreal.Classes
             List<int> objRefPositions = ScriptBlocks.SelectMany(tok => tok.inPackageReferences)
                 .Where(tup => tup.type == Token.INPACKAGEREFTYPE_ENTRY)
                 .Select(tup => tup.position).ToList();
-            int calculatedLength = DiskSize + 4 * objRefPositions.Count;
+            int calculatedLength = SizeOnDisk + 4 * objRefPositions.Count;
 
-            DiskToMemPosMap = new int[DiskSize];
+            DiskToMemPosMap = new int[SizeOnDisk];
             int iDisk = 0;
             int iMem = 0;
             foreach (int objRefPosition in objRefPositions)
@@ -271,7 +277,7 @@ namespace LegendaryExplorerCore.Unreal.Classes
                 }
                 iMem += 4;
             }
-            while (iDisk < DiskSize)
+            while (iDisk < SizeOnDisk)
             {
                 DiskToMemPosMap[iDisk] = iMem;
                 iDisk++;

@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -660,7 +661,12 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
 
         private void AddLine_Click(object sender, RoutedEventArgs e)
         {
-            if (CurrentLoadedExport == null) { return; }
+            AddLine();
+        }
+
+        public void AddLine()
+        {
+            if (CurrentLoadedExport == null) return;
 
             bool isNonSpkr = CurrentLoadedExport.ObjectName.Name.Contains("NonSpkr");
             string id = "";
@@ -748,7 +754,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             if (!isNonSpkr)
             {
                 ArrayProperty<ObjectProperty> referencedSoundCues = CurrentLoadedExport.GetProperty<ArrayProperty<ObjectProperty>>("ReferencedSoundCues")
-                    ?? new ArrayProperty<ObjectProperty>("ReferencedSoundCues");
+                                                                    ?? new ArrayProperty<ObjectProperty>("ReferencedSoundCues");
                 referencedSoundCues.Add(new ObjectProperty(audio.UIndex));
                 CurrentLoadedExport.WriteProperty(referencedSoundCues);
 
@@ -1506,7 +1512,53 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             }
         }
 
+        public void ReAssignLineIds()
+        {
+            if (Lines?.Count is not > 0) return;
 
+
+            if (PromptDialog.Prompt(this, "Please enter start of ID range", "Legendary Explorer", "", true) is string idString)
+            {
+                if (!int.TryParse(idString, out int tlkID) || tlkID < 0)
+                {
+                    MessageBox.Show(Window.GetWindow(this), $"'{idString}' is not a positive integer");
+                    return;
+                }
+                foreach (FaceFXLineEntry lineEntry in Lines)
+                {
+                    lineEntry.TLKID = tlkID;
+                    lineEntry.TLKString = TLKManagerWPF.GlobalFindStrRefbyID(tlkID, Pcc);
+                    lineEntry.Line.ID = idString;
+
+                    string oldName = lineEntry.Line.NameAsString;
+                    Match match = Regex.Match(oldName, @"\d+", RegexOptions.RightToLeft);
+                    string newName = lineEntry.Line.NameAsString = $"{oldName[..match.Index]}{idString}{oldName[(match.Index + match.Length)..]}";
+                    if (FaceFX.Names.Contains(newName))
+                    {
+                        lineEntry.Line.NameIndex = FaceFX.Names.IndexOf(newName);
+                    }
+                    else
+                    {
+                        FaceFX.Names.Add(newName);
+                        lineEntry.Line.NameIndex = FaceFX.Names.Count - 1;
+                    }
+                    lineEntry.OnPropertyChanged(nameof(lineEntry.Name));
+
+                    string oldPath = lineEntry.Line.Path;
+                    match = Regex.Match(oldPath, @"\d+", RegexOptions.RightToLeft);
+                    lineEntry.Line.Path = $"{oldPath[..match.Index]}{idString}{oldPath[(match.Index + match.Length)..]}";
+
+                    tlkID++;
+                    idString = tlkID.ToString();
+                }
+                SaveChanges();
+            }
+        }
+
+        private void ReAssignLineIds_Click(object sender, RoutedEventArgs e)
+        {
+            ReAssignLineIds();
+        }
     }
 
     public class Animation : NotifyPropertyChangedBase
@@ -1549,6 +1601,8 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
             get => _line;
             set => SetProperty(ref _line, value);
         }
+
+        public string Name => _line.NameAsString;
 
         private string _tlkString;
         public string TLKString

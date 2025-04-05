@@ -59,6 +59,8 @@ namespace LegendaryExplorer.Tools.FaceFXEditor
         public ICommand SaveCommand { get; set; }
         public ICommand SaveAsCommand { get; set; }
         public ICommand LoadAnimsetCommand { get; set; }
+        public ICommand AddLineCommand { get; set; }
+        public ICommand ReAssignLineIdsCommand { get; set; }
 
         private void LoadCommands()
         {
@@ -66,12 +68,19 @@ namespace LegendaryExplorer.Tools.FaceFXEditor
             SaveCommand = new GenericCommand(SavePackage, PackageIsLoaded);
             SaveAsCommand = new GenericCommand(SavePackageAs, PackageIsLoaded);
             LoadAnimsetCommand = new GenericCommand(LoadAnimset, CanLoadAnimset);
+            AddLineCommand = new GenericCommand(AddLine, IsAnimsetLoaded);
+            ReAssignLineIdsCommand = new GenericCommand(ReAssignLineIds, HasLines);
         }
 
-        private bool CanLoadAnimset()
-        {
-            return SelectedExport != null;
-        }
+        private bool HasLines() => editorControl.Lines?.Count is > 0;
+
+        private void ReAssignLineIds() => editorControl.ReAssignLineIds();
+
+        private bool IsAnimsetLoaded() => editorControl.CurrentLoadedExport is not null;
+
+        private void AddLine() => editorControl.AddLine();
+
+        private bool CanLoadAnimset() => SelectedExport != null;
 
         public void SelectAnimset(int uIndex, string lineName = null)
         {

@@ -43,14 +43,15 @@
                 <ListBox.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Add Line" Click="AddLine_Click"/>
+                        <MenuItem Header="Re-assign Line IDs to new range" Click="ReAssignLineIds_Click"/>
                     </ContextMenu>
                 </ListBox.ContextMenu>
                 <ListBox.ItemTemplate>
                     <DataTemplate DataType="{x:Type exportLoaderControls:FaceFXLineEntry}">
                         <StackPanel>
-                            <TextBlock Text="{Binding Line.NameAsString}" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding TLKString}" TextWrapping="Wrap" FontSize="10" FontStyle="Italic"  Visibility="{Binding TLKString, Converter={StaticResource NullVisibilityConverter}}"/>
-                            <TextBlock Text="{Binding LengthAsString}" VerticalAlignment="Center" Foreground="Gray"/>
+                            <TextBlock Text="{Binding Name, Mode=OneWay}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding TLKString, Mode=OneWay}" TextWrapping="Wrap" FontSize="10" FontStyle="Italic"  Visibility="{Binding TLKString, Converter={StaticResource NullVisibilityConverter}}"/>
+                            <TextBlock Text="{Binding LengthAsString, Mode=OneWay}" VerticalAlignment="Center" Foreground="Gray"/>
                             <StackPanel.ContextMenu>
                                 <ContextMenu x:Name="lineContextMenu">
                                     <MenuItem Header="Add Line" Click="AddLine_Click"/>

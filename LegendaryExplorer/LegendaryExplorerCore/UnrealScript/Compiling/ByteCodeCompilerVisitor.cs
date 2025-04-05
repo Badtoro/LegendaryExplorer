@@ -101,7 +101,14 @@ namespace LegendaryExplorerCore.UnrealScript.Compiling
         public static void Compile(Function func, UFunction target, UnrealScriptOptionsPackage usop)
         {
             var bytecodeCompiler = new ByteCodeCompilerVisitor(target, usop);
-            bytecodeCompiler.Compile(func);
+            try
+            {
+                bytecodeCompiler.Compile(func);
+            }
+            catch (OverflowException exception)
+            {
+                throw new OverflowException("Function is too long. Try splitting it into multiple functions.", exception);
+            }
         }
 
         private void Compile(Function func)
@@ -205,7 +212,14 @@ namespace LegendaryExplorerCore.UnrealScript.Compiling
         public static void Compile(State state, UState target, UnrealScriptOptionsPackage usop)
         {
             var bytecodeCompiler = new ByteCodeCompilerVisitor(target, usop);
-            bytecodeCompiler.Compile(state);
+            try
+            {
+                bytecodeCompiler.Compile(state);
+            }
+            catch (OverflowException exception)
+            {
+                throw new OverflowException("State code is too long. Try encapsulating some of it into functions.", exception);
+            }
         }
 
         private void Compile(State state)
@@ -272,7 +286,14 @@ namespace LegendaryExplorerCore.UnrealScript.Compiling
         public static void Compile(Class cls, UClass target, UnrealScriptOptionsPackage usop)
         {
             var bytecodeCompiler = new ByteCodeCompilerVisitor(target, usop);
-            bytecodeCompiler.Compile(cls);
+            try
+            {
+                bytecodeCompiler.Compile(cls);
+            }
+            catch (OverflowException exception)
+            {
+                throw new OverflowException("Replication block is too long. I genuinely don't know how you accomplished that.", exception);
+            }
         }
 
         private void Compile(Class cls)

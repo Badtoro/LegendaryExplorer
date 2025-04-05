@@ -31,13 +31,19 @@ namespace LegendaryExplorerCore.UnrealScript.Compiling
 
         protected void WriteByte(byte b)
         {
-            Position += 1;
+            checked
+            {
+                Position += 1;
+            }
             bytecode.Add(b);
         }
 
         protected void WriteBytes(ReadOnlySpan<byte> bytes)
         {
-            Position += (ushort)bytes.Length;
+            checked
+            {
+                Position += (ushort)bytes.Length;
+            }
             bytecode.AddRange(bytes);
         }
 
@@ -71,7 +77,10 @@ namespace LegendaryExplorerCore.UnrealScript.Compiling
             WriteInt(entry?.UIndex ?? 0);
             if (Game >= MEGame.ME3)
             {
-                Position += 4;
+                checked
+                {
+                    Position += 4;
+                }
             }
         }
 
