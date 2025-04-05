@@ -938,6 +938,7 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Symbols
                         matClass.VariableDeclarations.Add(new VariableDeclaration(new DynamicArrayType(StringType), EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "EditorComments"));
                     }
                     break;
+                }
                 case "MaterialExpression":
                 {
                     // for t3d parsing
