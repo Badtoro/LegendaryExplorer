@@ -19,9 +19,9 @@ namespace LegendaryExplorerCore.Unreal
     {
 
         public readonly IMEPackage Pcc;
-        public readonly Func<IMEPackage, string, IEntry> MissingObjectResolver;
+        public readonly Func<IMEPackage, string, string, IEntry> MissingObjectResolver;
 
-        private LEXJSONState(IMEPackage pcc, Func<IMEPackage, string, IEntry> missingObjectResolver = null)
+        private LEXJSONState(IMEPackage pcc, Func<IMEPackage, string, string, IEntry> missingObjectResolver = null)
         {
             Pcc = pcc;
             MissingObjectResolver = missingObjectResolver;
@@ -51,13 +51,13 @@ namespace LegendaryExplorerCore.Unreal
                 throw new JsonException($"Could not parse {objLiteral} as an object literal");
             }
             string ifp = m.Groups[2].Value;
-            IEntry entry = Pcc.FindEntry(ifp, m.Groups[1].Value) ?? MissingObjectResolver?.Invoke(Pcc, ifp);
+            IEntry entry = Pcc.FindEntry(ifp, m.Groups[1].Value) ?? MissingObjectResolver?.Invoke(Pcc, ifp, null); // unsure how to determine class type here.
             return entry?.UIndex ?? 0;
         }
 
         public int ReadEntryValue(ref Utf8JsonReader reader) => PathToUIndex(reader.GetString());
 
-        public static JsonSerializerOptions CreateSerializerOptions(IMEPackage pcc, Func<IMEPackage, string, IEntry> missingObjectResolver = null, JsonSerializerOptions options = null)
+        public static JsonSerializerOptions CreateSerializerOptions(IMEPackage pcc, Func<IMEPackage, string, string, IEntry> missingObjectResolver = null, JsonSerializerOptions options = null)
         {
             options = options is null ? new JsonSerializerOptions() : new JsonSerializerOptions(options);
             options.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;

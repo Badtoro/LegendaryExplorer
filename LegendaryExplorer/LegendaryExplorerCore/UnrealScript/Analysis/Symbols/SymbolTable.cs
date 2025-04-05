@@ -872,56 +872,56 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Symbols
             switch (node.Name)
             {
                 case "Player":
-                {
-                    var objClass = TypeDict[OBJECT];
-                    var netConType = new Class("NetConnection", node, objClass, EClassFlags.Intrinsic | EClassFlags.Abstract | EClassFlags.Transient | EClassFlags.Config)
                     {
-                        ConfigName = "Engine",
-                        Package = "Engine"
-                    };
-                    AddType(netConType);
-                    PushScope(netConType.Name);
+                        var objClass = TypeDict[OBJECT];
+                        var netConType = new Class("NetConnection", node, objClass, EClassFlags.Intrinsic | EClassFlags.Abstract | EClassFlags.Transient | EClassFlags.Config)
+                        {
+                            ConfigName = "Engine",
+                            Package = "Engine"
+                        };
+                        AddType(netConType);
+                        PushScope(netConType.Name);
                         var childConType = new Class("ChildConnection", netConType, objClass, EClassFlags.Intrinsic | EClassFlags.Transient | EClassFlags.Config, vars: [new(netConType, default, "Parent")])
                         {
                             ConfigName = "Engine", Package = "Engine"
                         };
                         AddType(childConType);
                         PushScope(childConType.Name);
-                            AddSymbol("Parent", childConType.VariableDeclarations[0]);
+                        AddSymbol("Parent", childConType.VariableDeclarations[0]);
                         PopScope();
                         netConType.VariableDeclarations.Add(new VariableDeclaration(new DynamicArrayType(new VariableType("ChildConnection")), default, "Children"));
                         AddSymbol("Children", netConType.VariableDeclarations[0]);
-                    PopScope();
-                    break;
-                }
+                        PopScope();
+                        break;
+                    }
                 case "Texture2D":
-                {
-                    var objClass = TypeDict[OBJECT];
-                    var lightmapTexture2DType = new Class("LightMapTexture2D", node, objClass, EClassFlags.Intrinsic | EClassFlags.Config)
                     {
-                        ConfigName = "Engine",
-                        Package = "Engine"
-                    };
-                    AddType(lightmapTexture2DType);
-                    PushScope(lightmapTexture2DType.Name);
-                    PopScope();
-                    break;
-                }
+                        var objClass = TypeDict[OBJECT];
+                        var lightmapTexture2DType = new Class("LightMapTexture2D", node, objClass, EClassFlags.Intrinsic | EClassFlags.Config)
+                        {
+                            ConfigName = "Engine",
+                            Package = "Engine"
+                        };
+                        AddType(lightmapTexture2DType);
+                        PushScope(lightmapTexture2DType.Name);
+                        PopScope();
+                        break;
+                    }
                 case "RB_BodySetup":
-                {
-                    PushScope("StaticMesh");
+                    {
+                        PushScope("StaticMesh");
                         var bodySetup = new VariableDeclaration(node, default, "BodySetup");
                         ((Class)TypeDict["StaticMesh"]).VariableDeclarations.Add(bodySetup);
                         AddSymbol(bodySetup.Name, bodySetup);
-                    PopScope();
-                    break;
-                }
+                        PopScope();
+                        break;
+                    }
                 case "CodecMovie":
-                {
-                    var codecBinkType = new Class("CodecMovieBink", node, TypeDict[OBJECT], EClassFlags.Intrinsic | EClassFlags.Transient) { Package = "Engine" };
-                    AddType(codecBinkType);
-                    PushScope(codecBinkType.Name); PopScope();
-                    break;
+                    {
+                        var codecBinkType = new Class("CodecMovieBink", node, TypeDict[OBJECT], EClassFlags.Intrinsic | EClassFlags.Transient) { Package = "Engine" };
+                        AddType(codecBinkType);
+                        PushScope(codecBinkType.Name); PopScope();
+                        break;
                     }
                 case "Material":
                 {
@@ -936,6 +936,20 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Symbols
                     if (matClass.VariableDeclarations.All(varDecl => varDecl.Name != "EditorComments"))
                     {
                         matClass.VariableDeclarations.Add(new VariableDeclaration(new DynamicArrayType(StringType), EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "EditorComments"));
+                    }
+                    break;
+                }
+                case "MaterialExpression":
+                {
+                    // for t3d parsing
+                    var exprClass = (Class)node;
+                    if (exprClass.VariableDeclarations.All(varDecl => varDecl.Name != "MaterialExpressionEditorX"))
+                    {
+                        exprClass.VariableDeclarations.Add(new VariableDeclaration(IntType, EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "MaterialExpressionEditorX"));
+                    }
+                    if (exprClass.VariableDeclarations.All(varDecl => varDecl.Name != "MaterialExpressionEditorY"))
+                    {
+                        exprClass.VariableDeclarations.Add(new VariableDeclaration(IntType, EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "MaterialExpressionEditorY"));
                     }
                     break;
                 }
