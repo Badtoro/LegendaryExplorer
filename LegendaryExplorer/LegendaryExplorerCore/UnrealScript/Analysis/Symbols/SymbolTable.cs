@@ -937,6 +937,20 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Symbols
                     }
                     break;
                 }
+                case "MaterialExpression":
+                    {
+                        // for t3d parsing
+                        var exprClass = (Class)node;
+                        if (exprClass.VariableDeclarations.All(varDecl => varDecl.Name != "MaterialExpressionEditorX"))
+                        {
+                            exprClass.VariableDeclarations.Add(new VariableDeclaration(IntType, EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "MaterialExpressionEditorX"));
+                        }
+                        if (exprClass.VariableDeclarations.All(varDecl => varDecl.Name != "MaterialExpressionEditorY"))
+                        {
+                            exprClass.VariableDeclarations.Add(new VariableDeclaration(IntType, EPropertyFlags.BioNonShip | EPropertyFlags.EditorOnly, "MaterialExpressionEditorY"));
+                        }
+                        break;
+                    }
             }
 
             if (node is Class c && c.Flags.Has(EClassFlags.Intrinsic))
