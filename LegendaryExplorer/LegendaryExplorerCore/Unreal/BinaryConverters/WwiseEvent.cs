@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using LegendaryExplorerCore.Packages;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 using UIndex = System.Int32;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters

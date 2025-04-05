@@ -2,7 +2,7 @@
 using LegendaryExplorerCore.UnrealScript.Analysis.Symbols;
 using LegendaryExplorerCore.UnrealScript.Language.Tree;
 using LegendaryExplorerCore.UnrealScript.Utilities;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 
 namespace LegendaryExplorerCore.UnrealScript.Language.Util
 {

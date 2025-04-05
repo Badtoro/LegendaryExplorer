@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
+using CommunityToolkit.HighPerformance;
 using LegendaryExplorerCore.Gammtek.Extensions;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Misc;
@@ -16,7 +17,6 @@ using LegendaryExplorerCore.UnrealScript.Language.Tree;
 using LegendaryExplorerCore.UnrealScript.Language.Util;
 using LegendaryExplorerCore.UnrealScript.Lexing;
 using LegendaryExplorerCore.UnrealScript.Utilities;
-using Microsoft.Toolkit.HighPerformance;
 using static LegendaryExplorerCore.Unreal.UnrealFlags;
 
 namespace LegendaryExplorerCore.UnrealScript.Compiling

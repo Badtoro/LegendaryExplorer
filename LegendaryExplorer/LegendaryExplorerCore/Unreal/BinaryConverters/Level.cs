@@ -7,7 +7,7 @@ using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.SharpDX;
 using LegendaryExplorerCore.Unreal.Collections;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 using UIndex = System.Int32;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters

@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using LegendaryExplorerCore.UnrealScript.Language.Tree;
 using LegendaryExplorerCore.UnrealScript.Lexing;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 
 namespace LegendaryExplorerCore.UnrealScript.Parsing
 {

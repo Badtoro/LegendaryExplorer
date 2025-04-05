@@ -16,7 +16,7 @@ using LegendaryExplorerCore.UnrealScript.Language.Tree;
 using LegendaryExplorerCore.UnrealScript.Language.Util;
 using LegendaryExplorerCore.UnrealScript.Lexing;
 using LegendaryExplorerCore.UnrealScript.Parsing;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 using static LegendaryExplorerCore.UnrealScript.Utilities.Keywords;
 
 namespace LegendaryExplorerCore.UnrealScript

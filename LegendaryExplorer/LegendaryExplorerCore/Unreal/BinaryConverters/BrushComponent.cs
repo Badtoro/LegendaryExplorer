@@ -4,7 +4,7 @@ using System.Numerics;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.Unreal.ObjectInfo;
 using LegendaryExplorerCore.Unreal.PhysX;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters
 {

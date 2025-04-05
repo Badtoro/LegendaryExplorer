@@ -4,13 +4,13 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using CommunityToolkit.HighPerformance;
 using LegendaryExplorerCore.Gammtek.IO;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.ME1.Unreal.UnhoodBytecode;
 using LegendaryExplorerCore.Unreal;
 using LegendaryExplorerCore.Unreal.BinaryConverters;
 using LegendaryExplorerCore.Unreal.ObjectInfo;
-using Microsoft.Toolkit.HighPerformance;
 
 namespace LegendaryExplorerCore.Packages
 {

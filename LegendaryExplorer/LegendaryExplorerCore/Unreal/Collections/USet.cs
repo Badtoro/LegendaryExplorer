@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Numerics;
 using CommunityToolkit.Diagnostics;
 using LegendaryExplorerCore.Gammtek.Collections;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 
 namespace LegendaryExplorerCore.Unreal.Collections;
 
