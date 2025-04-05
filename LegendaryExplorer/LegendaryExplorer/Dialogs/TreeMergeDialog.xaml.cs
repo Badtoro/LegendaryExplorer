@@ -11,7 +11,6 @@ using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Misc;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
-using Microsoft.Toolkit.HighPerformance;
 
 namespace LegendaryExplorer.Dialogs
 {

@@ -9,11 +9,11 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
+using CommunityToolkit.HighPerformance;
 using LegendaryExplorer.Libraries;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.Unreal;
-using Microsoft.Toolkit.HighPerformance;
 
 namespace LegendaryExplorer.Tools.ScriptDebugger
 {

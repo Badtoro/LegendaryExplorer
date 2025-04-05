@@ -193,7 +193,7 @@ namespace LegendaryExplorerCore.Tests
                                 stream.Position = 0;
                                 mat = Material.JsonDeserialize(stream, originalLoadedPackage, MissingObjectResolver);
 
-                                IEntry MissingObjectResolver(IMEPackage arg1, string arg2)
+                                IEntry MissingObjectResolver(IMEPackage arg1, string arg2, string arg3)
                                 {
                                     Assert.Fail($"Could not find '{arg2}' in package while doing JSON reserialization of {export.UIndex} {export.InstancedFullPath}. File: {p}");
                                     return null;
