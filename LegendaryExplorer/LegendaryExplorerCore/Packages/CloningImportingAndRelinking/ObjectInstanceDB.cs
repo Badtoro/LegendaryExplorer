@@ -4,11 +4,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using CommunityToolkit.HighPerformance;
 using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Misc;
 using LegendaryExplorerCore.Unreal;
-using Microsoft.Toolkit.HighPerformance;
 
 namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 {
