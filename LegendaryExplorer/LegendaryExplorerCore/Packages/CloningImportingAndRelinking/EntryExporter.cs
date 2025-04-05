@@ -44,15 +44,14 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                     {
                         // port it in
                         // Debug.WriteLine($"Porting in: {mapping.Key.InstancedFullPath}");
-                        //TODO: commit 82c99e3 was missing some changes that prevent this from compiling. re-enable once that's fixed
-                        //if (customROP?.CustomImportDependency != null)
-                        //{
-                        //    if (customROP.CustomImportDependency(mapping.Value, targetPackage, customROP, out List<EntryStringPair> customResults))
-                        //    {
-                        //        issues.AddRange(customResults);
-                        //        continue; // Do not use default logic.
-                        //    }
-                        //}
+                        if (customROP?.CustomImportDependency != null)
+                        {
+                            if (customROP.CustomImportDependency(mapping.Value, targetPackage, customROP, out List<EntryStringPair> customResults))
+                            {
+                                issues.AddRange(customResults);
+                                continue; // Do not use default logic.
+                            }
+                        }
 
                         var parent = PortParents(mapping.Value, targetPackage, customROP: customROP);
                         customROP?.CrossPackageMap.Clear(); // Do not persist this value, we do not want double relink
