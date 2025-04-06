@@ -19,6 +19,8 @@ using Microsoft.Win32;
 using System.IO;
 using System.Numerics;
 using static LegendaryExplorerCore.Unreal.PSA;
+using LegendaryExplorerCore.Save;
+using DocumentFormat.OpenXml.Bibliography;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -948,17 +950,284 @@ defaultproperties
 
         public static void ImportRonToBmf(PackageEditorWindow pew)
         {
-            // TODO
+            var d = new OpenFileDialog
+            {
+                Filter = "RON|*.ron",
+                Title = "Select a ron headmorph file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                // create a new BioMorphFace
+                var bmf = ExportCreator.CreateExport(pew.Pcc, Path.GetFileNameWithoutExtension(d.FileName), "BioMorphFace");
+
+                if (GetSelectedItem(pew, "SkeletalMesh", out var baseHead))
+                {
+                    // if they have selected the base head when they run this, set that as the base head
+                    bmf.WriteProperty(new ObjectProperty(baseHead, "m_oBaseHead"));
+
+                    // TODO selector dialog instead?
+                }
+
+                var headMorph = HeadMorph.FromRonFile(d.FileName);
+
+                // add a reference to the hair mesh, if it is in this file
+                if (headMorph.HairMesh != null && headMorph.HairMesh != "None")
+                {
+                    var hairMeshEntry = pew.Pcc.FindEntry(headMorph.HairMesh);
+                    if (hairMeshEntry != null)
+                    {
+                        bmf.WriteProperty(new ObjectProperty(hairMeshEntry, "m_oHairMesh"));
+                    }
+                }
+
+                // create the BioMaterialOverride object and property
+                var matOverrideEntry = ExportCreator.CreateExport(pew.Pcc, "BioMaterialOverride", "BioMaterialOverride", bmf);
+                bmf.WriteProperty(new ObjectProperty(matOverrideEntry, "m_oMaterialOverrides"));
+
+                // write the scalars into the material overrides
+                var scalarParams = headMorph.ScalarParameters.Select(x => new StructProperty("ScalarParameter", false, new NameProperty(x.Key, "nName"), new FloatProperty(x.Value, "sValue")));
+                matOverrideEntry.WriteProperty(new ArrayProperty<StructProperty>(scalarParams, "m_aScalarOverrides"));
+
+                // write the scalars into the material overrides
+                var vectorParams = headMorph.VectorParameters.Select(x => new StructProperty("ColorParameter", false, new NameProperty(x.Key, "nName"), LinearColorToStructProperty(x.Value, "cValue")));
+                matOverrideEntry.WriteProperty(new ArrayProperty<StructProperty>(vectorParams, "m_aColorOverrides"));
+
+                // write the textures into the material overrides
+                List<StructProperty> textureParams = [];
+                foreach (var tex in headMorph.TextureParameters)
+                {
+                    // if the referenced texture is in this file, add it to the material overrides
+                    var textureEntry = pew.Pcc.FindEntry(tex.Value, "Texture2D");
+                    if (textureEntry != null)
+                    {
+                        textureParams.Add(new StructProperty("TextureParameter", [new NameProperty(tex.Key, "nName"), new ObjectProperty(textureEntry, "m_pTexture")]));
+                    }
+                }
+                matOverrideEntry.WriteProperty(new ArrayProperty<StructProperty>(textureParams, "m_aTextureOverrides"));
+
+                // add the accessories if they are in this file
+                List<ObjectProperty> otherMeshes = [];
+                foreach (var accessory in headMorph.AccessoryMeshes)
+                {
+                    var meshEntry = pew.Pcc.FindEntry(accessory, "SkeletalMesh");
+                    if (meshEntry != null)
+                    {
+                        otherMeshes.Add(new ObjectProperty(meshEntry));
+                    }
+                }
+                if (otherMeshes.Any())
+                {
+                    bmf.WriteProperty(new ArrayProperty<ObjectProperty>(otherMeshes, "m_oOtherMeshes"));
+                }
+
+                // morph features
+                var morphFeatures = headMorph.MorphFeatures.Select(x => new StructProperty("MorphFeature", false, new NameProperty(x.Key, "sFeatureName"), new FloatProperty(x.Value, "Offset")));
+                bmf.WriteProperty(new ArrayProperty<StructProperty>(morphFeatures, "m_aMorphFeatures"));
+
+                // bone offsets
+                var boneOffsets = headMorph.OffsetBones.Select(x => new StructProperty("OffsetBonePos", false, new NameProperty(x.Key, "nName"), Vector3ToStructProperty(x.Value, "vPos")));
+                bmf.WriteProperty(new ArrayProperty<StructProperty>(boneOffsets, "m_aFinalSkeleton"));
+
+                // vertices
+                var bmfBin = new BioMorphFace();
+                List<Vector3[]> LODs = [];
+                if (headMorph.Lod0Vertices != null && headMorph.Lod0Vertices.Any())
+                {
+                    LODs.Add([.. headMorph.Lod0Vertices]);
+                }
+                if (headMorph.Lod1Vertices != null && headMorph.Lod1Vertices.Any())
+                {
+                    LODs.Add([.. headMorph.Lod1Vertices]);
+                }
+                if (headMorph.Lod2Vertices != null && headMorph.Lod2Vertices.Any())
+                {
+                    LODs.Add([.. headMorph.Lod2Vertices]);
+                }
+                bmfBin.LODs = [.. LODs];
+
+                bmf.WriteBinary(bmfBin);
+            }
+        }
+
+        private static StructProperty LinearColorToStructProperty(LinearColor color, NameReference? name = null)
+        {
+            return new StructProperty("LinearColor",
+                [
+                    new FloatProperty(color.R, "R"),
+                    new FloatProperty(color.G, "G"),
+                    new FloatProperty(color.B, "B"),
+                    new FloatProperty(color.A, "A")
+                ], name, true);
+        }
+
+        private static StructProperty Vector3ToStructProperty(Vector3 vect, NameReference? name = null)
+        {
+            return new StructProperty("Vector",
+                [
+                    new FloatProperty(vect.X, "X"),
+                    new FloatProperty(vect.Y, "Y"),
+                    new FloatProperty(vect.Z, "Z"),
+                ], name, true);
+        }
+
+        private static Vector3 StructPropertyToVector3(StructProperty prop)
+        {
+            return new Vector3(
+                prop.GetProp<FloatProperty>("X").Value,
+                prop.GetProp<FloatProperty>("Y").Value,
+                prop.GetProp<FloatProperty>("Z").Value);
+        }
+
+        private static LinearColor StructPropertyToLinearColor(StructProperty prop)
+        {
+            return new LinearColor(
+                prop.GetProp<FloatProperty>("R").Value,
+                prop.GetProp<FloatProperty>("G").Value,
+                prop.GetProp<FloatProperty>("B").Value,
+                prop.GetProp<FloatProperty>("A").Value);
         }
 
         public static void UpdateRonFromPsk(PackageEditorWindow pew)
         {
-            // TODO
+            // select a ron file to update
+            var ronDialog = new OpenFileDialog
+            {
+                Filter = "RON|*.ron",
+                Title = "Select a ron file"
+            };
+            if (ronDialog.ShowDialog() == true)
+            {
+                var pskDialog = new OpenFileDialog
+                {
+                    Filter = "PSK|*.psk",
+                    Title = "Select a psk file"
+                };
+                if (pskDialog.ShowDialog() == true)
+                {
+                    var headMorph = HeadMorph.FromRonFile(ronDialog.FileName);
+                    var psk = PSK.FromFile(pskDialog.FileName);
+
+                    headMorph.Lod0Vertices = psk.Points;
+
+                    headMorph.ToRonFile(ronDialog.FileName);
+                }
+            }
         }
 
         public static void ExportBmfToRon(PackageEditorWindow pew)
         {
-            // TODO
+            if (!GetSelectedItem(pew, "BioMorphFace", out var bmf))
+            {
+                ShowError("you must select a BioMorphFace export for this experiment");
+                return;
+            }
+
+            var headMorph = new HeadMorph()
+            {
+                AccessoryMeshes = [],
+                Lod0Vertices = [],
+                Lod1Vertices = [],
+                Lod2Vertices = [],
+                Lod3Vertices = [],
+                MorphFeatures = [],
+                OffsetBones = [],
+                ScalarParameters = [],
+                TextureParameters = [],
+                VectorParameters = []
+            };
+
+            var props = bmf.GetProperties();
+
+            // morph features
+            var morphs = props.GetProp<ArrayProperty<StructProperty>>("m_aMorphFeatures");
+            foreach (var morph in morphs)
+            {
+                headMorph.MorphFeatures.Add(morph.GetProp<NameProperty>("sFeatureName").Value, morph.GetProp<FloatProperty>("Offset").Value);
+            }
+
+            // final skeleton
+            var finalSkeleton = props.GetProp<ArrayProperty<StructProperty>>("m_aFinalSkeleton");
+            foreach (var offsetBone in finalSkeleton)
+            {
+                headMorph.OffsetBones.Add(offsetBone.GetProp<NameProperty>("nName").Value, StructPropertyToVector3(offsetBone.GetProp<StructProperty>("vPos")));
+            }
+
+            // other meshes
+            var otherMeshes = props.GetProp<ArrayProperty<ObjectProperty>>("m_oOtherMeshes");
+            if (otherMeshes != null)
+            {
+                foreach (var otherMesh in otherMeshes)
+                {
+                    var entry = pew.Pcc.GetEntry(otherMesh.Value);
+                    if (entry != null)
+                    {
+                        headMorph.AccessoryMeshes.Add(entry.MemoryFullPath);
+                    }
+                }
+            }
+
+            // LODs
+            var bmfBin = bmf.GetBinaryData<BioMorphFace>();
+            if (bmfBin.LODs.Length > 0)
+            {
+                headMorph.Lod0Vertices = [.. bmfBin.LODs[0]];
+            }
+            if (bmfBin.LODs.Length > 1)
+            {
+                headMorph.Lod1Vertices = [.. bmfBin.LODs[1]];
+            }
+            if (bmfBin.LODs.Length > 2)
+            {
+                headMorph.Lod2Vertices = [.. bmfBin.LODs[2]];
+            }
+            if (bmfBin.LODs.Length > 3)
+            {
+                headMorph.Lod3Vertices = [.. bmfBin.LODs[3]];
+            }
+
+            var materialsProp = props.GetProp<ObjectProperty>("m_oMaterialOverrides");
+            if (materialsProp != null)
+            {
+                var matOverrides = (ExportEntry)pew.Pcc.GetEntry(materialsProp.Value);
+
+                if (matOverrides != null)
+                {
+                    var matProps = matOverrides.GetProperties();
+
+                    // textures
+                    var textureProps = matProps.GetProp<ArrayProperty<StructProperty>>("m_aTextureOverrides");
+                    foreach (var tex in textureProps)
+                    {
+                        headMorph.TextureParameters.Add(
+                            tex.GetProp<NameProperty>("nName").Value,
+                            pew.Pcc.GetEntry(tex.GetProp<ObjectProperty>("m_pTexture").Value).MemoryFullPath);
+                    }
+
+                    // vectors
+                    var vectorProps = matProps.GetProp<ArrayProperty<StructProperty>>("m_aColorOverrides");
+                    foreach (var vector in vectorProps)
+                    {
+                        headMorph.VectorParameters.Add(
+                            vector.GetProp<NameProperty>("nName").Value,
+                            StructPropertyToLinearColor(vector.GetProp<StructProperty>("cValue")));
+                    }
+
+                    // scalars
+                    var scalarProps = matProps.GetProp<ArrayProperty<StructProperty>>("m_aScalarOverrides");
+                    foreach (var scalar in scalarProps)
+                    {
+                        headMorph.ScalarParameters.Add(
+                            scalar.GetProp<NameProperty>("nName").Value,
+                            scalar.GetProp<FloatProperty>("sValue").Value);
+                    }
+                }
+            }
+
+            var d = new SaveFileDialog { Filter = "RON|*.ron" };
+            if (d.ShowDialog() == true)
+            {
+                headMorph.ToRonFile(d.FileName);
+            }
         }
 
         public static void ImportPskAsMorphTarget(PackageEditorWindow pew)
@@ -1201,380 +1470,5 @@ defaultproperties
 
             return entry != null;
         }
-
-        //public static void CompareMeshes(PackageEditorWindow pew)
-        //{
-        //    if (pew.SelectedItem == null || pew.SelectedItem.Entry == null || pew.Pcc == null) { return; }
-
-        //    if (pew.SelectedItem.Entry.ClassName != "SkeletalMesh")
-        //    {
-        //        ShowError("Selected item is not a SkeletalMesh");
-        //        return;
-        //    }
-
-        //    var mesh1 = (ExportEntry)pew.SelectedItem.Entry;
-
-        //    var mesh2 = EntrySelector.GetEntry<ExportEntry>(pew, pew.Pcc, "Please select the mesh to compare to",
-        //            exp => exp.ClassName == "SkeletalMesh");
-        //    if (mesh2 == null)
-        //    {
-        //        return;
-        //    }
-
-        //    var (big, little) = CompareMeshes(mesh1, mesh2);
-
-        //    if (big.Any())
-        //    {
-        //        new ListDialog(big, "results", "Meshes are not identical", pew).Show();
-        //    }
-        //    else if (little.Any())
-        //    {
-        //        new ListDialog(little, "results", "Meshes might vary", pew).Show();
-        //    }
-        //    else
-        //    {
-        //        MessageBox.Show("Meshes appear to be identical");
-        //    }
-        //}
-
-        //private static (List<string>, List<string>) CompareMeshes(ExportEntry mesh1, ExportEntry mesh2)
-        //{
-        //    // things that make the meshes fundamentally different
-        //    List<string> bigDifferences = [];
-        //    // things that might make the meshes the same, if they are the only differences, such as different MICs
-        //    List<string> littleDifferences = [];
-
-        //    var mesh1Binary = mesh1.GetBinaryData<SkeletalMesh>();
-        //    var mesh2Binary = mesh2.GetBinaryData<SkeletalMesh>();
-
-        //    // non native props:
-        //    // sockets
-        //    // LODInfo
-        //    // ClothTearFactor
-
-        //    //MessageBox.Show($"comparing meshes {mesh1.InstancedFullPath} and {mesh2.InstancedFullPath}", "Testing", MessageBoxButton.OK);
-        //    // compare materials
-        //    if (mesh1Binary.Materials.Length != mesh2Binary.Materials.Length)
-        //    {
-        //        bigDifferences.Add("Meshes differ in number of materials");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i < mesh1Binary.Materials.Length; i++)
-        //        {
-        //            if (mesh1Binary.Materials[i]!= mesh2Binary.Materials[i])
-        //            {
-        //                littleDifferences.Add($"Material {i} differs between meshes");
-        //            }
-        //        }
-        //    }
-
-        //    // Origin/rotation Origin
-        //    if (mesh1Binary.Origin != mesh2Binary.Origin)
-        //    {
-        //        bigDifferences.Add("Meshes differ in Origin");
-        //    }
-        //    if (mesh1Binary.RotOrigin.Yaw != mesh2Binary.RotOrigin.Yaw
-        //        || mesh1Binary.RotOrigin.Pitch != mesh2Binary.RotOrigin.Pitch
-        //        || mesh1Binary.RotOrigin.Roll != mesh2Binary.RotOrigin.Roll)
-        //    {
-        //        bigDifferences.Add("Meshes differ in RotOrigin");
-        //    }
-
-        //    // Bounds
-        //    if (mesh1Binary.Bounds.Origin != mesh2Binary.Bounds.Origin
-        //        || mesh1Binary.Bounds.BoxExtent != mesh2Binary.Bounds.BoxExtent
-        //        || mesh1Binary.Bounds.SphereRadius != mesh2Binary.Bounds.SphereRadius)
-        //    {
-        //        bigDifferences.Add("Meshes differ in Bounds");
-        //    }
-
-        //    // Skeletal Depth
-        //    if (mesh1Binary.SkeletalDepth !=  mesh2Binary.SkeletalDepth)
-        //    {
-        //        bigDifferences.Add("Meshes differ in Skeletal Depth");
-        //    }
-
-        //    // Ref Skeleton
-        //    if (mesh1Binary.RefSkeleton.Length != mesh2Binary.RefSkeleton.Length)
-        //    {
-        //        bigDifferences.Add("Meshes differ in RefSkeleton length");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i <  mesh1Binary.RefSkeleton.Length; i++)
-        //        {
-        //            var ref1 = mesh1Binary.RefSkeleton[i];
-        //            var ref2 = mesh2Binary.RefSkeleton[i];
-        //            if (ref1.Name != ref2.Name)
-        //            {
-        //                bigDifferences.Add($"Meshes differ in RefSkeleton name at {i}");
-        //            }
-        //            if (ref1.Orientation != ref2.Orientation || ref1.Position != ref2.Position)
-        //            {
-        //                bigDifferences.Add($"Meshes differ in RefSkeleton position at {i}");
-        //            }
-        //            if (ref1.NumChildren != ref2.NumChildren)
-        //            {
-        //                bigDifferences.Add($"Meshes differ in RefSkeleton NumChildren at {i}");
-
-        //            }
-        //            if (ref1.ParentIndex !=  ref2.ParentIndex)
-        //            {
-        //                bigDifferences.Add($"Meshes differ in RefSkeleton ParentIndex at {i}");
-
-        //            }
-        //            if (ref1.Flags != ref2.Flags)
-        //            {
-        //                bigDifferences.Add($"Meshes differ in RefSkeleton Flags at {i}");
-
-        //            }
-        //        }
-        //    }
-
-        //    // NameIndexMap
-        //    if (mesh1Binary.NameIndexMap.Count !=  mesh2Binary.NameIndexMap.Count)
-        //    {
-        //        bigDifferences.Add("Meshes differ in NameIndexMap length");
-        //    }
-        //    else
-        //    {
-        //        foreach (var (name, index) in mesh1Binary.NameIndexMap)
-        //        {
-        //            if (mesh2Binary.NameIndexMap[name] != index)
-        //            {
-        //                bigDifferences.Add($"Meshes differ in NameIndexMap for bone {name}");
-        //            }
-        //        }
-        //    }
-
-        //    // PerPolyKDops
-        //    if (mesh1Binary.PerPolyBoneKDOPs.Length != mesh2Binary.PerPolyBoneKDOPs.Length)
-        //    {
-        //        bigDifferences.Add("Meshes differ in PerPolyBoneKDOPs length");
-        //    }
-        //    else
-        //    {
-        //        // TODO compare these more deeply maybe
-        //    }
-
-        //    if (mesh1Binary.BoneBreakNames.Length != mesh2Binary.BoneBreakNames.Length)
-        //    {
-        //        bigDifferences.Add("Meshes differ in BoneBreakNames length");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i < mesh1Binary.BoneBreakNames.Length; i++)
-        //        {
-        //            if (mesh2Binary.BoneBreakNames[i] != mesh1Binary.BoneBreakNames[i])
-        //            {
-        //                bigDifferences.Add($"Meshes differ in BoneBreakNames {i}");
-        //            }
-        //        }
-        //    }
-
-        //    if (mesh1Binary.LODModels.Length != mesh2Binary.LODModels.Length)
-        //    {
-        //        bigDifferences.Add("Meshes differ in LODModels length");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i < mesh1Binary.LODModels.Length; i++)
-        //        {
-        //            CompareLOD(i, mesh1Binary.LODModels[i], mesh2Binary.LODModels[i], bigDifferences);
-        //        }
-        //    }
-        //    // TODO compare non native props, a couple more native props
-
-        //    return (bigDifferences, littleDifferences);
-        //}
-
-        //private static void CompareLOD(int number, StaticLODModel mesh1LOD, StaticLODModel mesh2LOD, List<string> BigDifferences)
-        //{
-        //    // sections
-        //    if (mesh1LOD.Sections.Length != mesh2LOD.Sections.Length)
-        //    {
-        //        BigDifferences.Add($"mesh LOD {number} differs in number of sections");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i < mesh1LOD.Sections.Length; i++) {
-        //            if (mesh1LOD.Sections[i].BaseIndex != mesh2LOD.Sections[i].BaseIndex)
-        //            {
-        //                BigDifferences.Add($"LOD Section {i} differs in BaseIndex");
-        //            }
-        //            if (mesh1LOD.Sections[i].ChunkIndex != mesh2LOD.Sections[i].ChunkIndex)
-        //            {
-        //                BigDifferences.Add($"LOD Section {i} differs in ChunkIndex");
-        //            }
-        //            if (mesh1LOD.Sections[i].MaterialIndex != mesh2LOD.Sections[i].MaterialIndex)
-        //            {
-        //                BigDifferences.Add($"LOD Section {i} differs in MaterialIndex");
-        //            }
-        //            if (mesh1LOD.Sections[i].NumTriangles != mesh2LOD.Sections[i].NumTriangles)
-        //            {
-        //                BigDifferences.Add($"LOD Section {i} differs in NumTriangles");
-        //            }
-        //            if (mesh1LOD.Sections[i].TriangleSorting != mesh2LOD.Sections[i].TriangleSorting)
-        //            {
-        //                BigDifferences.Add($"LOD Section {i} differs in TriangleSorting");
-        //            }
-        //        }
-        //    }
-
-        //    // Chunks
-        //    if (mesh1LOD.Chunks.Length != mesh2LOD.Chunks.Length)
-        //    {
-        //        BigDifferences.Add($"mesh LOD {number} differs in number of Chunks");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i < mesh1LOD.Chunks.Length; i++)
-        //        {
-        //            if (mesh1LOD.Chunks[i].BaseVertexIndex != mesh2LOD.Chunks[i].BaseVertexIndex)
-        //            {
-        //                BigDifferences.Add($"LOD {number} Chunk {i} differs in BaseVertexIndex");
-        //            }
-        //            if (mesh1LOD.Chunks[i].NumRigidVertices != mesh2LOD.Chunks[i].NumRigidVertices)
-        //            {
-        //                BigDifferences.Add($"LOD {number} Chunk {i} differs in NumRigidVertices");
-        //            }
-        //            if (mesh1LOD.Chunks[i].NumSoftVertices != mesh2LOD.Chunks[i].NumSoftVertices)
-        //            {
-        //                BigDifferences.Add($"LOD {number} Chunk {i} differs in NumSoftVertices");
-        //            }
-        //            if (mesh1LOD.Chunks[i].MaxBoneInfluences != mesh2LOD.Chunks[i].MaxBoneInfluences)
-        //            {
-        //                BigDifferences.Add($"LOD {number} Chunk {i} differs in MaxBoneInfluences");
-        //            }
-        //            if (mesh1LOD.Chunks[i].BoneMap.Length != mesh2LOD.Chunks[i].BoneMap.Length)
-        //            {
-        //                BigDifferences.Add($"LOD {number} chunk {i} differs in BoneMap length");
-        //            }
-        //            else
-        //            {
-        //                for (int j = 0; j < mesh1LOD.Chunks[i].BoneMap.Length; j++)
-        //                {
-        //                    if (mesh1LOD.Chunks[i].BoneMap[j] != mesh2LOD.Chunks[i].BoneMap[j])
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} BoneMap {j} does not match");
-        //                    }
-        //                }
-        //            }
-        //            if (mesh1LOD.Chunks[i].RigidVertices.Length != mesh2LOD.Chunks[i].RigidVertices.Length)
-        //            {
-        //                BigDifferences.Add($"LOD {number} chunk {i} differs in RigidVertices length");
-        //            }
-        //            else
-        //            {
-        //                for (int j = 0; j < mesh1LOD.Chunks[i].RigidVertices.Length; j++)
-        //                {
-        //                    if (mesh1LOD.Chunks[i].RigidVertices[j].Position != mesh2LOD.Chunks[i].RigidVertices[j].Position)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} RigidVertices {j} position does not match");
-        //                    }
-        //                    if (mesh1LOD.Chunks[i].RigidVertices[j].Bone != mesh2LOD.Chunks[i].RigidVertices[j].Bone)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} RigidVertices {j} Bone does not match");
-        //                    }
-        //                    if (mesh1LOD.Chunks[i].RigidVertices[j].UV != mesh2LOD.Chunks[i].RigidVertices[j].UV)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} RigidVertices {j} UV does not match");
-        //                    }
-        //                    if ((Vector4)mesh1LOD.Chunks[i].RigidVertices[j].TangentX != (Vector4)mesh2LOD.Chunks[i].RigidVertices[j].TangentX)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} RigidVertices {j} TangentX does not match");
-        //                    }
-        //                    if ((Vector4)mesh1LOD.Chunks[i].RigidVertices[j].TangentY != (Vector4)mesh2LOD.Chunks[i].RigidVertices[j].TangentY)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} RigidVertices {j} TangentY does not match");
-        //                    }
-        //                    if ((Vector4)mesh1LOD.Chunks[i].RigidVertices[j].TangentZ != (Vector4)mesh2LOD.Chunks[i].RigidVertices[j].TangentZ)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} RigidVertices {j} TangentZ does not match");
-        //                    }
-        //                    // TODO UDK things?
-        //                }
-        //            }
-        //            if (mesh1LOD.Chunks[i].SoftVertices.Length != mesh2LOD.Chunks[i].SoftVertices.Length)
-        //            {
-        //                BigDifferences.Add($"LOD {number} chunk {i} differs in SoftVertices length");
-        //            }
-        //            else
-        //            {
-        //                for (int j = 0; j < mesh1LOD.Chunks[i].SoftVertices.Length; j++)
-        //                {
-        //                    if (mesh1LOD.Chunks[i].SoftVertices[j].Position != mesh2LOD.Chunks[i].SoftVertices[j].Position)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} SoftVertices {j} position does not match");
-        //                    }
-        //                    if (mesh1LOD.Chunks[i].SoftVertices[j].UV != mesh2LOD.Chunks[i].SoftVertices[j].UV)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} SoftVertices {j} UV does not match");
-        //                    }
-        //                    if ((Vector4)mesh1LOD.Chunks[i].SoftVertices[j].TangentX != (Vector4)mesh2LOD.Chunks[i].SoftVertices[j].TangentX)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} SoftVertices {j} TangentX does not match");
-        //                    }
-        //                    if ((Vector4)mesh1LOD.Chunks[i].SoftVertices[j].TangentY != (Vector4)mesh2LOD.Chunks[i].SoftVertices[j].TangentY)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} SoftVertices {j} TangentY does not match");
-        //                    }
-        //                    if ((Vector4)mesh1LOD.Chunks[i].SoftVertices[j].TangentZ != (Vector4)mesh2LOD.Chunks[i].SoftVertices[j].TangentZ)
-        //                    {
-        //                        BigDifferences.Add($"LOD {number} chunk {i} SoftVertices {j} TangentZ does not match");
-        //                    }
-        //                    // TODO influence bones/weights, UDK things?
-        //                }
-        //            }
-
-
-        //        }
-        //    }
-
-        //    // Verts
-        //    if (mesh1LOD.NumVertices != mesh2LOD.NumVertices)
-        //    {
-        //        BigDifferences.Add($"LOD {number} differs in number of vertices");
-        //    }
-        //    if (mesh1LOD.VertexBufferGPUSkin.VertexData.Length != mesh2LOD.VertexBufferGPUSkin.VertexData.Length)
-        //    {
-        //        BigDifferences.Add($"LOD {number} differs in VertexData length");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i < mesh1LOD.VertexBufferGPUSkin.VertexData.Length; i++)
-        //        {
-        //            if (mesh1LOD.VertexBufferGPUSkin.VertexData[i].Position != mesh2LOD.VertexBufferGPUSkin.VertexData[i].Position)
-        //            {
-        //                BigDifferences.Add($"LOD {number} vertex {i} differs in position");
-        //                continue;
-        //            }
-        //            if ((Vector2)mesh1LOD.VertexBufferGPUSkin.VertexData[i].UV != (Vector2)mesh2LOD.VertexBufferGPUSkin.VertexData[i].UV)
-        //            {
-        //                BigDifferences.Add($"LOD {number} vertex {i} differs in UV");
-        //                continue;
-        //            }
-        //            // TODO influence bones/weights
-        //        }
-        //    }
-        //    // index Buffer
-        //    if (mesh1LOD.IndexBuffer.Length != mesh2LOD.IndexBuffer.Length)
-        //    {
-        //        BigDifferences.Add($"LOD {number} differs in index buffer length");
-        //    }
-        //    else
-        //    {
-        //        for (int i = 0; i < mesh1LOD.IndexBuffer.Length; i++)
-        //        {
-        //            if (mesh1LOD.IndexBuffer[i] != mesh2LOD.IndexBuffer[i])
-        //            {
-        //                BigDifferences.Add($"LOD {number} IndexBuffer {i} differs");
-        //                continue;
-        //            }
-
-        //        }
-        //    }
-        //}
     }
 }
