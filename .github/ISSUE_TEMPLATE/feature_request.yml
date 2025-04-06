@@ -31,8 +31,8 @@ body:
       label: Can you build the toolset from source?
       description: Users who [build the toolset from source](https://github.com/ME3Tweaks/LegendaryExplorer/wiki/How-to-build-the-toolset-from-source) are more likely to have their feature requests implemented.. You can find help on the ME3Tweaks Discord for how to do various tasks with the toolset and Legendary Explorer Core.
       options:
-        - 'Yes'
         - 'No'
+        - 'Yes'
     validations:
       required: true
   - type: textarea
