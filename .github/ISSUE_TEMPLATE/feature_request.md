@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 ## NOTE: Development resources are limited
-Issues made here are worked on when toolset developers have the free time and motivation to addressthem. If you have a pressing need for a feature, you should consider implementing it yourself - you can start by [building the toolset from source](https://github.com/ME3Tweaks/LegendaryExplorer/wiki/How-to-build-the-toolset-from-source). You can find help on the ME3Tweaks Discord for how to do various tasks with the toolset and Legendary Explorer Core.
+Issues made here are worked on when toolset developers have the free time and motivation to address them. If you have a pressing need for a feature, you should consider implementing it yourself - you can start by [building the toolset from source](https://github.com/ME3Tweaks/LegendaryExplorer/wiki/How-to-build-the-toolset-from-source). You can find help on the ME3Tweaks Discord for how to do various tasks with the toolset and Legendary Explorer Core.
 
 ## Fill out all fields in this template
 **Is your feature request related to a problem? Please describe.**
