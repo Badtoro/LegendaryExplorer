@@ -9,18 +9,14 @@ using System.Windows;
 using System.Linq;
 using System.Collections.Generic;
 using System;
-//using Tex2D = LegendaryExplorerCore.Unreal.Classes.Texture2D;
-//using SixLabors.ImageSharp.PixelFormats;
 using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
 using LegendaryExplorer.Misc.ExperimentsTools;
-//using LegendaryExplorer.Misc;
 using LegendaryExplorerCore.Helpers;
 using Microsoft.Win32;
 using System.IO;
 using System.Numerics;
 using static LegendaryExplorerCore.Unreal.PSA;
 using LegendaryExplorerCore.Save;
-using DocumentFormat.OpenXml.Bibliography;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -374,102 +370,6 @@ defaultproperties
             }
         }
 
-        //public static void SplitTeethFromScalp(PackageEditorWindow pew)
-        //{
-        //    // get the export and binary of the Skeletal Mesh that is currently selected, if any
-        //    if (GetSelectedMeshBinary(pew, out var headMesh, out var meshBinary))
-        //    {
-        //        // ask the user to pick which material they want to split (usually scalp material)
-        //        var chosenMaterialIndex = ChooseMaterial(pew, meshBinary, "Which material contains the mouthbox?");
-        //        if (chosenMaterialIndex == -1)
-        //        {
-        //            return;
-        //        }
-        //        // add a new material slot to split the mouthbox into
-        //        var newMaterialIndex = AddMaterialSlot(meshBinary);
-
-        //        // now, for an annoying part: look up the teeth mask texture from that material
-        //        var scalpMICUIndex = meshBinary.Materials[chosenMaterialIndex];
-
-        //        if (!pew.Pcc.TryGetUExport(scalpMICUIndex, out var scalpMIC))
-        //        {
-        //            ShowError("invalid material export; try porting it in instead of using an import");
-        //            return;
-        //        }
-
-        //        var teethMaskTexExport = pew.Pcc.FindExport("BRT.HMM_BRT_MED_Spwr_Stack");
-
-        //        //var textureParams = scalpMIC.GetProperty<ArrayProperty<StructProperty>>("TextureParameterValues");
-        //        //if (textureParams == null)
-        //        //{
-        //        //    ShowError("could not find teeth mask");
-        //        //    return;
-        //        //}
-
-        //        //var teethMaskParam = textureParams.FirstOrDefault(x => x.GetProp<NameProperty>("ParameterName")?.Value.ToString() == "HED_Teeth_Diff");
-        //        //if (teethMaskParam == null)
-        //        //{
-        //        //    ShowError("could not find teeth mask");
-        //        //    return;
-        //        //}
-
-        //        //if (!pew.Pcc.TryGetUExport(teethMaskParam.GetProp<ObjectProperty>("ParameterValue").Value, out var teethMaskTexExport))
-        //        //{
-        //        //    ShowError("could not find teeth mask");
-        //        //    return;
-        //        //}
-
-        //        var teethMaskImg = ToIsImage(new Tex2D(teethMaskTexExport));
-
-        //        bool IsMouthBoxTriangle(StaticLODModel lod, int triangleIndex)
-        //        {
-        //            var (v1, v2, v3) = GetTriangle(lod, triangleIndex);
-
-        //            var uvCentroidX = (GetVertex(lod, v1).UV.X + GetVertex(lod, v2).UV.X + GetVertex(lod, v3).UV.X) / 3;
-        //            var uvCentroidY = (GetVertex(lod, v1).UV.Y+ GetVertex(lod, v2).UV.Y + GetVertex(lod, v3).UV.Y) / 3;
-
-        //            var centroidPixel = GetPixel(teethMaskImg, uvCentroidX, uvCentroidY);
-
-        //            return centroidPixel.B > 0;
-        //        }
-
-        //        // from there, find the section we need to modify
-        //        SplitMaterial(meshBinary.LODModels.First(), chosenMaterialIndex, newMaterialIndex, IsMouthBoxTriangle);
-
-        //        headMesh.WriteBinary(meshBinary);
-        //    }
-        //}
-
-        //private static Bgra32 GetPixel(SixLabors.ImageSharp.Image<Bgra32> img, float x, float y)
-        //{
-        //    x = x % 1;
-        //    y = y % 1;
-        //    return img[(int)(img.Width * x), (int)(img.Height * y)];
-        //}
-
-        //private static SixLabors.ImageSharp.Image<Bgra32> ToIsImage(Tex2D tex)
-        //{
-        //    var rawPng = tex.GetPNG(tex.GetTopMip());
-        //    return SixLabors.ImageSharp.Image.Load<Bgra32>(rawPng);
-        //}
-
-        //public static byte[] GetPNG(LegendaryExplorerCore.Unreal.Classes.Texture2DMipInfo info, Tex2D tex)
-        //{
-        //    PixelFormat format = Image.getPixelFormatType(tex.TextureFormat);
-        //    return ConvertToPng(Tex2D.GetTextureData(info, tex.Export.Game), info.width, info.height, format)
-        //        .ToArray();
-        //}
-
-        //public static MemoryStream ConvertToPng(byte[] src, int w, int h, PixelFormat format)
-        //{
-        //    byte[] tmpData = Image.convertRawToARGB(src, ref w, ref h, format);
-        //    var ms = new MemoryStream();
-        //    var im = SixLabors.ImageSharp.Image.LoadPixelData<Bgra32>(tmpData, w, h);
-        //    //im.SaveAsPng(ms);
-        //    ms.Position = 0;
-        //    return ms;
-        //}
-
         private static void SplitMaterial(StaticLODModel lod, int originalMaterialIndex, int newMaterialIndex, Func<StaticLODModel, int, bool> isTriangleNewMaterial)
         {
             SkelMeshSection targetSection = null;
@@ -789,8 +689,6 @@ defaultproperties
             var parentMat = SharedMethods.ResolveEntryToExport(targetExport.FileRef.GetEntry(targetExport.GetProperty<ObjectProperty>("Parent").Value), new PackageCache());
 
             ArrayProperty<StructProperty>? parentTextures = parentMat?.GetProperty<ArrayProperty<StructProperty>>("TextureParameterValues");
-            //ArrayProperty<StructProperty> parentVectors = parentMat.GetProperty<ArrayProperty<StructProperty>>("VectorParameterValues");
-            //ArrayProperty<StructProperty> parentScalars = parentMat.GetProperty<ArrayProperty<StructProperty>>("ScalarParameterValues");
 
             ArrayProperty<StructProperty> sourceTextures = source.GetProperty<ArrayProperty<StructProperty>>("m_aTextureOverrides");
             ArrayProperty<StructProperty> sourceVectors = source.GetProperty<ArrayProperty<StructProperty>>("m_aColorOverrides");
@@ -810,7 +708,6 @@ defaultproperties
                     {
                         PropertyCollection props =
                         [
-                            //GenerateExpressionGUID()
                             new NameProperty(sourceParamName, "ParameterName"),
                             new ObjectProperty(sourceTex.GetProp<ObjectProperty>("m_pTexture").Value, "ParameterValue"),
                         ];
@@ -834,7 +731,6 @@ defaultproperties
                     StructProperty ParameterValue = new("LinearColor", color, "ParameterValue", true);
                     PropertyCollection props =
                     [
-                        //GenerateExpressionGUID();
                         ParameterValue,
                         new NameProperty(sourceVect.GetProp<NameProperty>("nName").Value, "ParameterName"),
                     ];
@@ -848,7 +744,6 @@ defaultproperties
                 {
                     PropertyCollection props =
                     [
-                        //props.Add(GenerateExpressionGUID());
                         new NameProperty(sourceScal.GetProp<NameProperty>("nName").Value, "ParameterName"),
                         new FloatProperty(sourceScal.GetProp<FloatProperty>("sValue").Value, "ParameterValue"),
                     ];
@@ -1282,7 +1177,7 @@ defaultproperties
                 for (int i = 0; i < psk.Points.Count; i++)
                 {
                     // gotta flip the y part of the position
-                    psk.Points[i] = new Vector3(psk.Points[i].X, psk.Points[i].Y * -1, psk.Points[i].Z);
+                    psk.Points[i] = new Vector3(psk.Points[i].X, psk.Points[i].Y * -1, psk.Points[i].Z);    
 
                     if (!ApproximatelyEqual(baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position, psk.Points[i]))
                     {
@@ -1290,8 +1185,6 @@ defaultproperties
                         {
                             SourceIdx = (ushort)i,
                             PositionDelta = psk.Points[i] - baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position
-                            // TODO anything with the tangent deltas?
-                            // TODO anything with the bone offsets?
                         });
                     }
                 }

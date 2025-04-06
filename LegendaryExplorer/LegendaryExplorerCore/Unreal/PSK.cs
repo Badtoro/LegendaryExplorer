@@ -83,6 +83,8 @@ namespace LegendaryExplorerCore.Unreal
             };
             sc.Serialize(ref weightsHeader);
             sc.Serialize(ref Weights, weightsHeader.DataCount, sc.Serialize);
+            // some programs (including Blender 4.2+ PSK plugin) can understand slightly nonstandard data such as the vertex offsets of morph targets, or shape keys in Blender's terminology. 
+            // If the code does not put this in explicitly, it will emit a standard psk. 
             if (Morphs != null && Morphs.Count != 0)
             {
                 var morphsHeader = new PSA.ChunkHeader
@@ -154,7 +156,7 @@ namespace LegendaryExplorerCore.Unreal
                     matIndices[i3] = materialIndex;
                     psk.Faces.Add(new PSKTriangle
                     {
-                        //intentionally flipped
+                        // intentionally flipped; corner ordering determines normal direction, and flipped normals will mess everything up
                         WedgeIdx1 = (ushort)i1,
                         WedgeIdx0 = (ushort)i2,
                         WedgeIdx2 = (ushort)i3,
