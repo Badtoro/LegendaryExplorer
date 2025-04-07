@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using LegendaryExplorerCore.Unreal.BinaryConverters;
 
@@ -14,6 +15,8 @@ namespace LegendaryExplorerCore.Unreal
         public List<PSKMaterial> Materials;
         public List<PSA.PSABone> Bones;
         public List<PSKWeight> Weights;
+        public List<MorphInfo> Morphs;
+        public List<MorphDelta> MorphData;
 
         private const int version = 1999801;
 
@@ -80,6 +83,30 @@ namespace LegendaryExplorerCore.Unreal
             };
             sc.Serialize(ref weightsHeader);
             sc.Serialize(ref Weights, weightsHeader.DataCount, sc.Serialize);
+            // some programs (including Blender 4.2+ PSK plugin) can understand slightly nonstandard data such as the vertex offsets of morph targets, or shape keys in Blender's terminology. 
+            // If the code does not put this in explicitly, it will emit a standard psk. 
+            if (Morphs != null && Morphs.Count != 0)
+            {
+                var morphsHeader = new PSA.ChunkHeader
+                {
+                    ChunkID = "MRPHINFO",
+                    Version = version,
+                    DataSize = 0x44,
+                    DataCount = Morphs.Count
+                };
+                sc.Serialize(ref morphsHeader);
+                sc.Serialize(ref Morphs, morphsHeader.DataCount, sc.Serialize);
+
+                var morphDataHeader = new PSA.ChunkHeader
+                {
+                    ChunkID = "MRPHDATA",
+                    Version = version,
+                    DataSize = 0x1c,
+                    DataCount = MorphData.Count
+                };
+                sc.Serialize(ref morphDataHeader);
+                sc.Serialize(ref MorphData, morphDataHeader.DataCount, sc.Serialize);
+            }
         }
 
         public void ToFile(string filePath)
@@ -103,29 +130,36 @@ namespace LegendaryExplorerCore.Unreal
             int numVertices = (int)lod.NumVertices;
             var psk = new PSK
             {
-                Points = new List<Vector3>(numVertices),
+                Points = [],
                 Wedges = [],
                 Faces = [],
                 Materials = [],
                 Bones = [],
-                Weights = []
+                Weights = [],
+                Morphs = [],
+                MorphData = []
             };
             int numTriangles = 0;
             var matIndices = new byte[numVertices];
             foreach (SkelMeshSection section in lod.Sections)
             {
                 numTriangles += section.NumTriangles;
-                for (int i = 0; i < section.NumTriangles * 3; i++)
+                for (uint t = 0; t < section.NumTriangles; t++)
                 {
                     uint baseIndex = section.BaseIndex;
+                    int i1 = lod.IndexBuffer[baseIndex + t * 3];
+                    int i2 = lod.IndexBuffer[baseIndex + t * 3 + 1];
+                    int i3 = lod.IndexBuffer[baseIndex + t * 3 + 2];
                     byte materialIndex = (byte)section.MaterialIndex;
-                    matIndices[lod.IndexBuffer[baseIndex + i]] = materialIndex;
+                    matIndices[i1] = materialIndex;
+                    matIndices[i2] = materialIndex;
+                    matIndices[i3] = materialIndex;
                     psk.Faces.Add(new PSKTriangle
                     {
-                        //intentionally flipped
-                        WedgeIdx1 = (ushort)(baseIndex + i * 3 + 0),
-                        WedgeIdx0 = (ushort)(baseIndex + i * 3 + 1),
-                        WedgeIdx2 = (ushort)(baseIndex + i * 3 + 2),
+                        // intentionally flipped; corner ordering determines normal direction, and flipped normals will mess everything up
+                        WedgeIdx1 = (ushort)i1,
+                        WedgeIdx0 = (ushort)i2,
+                        WedgeIdx2 = (ushort)i3,
                         MatIndex = materialIndex
                     });
                 }
@@ -145,7 +179,7 @@ namespace LegendaryExplorerCore.Unreal
                 for (int i = 0; i < lod.ME1VertexBufferGPUSkin.Length; i++)
                 {
                     SoftSkinVertex vertex = lod.ME1VertexBufferGPUSkin[i];
-                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z * -1));
+                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z));
                     psk.Wedges.Add(new PSKWedge
                     {
                         MatIndex = matIndices[i],
@@ -155,14 +189,17 @@ namespace LegendaryExplorerCore.Unreal
                     });
                     for (int j = 0; j < 4; j++)
                     {
-                        if (vertex.InfluenceBones[j] == 0)
+                        if (vertex.InfluenceWeights[j] == 0)
                         {
                             break;
                         }
 
+                        // first, we need to find the chunk containing this vertex:
+                        var chunk = lod.Chunks.Last(x => x.BaseVertexIndex <= i);
+
                         psk.Weights.Add(new PSKWeight
                         {
-                            Bone = vertex.InfluenceBones[j],
+                            Bone = chunk.BoneMap[vertex.InfluenceBones[j]],
                             Weight = vertex.InfluenceWeights[j] * weightUnpackScale,
                             Point = i
                         });
@@ -174,7 +211,7 @@ namespace LegendaryExplorerCore.Unreal
                 for (int i = 0; i < lod.VertexBufferGPUSkin.VertexData.Length; i++)
                 {
                     GPUSkinVertex vertex = lod.VertexBufferGPUSkin.VertexData[i];
-                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z * -1));
+                    psk.Points.Add(new Vector3(vertex.Position.X, vertex.Position.Y * -1, vertex.Position.Z));
                     psk.Wedges.Add(new PSKWedge
                     {
                         MatIndex = matIndices[i],
@@ -184,14 +221,18 @@ namespace LegendaryExplorerCore.Unreal
                     });
                     for (int j = 0; j < 4; j++)
                     {
-                        if (vertex.InfluenceBones[j] == 0)
+                        if (vertex.InfluenceWeights[j] == 0)
                         {
                             break;
                         }
 
+                        // first, we need to find the chunk containing this vertex:
+                        var chunk = lod.Chunks.Last(x => x.BaseVertexIndex <= i);
+
+
                         psk.Weights.Add(new PSKWeight
                         {
-                            Bone = vertex.InfluenceBones[j],
+                            Bone = chunk.BoneMap[vertex.InfluenceBones[j]],
                             Weight = vertex.InfluenceWeights[j] * weightUnpackScale,
                             Point = i
                         });
@@ -206,8 +247,8 @@ namespace LegendaryExplorerCore.Unreal
                     Flags = meshBone.Flags,
                     ParentIndex = meshBone.ParentIndex,
                     NumChildren = meshBone.NumChildren,
-                    Position = meshBone.Position with { Y = meshBone.Position.Y * -1 },
-                    Rotation = new Quaternion(meshBone.Orientation.X, meshBone.Orientation.Y * -1, meshBone.Orientation.Z, meshBone.Orientation.W * -1)
+                    Position = new Vector3(meshBone.Position.X, meshBone.Position.Y * -1, meshBone.Position.Z),
+                    Rotation = new Quaternion(meshBone.Orientation.X, meshBone.Orientation.Y * -1, meshBone.Orientation.Z, meshBone.Orientation.W)
                 });
             }
 
@@ -245,6 +286,19 @@ namespace LegendaryExplorerCore.Unreal
             public float Weight;
             public int Point;
             public int Bone;
+        }
+
+        public class MorphInfo
+        {
+            public string Name;
+            public int VertexCount;
+        }
+
+        public class MorphDelta
+        {
+            public Vector3 PositionDelta;
+            public Vector3 TangentZDelta;
+            public int PointIndex;
         }
     }
 }
@@ -303,6 +357,27 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             Serialize(ref w.Weight);
             Serialize(ref w.Point);
             Serialize(ref w.Bone);
+        }
+
+        public void Serialize(ref PSK.MorphInfo m)
+        {
+            if (IsLoading)
+            {
+                m = new PSK.MorphInfo();
+            }
+            SerializeFixedSizeString(ref m.Name, 64);
+            Serialize(ref m.VertexCount);
+        }
+
+        public void Serialize(ref PSK.MorphDelta m)
+        {
+            if (IsLoading)
+            {
+                m = new PSK.MorphDelta();
+            }
+            Serialize(ref m.PositionDelta);
+            Serialize(ref m.TangentZDelta);
+            Serialize(ref m.PointIndex);
         }
     }
 }
