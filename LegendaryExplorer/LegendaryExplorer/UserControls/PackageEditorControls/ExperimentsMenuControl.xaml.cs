@@ -1315,6 +1315,72 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
 
         #endregion
 
+        // EXPERIMENTS: DropTheSquid
+        private void MakeCustomMorphTargetSet_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.MakeCustomMorphTargetSet(GetPEWindow());
+        }
+
+        private void MakeHeterochromia_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.MakeHeterochromiaMesh(GetPEWindow());
+        }
+
+        private void GetMeshMaterials_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.GetMeshMaterials(GetPEWindow());
+        }
+
+        private void ExportMeshToPsk_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.MeshToPsk(GetPEWindow());
+        }
+
+        private void ImportRonToBmf_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ImportRonToBmf(GetPEWindow());
+        }
+
+        private void UpdateRonFromPsk_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.UpdateRonFromPsk(GetPEWindow());
+        }
+
+        private void MorphFaceToMesh_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.BioMorphFaceToMesh(GetPEWindow());
+        }
+
+        private void ReplaceMeshFromPSK_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ReplaceMeshDataFromPsk(GetPEWindow());
+        }
+
+        private void AddNewMorphTargetFromPsk_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ImportPskAsMorphTarget(GetPEWindow());
+        }
+
+        private void ExportMorphTargetSetToBlender_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ExportMorphTargetSet(GetPEWindow());
+        }
+
+        private void ExportBmfToPskAndPsa_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.BioMorphFaceToPskAndPsa(GetPEWindow());
+        }
+
+        private void ImportPskToBmf_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ReplaceBMFDataFromPsk(GetPEWindow());
+        }
+
+        private void ExportBmfToRon_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ExportBmfToRon(GetPEWindow());
+        }
+
         // EXPERIMENTS: OTHER PEOPLE ------------------------------------------------------------
         #region Other people's experiments
         private void ExportLevelToT3D_Click(object sender, RoutedEventArgs e)
