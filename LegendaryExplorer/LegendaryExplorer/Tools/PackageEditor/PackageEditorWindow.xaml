@@ -387,7 +387,8 @@
                 <TreeView x:Name="LeftSide_TreeView" Grid.Column="0" Grid.Row="1" FontFamily="Consolas" Visibility="Collapsed" dd:DragDrop.IsDragSource="True" dd:DragDrop.IsDropTarget="True" dd:DragDrop.DropHandler="{Binding}" ItemsSource="{Binding AllTreeViewNodesX}" FocusManager.IsFocusScope="True" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                     <TreeView.Resources>
                         <HierarchicalDataTemplate DataType="{x:Type SharedUI:TreeViewEntry}" ItemsSource="{Binding Sublinks}">
-                            <Border ContextMenu="{StaticResource EntryContextMenu}" Background="Transparent"  Padding="{Binding Path=(SharedUI:TouchComfySettings.TreeViewMargin)}">
+                            <controls:TreeViewEntryContainer ContextMenu="{StaticResource EntryContextMenu}" Background="Transparent"  Padding="{Binding Path=(SharedUI:TouchComfySettings.TreeViewMargin)}">
+                                <controls:TreeViewEntryContainer.ToolTip>TestTrigger</controls:TreeViewEntryContainer.ToolTip>
                                 <DockPanel>
 
                                     <TextBlock DockPanel.Dock="Bottom" Text="{Binding SubText}"  FontSize="10" Foreground="{Binding Path=ForegroundColor}" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="300" HorizontalAlignment="Left"  Visibility="{Binding SubText, Converter={StaticResource NullVisibilityConverter}}" >
@@ -421,7 +422,7 @@
                                         <b:ChangePropertyAction PropertyName="IsSelected" Value="true" TargetObject="{Binding}"/>
                                     </b:EventTrigger>
                                 </b:Interaction.Triggers>
-                            </Border>
+                            </controls:TreeViewEntryContainer>
                         </HierarchicalDataTemplate>
                         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"
                       Color="LightBlue" />

@@ -431,6 +431,11 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsM.ImportBankTest(GetPEWindow());
         }
 
+        private void GenerateBlankDocuDBs_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsM.GenerateBlankDocuDBs();
+        }
+
         private void BuildPreviewLevel_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsM.BuildPreviewLevel(GetPEWindow());

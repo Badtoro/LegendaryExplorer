@@ -51,6 +51,17 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
     /// </summary>
     public static class PackageEditorExperimentsM
     {
+        public static void GenerateBlankDocuDBs()
+        {
+#if DEBUG
+            foreach (var game in (MEGame[])[MEGame.LE2, MEGame.LE3])
+            {
+                var db = DocuDB.GetEmptyDB(game);
+                File.WriteAllText(Path.Combine(AppDirectories.DocuDBsFolder, game + ".json"), JsonConvert.SerializeObject(db, Formatting.Indented));
+            }
+#endif
+        }
+
         public static void BuildPreviewLevel(PackageEditorWindow pe)
         {
             var package = PreviewLevelBuilder.BuildAssetViewerLevel(MEGame.LE3);

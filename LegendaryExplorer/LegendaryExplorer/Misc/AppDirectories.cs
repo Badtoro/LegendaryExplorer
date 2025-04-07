@@ -26,6 +26,7 @@ namespace LegendaryExplorer.Misc
         public static string HexConverterPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "HexConverter.exe");
 
         public static string ObjectDatabasesFolder => Directory.CreateDirectory(Path.Combine(AppDataFolder, "ObjectDatabases")).FullName;
+        public static string DocuDBsFolder => Directory.CreateDirectory(Path.Combine(AppDataFolder, "DocuDBs")).FullName;
         public static string GetObjectDatabasePath(MEGame game) => Path.Combine(ObjectDatabasesFolder, $"{game}.bin");
         public static string GetMaterialGuidMapPath(MEGame game) => Path.Combine(ObjectDatabasesFolder, $"{game}MaterialMap.json"); //todo: update to .bin format
 
