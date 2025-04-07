@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an idea for Legendary Explorer or Legendary Explorer Core
+title: "[Feature request]: "
+labels: ["feature request"]
+assignees:
+  - octocat
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to request a new feature! Please note that feature requests are only worked on when toolset developers have the free time and motivation to address them.
+  - type: textarea
+    id: feature
+    attributes:
+      label: Describe the solution you'd like
+      description: Use as much detail as you can. Requests with fleshed out details of their implementation are more likely to be implemented.
+      placeholder: I'm always frustrated when...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: List alternative solutions
+      description: Describe any alternative solutions or features you've considered that you haven't found adequate for your needs.
+      placeholder: I did this task, one by one...
+    validations:
+      required: true
+  - type: dropdown
+    id: selfimplementation
+    attributes:
+      label: Can you build the toolset from source?
+      description: Users who [build the toolset from source](https://github.com/ME3Tweaks/LegendaryExplorer/wiki/How-to-build-the-toolset-from-source) are more likely to have their feature requests implemented.. You can find help on the ME3Tweaks Discord for how to do various tasks with the toolset and Legendary Explorer Core.
+      options:
+        - 'No'
+        - 'Yes'
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add any other context or screenshots about the feature request here. 
