@@ -17,6 +17,7 @@ using System.IO;
 using System.Numerics;
 using static LegendaryExplorerCore.Unreal.PSA;
 using LegendaryExplorerCore.Save;
+using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -358,7 +359,8 @@ defaultproperties
                     return;
                 }
                 // add a new material slot to split the right eye into
-                var newMaterialIndex = AddMaterialSlot(meshBinary);
+                SetNumMaterialSlots(meshBinary, meshBinary.Materials.Length + 1);
+                var newMaterialIndex = meshBinary.Materials.Length + 1;
 
                 // from there, find the section we need to modify
                 foreach (var lod in meshBinary.LODModels)
@@ -494,16 +496,20 @@ defaultproperties
             return materialChoices.IndexOf(mat);
         }
 
-        private static int AddMaterialSlot(SkeletalMesh meshBinary)
+        private static void SetNumMaterialSlots(SkeletalMesh meshBinary, int numMaterials)
         {
+            if (meshBinary.Materials.Length == numMaterials)
+            {
+                return;
+            }
+
             var tempMaterials = meshBinary.Materials;
-            meshBinary.Materials = new int[meshBinary.Materials.Length + 1];
-            for (int i = 0; i < tempMaterials.Length; i++)
+
+            meshBinary.Materials = new int[numMaterials];
+            for (int i = 0; i < numMaterials && i < tempMaterials.Length; i++)
             {
                 meshBinary.Materials[i] = tempMaterials[i];
             }
-
-            return meshBinary.Materials.Length - 1;
         }
 
         private static void ShowError(string errMsg)
@@ -781,18 +787,216 @@ defaultproperties
                         return;
                     }
 
+                    // TODO make sure the skeletons match; we may need to update that from the psk so indices, positions, etc match
+
+                    SetNumMaterialSlots(meshBin, psk.Materials.Count);
+
+                    var LOD = meshBin.LODModels[0];
+
+                    var weightsByPoint = psk.Weights.GroupBy(x => x.Point).ToDictionary(g => g.Key, g => g.ToList());
+
+                    SetupSectionsAndChunks(psk, LOD, weightsByPoint, meshBin.RefSkeleton);
+
+                    // update the UVs of each vertex
+                    foreach (var wedge in psk.Wedges)
+                    {
+                        LOD.VertexBufferGPUSkin.VertexData[wedge.PointIndex].UV = new Vector2DHalf(wedge.U, wedge.V);
+                    }
+
+                    // update the position and weights of each point
                     for (int i = 0; i < psk.Points.Count; i++)
                     {
                         // replace the position data with that of the psk
-                        meshBin.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i];
-                        // gotta invert that Y for whatever reason, like it got inverted on export
-                        meshBin.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position.Y *= -1;
-                        // TODO also replace the UVs and material slot in the future?
+                        // gotta invert that Y, just like we inverted in on import
+                        LOD.VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i] with { Y = psk.Points[i].Y * -1 };
+
+                        // find the chunk containing this point
+                        // TODO optimization: don't look this up every loop; the chunks are ordered non overlapping sequences of verts
+                        var containingChunk = LOD.Chunks.LastOrDefault(x => x.BaseVertexIndex <= i);
+
+                        var newBoneInfluenceIndices = new byte[4];
+                        var newBoneInfluenceWeights = new byte[4];
+                        var influences = weightsByPoint[i].OrderByDescending(x => x.Weight).ToArray();
+                        // sum up all the influences so we can normalize them on import
+                        var sum = influences.Select(x => x.Weight).Aggregate((float runningTotal, float currentValue) => runningTotal + currentValue);
+                        for (int j = 0; j < 4 && j < influences.Length; j++)
+                        {
+                            var influence = influences[j];
+
+                            var boneName = psk.Bones[influence.Bone].Name;
+                            var meshBoneIndex = meshBin.RefSkeleton.FindIndex(x => x.Name == boneName);
+                            var mappedBoneIndex = containingChunk.BoneMap.IndexOf((ushort)meshBoneIndex);
+                            newBoneInfluenceIndices[j] = (byte)mappedBoneIndex;
+                            // normalize, convert to a byte with 0 being none and 255 being full
+                            newBoneInfluenceWeights[j] = (byte)Math.Round(influence.Weight * 255f / sum);
+                        }
+                        LOD.VertexBufferGPUSkin.VertexData[i].InfluenceBones = new Influences(newBoneInfluenceIndices[0], newBoneInfluenceIndices[1], newBoneInfluenceIndices[2], newBoneInfluenceIndices[3]);
+                        LOD.VertexBufferGPUSkin.VertexData[i].InfluenceWeights = new Influences(newBoneInfluenceWeights[0], newBoneInfluenceWeights[1], newBoneInfluenceWeights[2], newBoneInfluenceWeights[3]);
                     }
+
+                    // remove the extra LODs; we are not handling them correctly anyway
+                    meshBin.LODModels = [meshBin.LODModels[0]];
 
                     meshExport.WriteBinary(meshBin);
                 }
             }
+        }
+
+        private static void SetupSectionsAndChunks(PSK psk, StaticLODModel lod, Dictionary<int, List<PSK.PSKWeight>> weightsByPoint, MeshBone[] refSkeleton)
+        {
+            // the triangles, grouped by material
+            var matGroups = psk.Faces.GroupBy(x => x.MatIndex).OrderBy(x => x.Key).Select(x => x.ToArray()).ToArray();
+
+            // the indices of those triangles in order to put into the mesh binary
+            // yes, the order is intentionally flipped to make sure the normals come out right
+            var indexBuffer = matGroups.SelectMany(x => x).SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]).ToArray();
+
+            // make some pseudo sections from those, tracking the min and max vertex index needed to contain each section of triangles
+            List<MeshSection> sections = [];
+            var startIndex = 0;
+            foreach (var matGroup in matGroups)
+            {
+                var section = new MeshSection
+                {
+                    Triangles = matGroup,
+                    BaseTriIndex = startIndex,
+                    MatIndex = matGroup[0].MatIndex,
+                };
+
+                // calculate the min and max vertex indices within this section
+                var sectionIndices = matGroup.SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]);
+                section.MinVertIndex = sectionIndices.Min();
+                section.MaxVertIndex = sectionIndices.Max();
+
+                sections.Add(section);
+                startIndex += matGroup.Length;
+            }
+
+            // given this, I then need to make the fewest number of chunks with non overlapping vertex ranges
+            // in the best case this means the same number of chunks as sections
+            // in the worst case we fold them into a single chunk
+            // hypothetically we could split the sections to avoid merging chunks but I haven't tested that and it won't work in all cases
+
+            // first, sort the sections by min vert index then max vert index, so we can enumerate them in that order
+            sections = [.. sections.OrderBy(x => x.MinVertIndex).ThenBy(x => x.MaxVertIndex)];
+            List<MeshChunk> chunks = [];
+            chunks.Add(new MeshChunk
+            {
+                VertIndexStart = 0,
+                VertIndexEnd = sections[0].MaxVertIndex,
+                InfluenceBones = []
+            });
+            foreach (var section in sections)
+            {
+                if (section.MinVertIndex > chunks[^1].VertIndexEnd)
+                {
+                    // sections have non overlapping vertices; make a new chunk
+                    chunks.Add(new MeshChunk
+                    {
+                        VertIndexStart = section.MinVertIndex,
+                        VertIndexEnd = section.MaxVertIndex,
+                        InfluenceBones = []
+                    });
+                }
+                else
+                {
+                    // sections have overlapping vertices and we need to combine the chunks
+                    chunks[^1].VertIndexEnd = Math.Max(section.MaxVertIndex, chunks[^1].VertIndexEnd);
+                }
+            }
+
+            // now, assign a chunk index to each section
+            for (var i = 0; i < sections.Count; i++)
+            {
+                sections[i].ChunkIndex = chunks.FindIndex(x => x.VertIndexStart <= sections[i].MinVertIndex && x.VertIndexEnd >= sections[i].MaxVertIndex);
+            }
+
+            // next, we need to see which bones influence each chunk
+            // as well as count the rigid and soft vertices (not positive if that matters in game or not, but I am trying to emulate vanilla as closely as possible)
+            foreach (var chunk in chunks)
+            {
+                for (var i = chunk.VertIndexStart; i <= chunk.VertIndexEnd; i++)
+                {
+                    if (weightsByPoint.TryGetValue(i, out var weights))
+                    {
+                        switch (weights.Count)
+                        {
+                            case <= 1:
+                                chunk.RigidVerts++;
+                                break;
+                            case > 4:
+                                throw new Exception("there are too many bones influencing this vertex, and I don't know how to handle that.");
+                            default:
+                                chunk.SoftVerts++;
+                                break;
+                        }
+                        if (weights.Count > chunk.maxBoneInfluences)
+                        {
+                            chunk.maxBoneInfluences = weights.Count;
+                        }
+                        foreach (var weight in weights)
+                        {
+                            chunk.InfluenceBones.Add((ushort)weight.Bone);
+                        }
+                    }
+                    else
+                    {
+                        // for some reason this vert has no weights, which really seems like a bug, but I will treat it as a rigid vertex
+                        chunk.RigidVerts++;
+                    }
+                }
+                // the indices into the bone mapping array are bytes, so we can't have too many here without splitting the chunk up, which I have not implemented because it is extraorinarily unlikely to come up in real worls usage
+                if (chunk.InfluenceBones.Count > 255)
+                {
+                    throw new Exception("there are too many influence bones in this chunk; Send the psk to Squid and tell him to implement chunk splitting logic.");
+                }
+            }
+
+            ushort GetMeshBoneIndex(ushort pskIndex)
+            {
+                var pskBone = psk.Bones[pskIndex];
+                return (ushort)refSkeleton.FindIndex(x => x.Name == pskBone.Name);
+            }
+
+            // now that this is all done, we can finally add this stuff to the mesh binary
+            lod.IndexBuffer = indexBuffer;
+
+            lod.Sections = [..sections.Select(x => new SkelMeshSection
+            {
+                BaseIndex = (uint)(x.BaseTriIndex * 3),
+                ChunkIndex = (ushort)x.ChunkIndex,
+                MaterialIndex = (ushort)x.MatIndex,
+                NumTriangles = x.Triangles.Length
+            })];
+
+            lod.Chunks = [..chunks.Select(x => new SkelMeshChunk
+            {
+                BaseVertexIndex = (uint)x.VertIndexStart,
+                MaxBoneInfluences = x.maxBoneInfluences,
+                NumRigidVertices = x.RigidVerts,
+                NumSoftVertices = x.SoftVerts,
+                BoneMap = [.. x.InfluenceBones.Select(GetMeshBoneIndex).Order()]
+            })];
+        }
+
+        private class MeshSection
+        {
+            public PSK.PSKTriangle[] Triangles;
+            public int BaseTriIndex;
+            public int ChunkIndex;
+            public int MatIndex;
+            public int MinVertIndex;
+            public int MaxVertIndex;
+        }
+
+        private class MeshChunk
+        {
+            public int VertIndexStart;
+            public int VertIndexEnd;
+            public HashSet<ushort> InfluenceBones;
+            public int RigidVerts;
+            public int SoftVerts;
+            public int maxBoneInfluences;
         }
 
         public static void ReplaceBMFDataFromPsk(PackageEditorWindow pew)
