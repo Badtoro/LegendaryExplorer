@@ -56,7 +56,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 #if DEBUG
             foreach (var game in (MEGame[])[MEGame.LE2, MEGame.LE3])
             {
-                var db = DocuDB.GetEmptyDB(game);
+                var db = LegendaryExplorerCore.UnrealScript.Documentation.DocuDB.GetEmptyDB(game);
                 File.WriteAllText(Path.Combine(AppDirectories.DocuDBsFolder, game + ".json"), JsonConvert.SerializeObject(db, Formatting.Indented));
             }
 #endif
@@ -508,7 +508,7 @@ return;
                     {
                         using var masterUdk = MEPackageHandler.OpenMEPackage(packagePath);
                         AdjustLighting(masterUdk, multiplier);
-                        if (masterUdk.IsModified) 
+                        if (masterUdk.IsModified)
                             masterUdk.Save();
                     }
 
@@ -2285,8 +2285,64 @@ defaultproperties
             MessageBox.Show("Done.");
         }
 
+        class TexInfo
+        {
+            public string packagefile { get; set; }
+            public string memoryfullpath { get; set; }
+            public string classname { get; set; }
+        }
+
+        private static void GenTexDB()
+        {
+            // Maps a texture's instance object name to the path of a package that contains it's export data
+            var TextureToPackageName = new CaseInsensitiveConcurrentDictionary<TexInfo>();
+
+            // var compiledFile = MEPackageHandler.OpenMEPackage(@"S:\Milan\UDK\LE3_Mats.pcc", forceLoadFromDisk: true);
+
+
+            var backupPath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3);
+            var files = Directory.GetFiles(backupPath, "*.pcc", SearchOption.AllDirectories);
+            var set = new SortedSet<string>();
+
+            Parallel.ForEach(files, packageF =>
+            {
+                //foreach (var packageF in files )
+                //{
+                var package = MEPackageHandler.UnsafePartialLoad(packageF, x => false);
+                foreach (var tex in package.Exports.Where(x => !x.IsDefaultObject && x.IsA("Texture"))) // This might need changed later.
+                {
+                    if (tex.ClassName is "LightMapTexture2D" or "ShadowMapTexture2D")
+                        continue; // Do not care.
+                    set.Add(tex.ClassName);
+                    var instancedName = tex.ObjectName.Instanced;
+                    if (!TextureToPackageName.TryGetValue(instancedName, out _))
+                    {
+                        TextureToPackageName[instancedName] = new TexInfo() { packagefile = package.FilePath, memoryfullpath = tex.MemoryFullPath, classname = tex.ClassName };
+                    }
+                }
+
+                //foreach (var tex in package.Imports.Where(x => x.idxLink != 0 && x.IsA("Texture2D"))) // This might need changed later.
+                //{
+                //    var instancedName = tex.ObjectName.Instanced;
+                //    if (!TextureToPackageName.TryGetValue(instancedName, out _))
+                //    {
+                //        TextureToPackageName[instancedName] = new TexInfo() { packagefile = package.FilePath, memoryfullpath = tex.MemoryFullPath, classname = tex.ClassName };
+                //    }
+                //}
+                //}
+            });
+            var outJ = JsonConvert.SerializeObject(TextureToPackageName, Formatting.Indented);
+            File.WriteAllText(@"S:\Milan\UDK\TextureDBForT3D.json", outJ);
+            Debug.WriteLine(string.Join('\n', set));
+        }
+
         public static void MScanner(PackageEditorWindow pe)
         {
+            //GenUObjDB();
+            GenTexDB();
+            MessageBox.Show("DONE");
+            return;
+
             var package = pe.Pcc.Exports.FirstOrDefault(x => x.ClassName == "Package" && x.Parent == null);
             foreach (var exp in pe.Pcc.Exports.Where(x => x.Parent == null && x.ClassName != "Package"))
             {
@@ -2902,6 +2958,50 @@ defaultproperties
                 Debug.WriteLine($"DUPLICATE IFP: {duplicate.Key} in {duplicate.Value}");
             }
 #endif
+        }
+
+
+        private static void GenUObjDB()
+        {
+            var objectType = "MaterialInstanceConstant";
+            var isA = true;
+
+            // Maps all meshes to their source packages
+            var packageToObjList = new CaseInsensitiveDictionary<CaseInsensitiveDictionary<string>>();
+
+            var backupPath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3);
+            foreach (var packageF in Directory.GetFiles(backupPath, "*.pcc", SearchOption.AllDirectories))
+            {
+                var package = MEPackageHandler.UnsafePartialLoad(packageF, x => false);
+                List<ExportEntry> objects = null;
+                if (!isA)
+                {
+                    objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && x.ClassName == objectType && x.GetRoot().ObjectName != "TheWorld").ToList();
+                }
+                else
+                {
+                    objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && (x.Parent == null || x.Parent.ClassName == "Package") && x.IsA(objectType) && x.GetRoot().ObjectName != "TheWorld").ToList();
+                }
+
+
+                foreach (var obj in objects) // This might need changed later.
+                {
+                    var linker = obj.GetLinker();
+                    if (!packageToObjList.TryGetValue(linker, out var objs))
+                    {
+                        objs = packageToObjList[linker] = new CaseInsensitiveDictionary<string>();
+                    }
+
+                    if (!objs.TryGetValue(obj.MemoryFullPath, out _))
+                    {
+                        objs[obj.MemoryFullPath] = package.FilePath;
+                    }
+                }
+            }
+
+            var outJ = JsonConvert.SerializeObject(packageToObjList);
+            File.WriteAllText($@"S:\Milan\UDK\PackageMappingFor{objectType}.json", outJ);
+
         }
 
         public static void GlobalShaderCacheResearch()
