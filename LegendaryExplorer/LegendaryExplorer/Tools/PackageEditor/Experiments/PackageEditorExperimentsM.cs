@@ -57,7 +57,15 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
             foreach (var game in (MEGame[])[MEGame.LE2, MEGame.LE3])
             {
                 var db = LegendaryExplorerCore.UnrealScript.Documentation.DocuDB.GetEmptyDB(game);
-                File.WriteAllText(Path.Combine(AppDirectories.DocuDBsFolder, game + ".json"), JsonConvert.SerializeObject(db, Formatting.Indented));
+
+                var dbDir = Path.Combine(AppDirectories.DocuDBsFolder, game.ToString());
+                Directory.CreateDirectory(dbDir);
+
+                foreach (var cls in db.ClassDocumentation)
+                {
+                    var outPath = Path.Combine(dbDir, $"{cls.Key}.json");
+                    File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
+                }
             }
 #endif
         }
