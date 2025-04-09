@@ -783,11 +783,20 @@ defaultproperties
 
                     if (psk.Points.Count != psk.Wedges.Count)
                     {
-                        ShowError("Can't import this psk; number of points and wedges differ.");
+                        ShowError("Can't import this psk; number of points and wedges differ. You probably created new material or UV seams, which will break morph targets");
                         return;
                     }
 
-                    // TODO make sure the skeletons match; we may need to update that from the psk so indices, positions, etc match
+
+                    // make sure the skeletons match; we may need to update that from the psk so positions, rotations, etc match
+                    foreach (var bone in meshBin.RefSkeleton)
+                    {
+                        var pskBone = psk.Bones.FirstOrDefault(x => x.Name == bone.Name);
+                        bone.Position = pskBone.Position with { Y = -pskBone.Position.Y };
+                        bone.Orientation = pskBone.Rotation with { Y = -pskBone.Rotation.Y };
+                        // TODO I could probably have it update the structure but it seems super unlikely anyone would actually want to do that
+                    }
+
 
                     SetNumMaterialSlots(meshBin, psk.Materials.Count);
 
