@@ -61,9 +61,24 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 var dbDir = Path.Combine(AppDirectories.DocuDBsFolder, game.ToString());
                 Directory.CreateDirectory(dbDir);
 
+                var classesDir = Directory.CreateDirectory(Path.Combine(dbDir, "classes")).FullName;
                 foreach (var cls in db.ClassDocumentation)
                 {
-                    var outPath = Path.Combine(dbDir, $"{cls.Key}.json");
+                    var outPath = Path.Combine(classesDir, $"{cls.Key}.json");
+                    File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
+                }
+
+                var structs = Directory.CreateDirectory(Path.Combine(dbDir, "structs")).FullName;
+                foreach (var cls in db.StructDocumentation)
+                {
+                    var outPath = Path.Combine(structs, $"{cls.Key}.json");
+                    File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
+                }
+
+                var enums = Directory.CreateDirectory(Path.Combine(dbDir, "enums")).FullName;
+                foreach (var cls in db.EnumDocumentation)
+                {
+                    var outPath = Path.Combine(enums, $"{cls.Key}.json");
                     File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
                 }
             }
