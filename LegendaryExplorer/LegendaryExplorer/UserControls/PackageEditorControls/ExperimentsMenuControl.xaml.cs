@@ -1381,6 +1381,11 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.ExportBmfToRon(GetPEWindow());
         }
 
+        private void SmoothMeshSeams_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.SmoothMeshSeams(GetPEWindow());
+        }
+
         // EXPERIMENTS: OTHER PEOPLE ------------------------------------------------------------
         #region Other people's experiments
         private void ExportLevelToT3D_Click(object sender, RoutedEventArgs e)

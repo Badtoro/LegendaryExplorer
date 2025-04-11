@@ -496,6 +496,15 @@ defaultproperties
             return materialChoices.IndexOf(mat);
         }
 
+        private static ExportEntry ChooseSkeletalMesh(PackageEditorWindow pew, string prompt)
+        {
+            if (EntrySelector.GetEntry<ExportEntry>(pew, pew.Pcc, prompt, exp => exp.ClassName == "SkeletalMesh") is ExportEntry meshExport)
+            {
+                return meshExport;
+            }
+            return null;
+        }
+
         private static void SetNumMaterialSlots(SkeletalMesh meshBinary, int numMaterials)
         {
             if (meshBinary.Materials.Length == numMaterials)
@@ -601,7 +610,7 @@ defaultproperties
                 var baseMeshBin = baseHeadMesh.GetBinaryData<SkeletalMesh>();
 
                 // make most of the psk from the base head mesh
-                var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh.GetBinaryData<SkeletalMesh>());
+                var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh.GetBinaryData<SkeletalMesh>(), 0, true);
 
                 var bmfBin = bmf.GetBinaryData<BioMorphFace>();
 
@@ -761,6 +770,64 @@ defaultproperties
             if (sourceVectors != null) { targetExport.WriteProperty(targetVectors); }
             if (sourceScalars != null) { targetExport.WriteProperty(targetScalars); }
         }
+
+        // seems promising, but needs more work
+        public static void SmoothMeshSeams(PackageEditorWindow pew)
+        {
+            // pick two meshes
+            var sourceMesh = ChooseSkeletalMesh(pew, "Choose source mesh (usually a head mesh) which will not be modified in this operation, just used as the source for vertex normals");
+            var targetMesh = ChooseSkeletalMesh(pew, "Choose Target mesh (usually a body with a neck seam or a hair mesh that needs to be seamless with the scalp) which will have its vertex normals updated to match those on the source mesh as part of the operation.");
+
+            if (sourceMesh != null && targetMesh != null)
+            {
+                var sourceBin = sourceMesh.GetBinaryData<SkeletalMesh>();
+                var targetBin = targetMesh.GetBinaryData<SkeletalMesh>();
+
+                var sourceVerts = new List<(int vertIndex, GPUSkinVertex vert)>();
+                var targetVerts = new List<(int vertIndex, GPUSkinVertex vert)>();
+
+                for (var i = 0; i < sourceBin.LODModels[0].VertexBufferGPUSkin.VertexData.Length; i++)
+                {
+                    sourceVerts.Add((i, sourceBin.LODModels[0].VertexBufferGPUSkin.VertexData[i]));
+                }
+
+                for (var i = 0; i < targetBin.LODModels[0].VertexBufferGPUSkin.VertexData.Length; i++)
+                {
+                    targetVerts.Add((i, targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[i]));
+                }
+
+                var overlap = targetVerts.Join(sourceVerts, first => first.vert.Position, second => second.vert.Position, (first, second) => (first.vertIndex, second.vert), new VertComparer()).ToList();
+                // now find which verts are in both sequences comparing by position, returning the ones from 
+                //var intersect = targetVerts.Intersect(sourceVerts, new VertComparer()).ToArray();
+
+                foreach (var (targetIndex, sourceVert) in overlap)
+                {
+                    // copy the position, tanX and tanZ from the source to the target to make the seam match up better.
+                    targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[targetIndex].Position = sourceVert.Position;
+                    //targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[targetIndex].TangentX = sourceVert.TangentX;
+                    targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[targetIndex].TangentZ = sourceVert.TangentZ;
+                }
+
+                targetMesh.WriteBinary(targetBin);
+            }
+        }
+
+        private class VertComparer : IEqualityComparer<Vector3>
+        {
+            public bool Equals(Vector3 x, Vector3 y)
+            {
+                return (x - y).Length() < 0.1;
+            }
+
+            public int GetHashCode(Vector3 obj)
+            {
+                return 0;
+            }
+        }
+
+        // TODO import psa as morph target bone offsets
+        // TODO import psa as BMF offset
+        // TODO apply psa to ron file for bone offsets?
 
         public static void ReplaceMeshDataFromPsk(PackageEditorWindow pew)
         {
@@ -1052,7 +1119,7 @@ defaultproperties
             var d = new SaveFileDialog { Filter = "PSK|*.psk" };
             if (d.ShowDialog() == true)
             {
-                PSK.CreateFromSkeletalMesh(skelMeshExport.GetBinaryData<SkeletalMesh>()).ToFile(d.FileName);
+                PSK.CreateFromSkeletalMesh(skelMeshExport.GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
             }
         }
 
@@ -1454,7 +1521,7 @@ defaultproperties
 
                 // output the special psk into a file with the name of the base head
                 // make most of the psk from the base skeletal mesh
-                var psk = PSK.CreateFromSkeletalMesh(baseMeshBin);
+                var psk = PSK.CreateFromSkeletalMesh(baseMeshBin, 0, true);
 
                 foreach (var target in targets)
                 {

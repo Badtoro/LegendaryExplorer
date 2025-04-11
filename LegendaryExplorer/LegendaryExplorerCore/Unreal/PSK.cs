@@ -6,15 +6,17 @@ using LegendaryExplorerCore.Unreal.BinaryConverters;
 
 namespace LegendaryExplorerCore.Unreal
 {
-    //WIP. Not sure if it produces correct output
     public class PSK
     {
+        // standard official PSK stuff, in the official order
         public List<Vector3> Points;
         public List<PSKWedge> Wedges;
         public List<PSKTriangle> Faces;
         public List<PSKMaterial> Materials;
         public List<PSA.PSABone> Bones;
         public List<PSKWeight> Weights;
+        // nonstandard, but some things can read/write this data
+        public List<Vector3> VertexNormals;
         public List<MorphInfo> Morphs;
         public List<MorphDelta> MorphData;
 
@@ -83,6 +85,21 @@ namespace LegendaryExplorerCore.Unreal
             };
             sc.Serialize(ref weightsHeader);
             sc.Serialize(ref Weights, weightsHeader.DataCount, sc.Serialize);
+
+            // some programs support slightly nonstandard data like vertex norms, which we will emit if present
+            if (VertexNormals != null && VertexNormals.Count > 0)
+            {
+                var VertexNormalsHeader = new PSA.ChunkHeader
+                {
+                    ChunkID = "VTXNORMS",
+                    Version = version,
+                    DataSize = 0xc,
+                    DataCount = VertexNormals.Count
+                };
+                sc.Serialize(ref VertexNormalsHeader);
+                sc.Serialize(ref VertexNormals, VertexNormalsHeader.DataCount, sc.Serialize);
+            }
+
             // some programs (including Blender 4.2+ PSK plugin) can understand slightly nonstandard data such as the vertex offsets of morph targets, or shape keys in Blender's terminology. 
             // If the code does not put this in explicitly, it will emit a standard psk. 
             if (Morphs != null && Morphs.Count != 0)
@@ -123,7 +140,7 @@ namespace LegendaryExplorerCore.Unreal
             return psk;
         }
 
-        public static PSK CreateFromSkeletalMesh(SkeletalMesh skelMesh, int lodIdx = 0)
+        public static PSK CreateFromSkeletalMesh(SkeletalMesh skelMesh, int lodIdx = 0, bool includeVertexNormals = false)
         {
             var lod = skelMesh.LODModels[lodIdx];
 
@@ -137,7 +154,8 @@ namespace LegendaryExplorerCore.Unreal
                 Bones = [],
                 Weights = [],
                 Morphs = [],
-                MorphData = []
+                MorphData = [],
+                VertexNormals = []
             };
             int numTriangles = 0;
             var matIndices = new byte[numVertices];
@@ -219,6 +237,14 @@ namespace LegendaryExplorerCore.Unreal
                         U = vertex.UV.X,
                         V = vertex.UV.Y
                     });
+                    // include some slightly nonstandard stuff here
+                    if (includeVertexNormals)
+                    {
+                        var vertNorm = (Vector3)vertex.TangentZ;
+                        vertNorm = vertNorm with { Y = -vertNorm.Y };
+                        vertNorm = Vector3.Normalize(vertNorm);
+                        psk.VertexNormals.Add(vertNorm);
+                    }
                     for (int j = 0; j < 4; j++)
                     {
                         if (vertex.InfluenceWeights[j] == 0)
