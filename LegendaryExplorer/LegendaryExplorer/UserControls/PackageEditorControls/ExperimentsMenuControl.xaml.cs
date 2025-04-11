@@ -1371,9 +1371,9 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.BioMorphFaceToPskAndPsa(GetPEWindow());
         }
 
-        private void ImportPskToBmf_Click(object sender, RoutedEventArgs e)
+        private void ImportPskAndPsaToBmf_Click(object sender, RoutedEventArgs e)
         {
-            PackageEditorExperimentsSquid.ReplaceBMFDataFromPsk(GetPEWindow());
+            PackageEditorExperimentsSquid.ReplaceBMFDataFromPskAndPsa(GetPEWindow());
         }
 
         private void ExportBmfToRon_Click(object sender, RoutedEventArgs e)

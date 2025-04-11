@@ -825,96 +825,140 @@ defaultproperties
             }
         }
 
-        // TODO import psa as morph target bone offsets
-        // TODO import psa as BMF offset
-        // TODO apply psa to ron file for bone offsets?
+        private static bool GetPsaFromFile(PackageEditorWindow pew, out PSA psa, out string filePath)
+        {
+            var d = new OpenFileDialog
+            {
+                Filter = "PSA|*.psa",
+                Title = "Select a psa file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                psa = PSA.FromFile(d.FileName);
+                filePath = d.FileName;
+                return psa != null;
+            }
+
+            psa = null;
+            filePath = null;
+            return false;
+        }
+
+        private static bool GetPskFromFile(PackageEditorWindow pew, out PSK psk, out string filePath)
+        {
+            var d = new OpenFileDialog
+            {
+                Filter = "PSK|*.psk",
+                Title = "Select a psk file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                psk = PSK.FromFile(d.FileName);
+                filePath = d.FileName;
+                return psk != null;
+            }
+
+            psk = null;
+            filePath = null;
+            return false;
+        }
+
+        private static bool GetHeadmorphFromFile(PackageEditorWindow pew, out HeadMorph headmorph, out string filePath)
+        {
+            var d = new OpenFileDialog
+            {
+                Filter = "RON|*.ron",
+                Title = "Select a ron file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                headmorph = HeadMorph.FromRonFile(d.FileName);
+                filePath = d.FileName;
+                return headmorph != null;
+            }
+
+            headmorph = null;
+            filePath = null;
+            return false;
+        }
 
         public static void ReplaceMeshDataFromPsk(PackageEditorWindow pew)
         {
-            if (GetSelectedMeshBinary(pew, out var meshExport, out var meshBin))
+            if (GetSelectedMeshBinary(pew, out var meshExport, out var meshBin)
+                && GetPskFromFile(pew, out var psk, out _))
             {
-                var d = new OpenFileDialog
+                if (psk.Points.Count != meshBin.LODModels[0].NumVertices)
                 {
-                    Filter = "PSK|*.psk",
-                    Title = "Select a psk file"
-                };
-                if (d.ShowDialog() == true)
-                {
-                    var psk = PSK.FromFile(d.FileName);
-
-                    if (psk.Points.Count != meshBin.LODModels[0].NumVertices)
-                    {
-                        ShowError("the number of vertices in the mesh (LOD 0) and the psk must match.");
-                        return;
-                    }
-
-                    if (psk.Points.Count != psk.Wedges.Count)
-                    {
-                        ShowError("Can't import this psk; number of points and wedges differ. You probably created new material or UV seams, which will break morph targets");
-                        return;
-                    }
-
-
-                    // make sure the skeletons match; we may need to update that from the psk so positions, rotations, etc match
-                    foreach (var bone in meshBin.RefSkeleton)
-                    {
-                        var pskBone = psk.Bones.FirstOrDefault(x => x.Name == bone.Name);
-                        bone.Position = pskBone.Position with { Y = -pskBone.Position.Y };
-                        bone.Orientation = pskBone.Rotation with { Y = -pskBone.Rotation.Y };
-                        // TODO I could probably have it update the structure but it seems super unlikely anyone would actually want to do that
-                    }
-
-
-                    SetNumMaterialSlots(meshBin, psk.Materials.Count);
-
-                    var LOD = meshBin.LODModels[0];
-
-                    var weightsByPoint = psk.Weights.GroupBy(x => x.Point).ToDictionary(g => g.Key, g => g.ToList());
-
-                    SetupSectionsAndChunks(psk, LOD, weightsByPoint, meshBin.RefSkeleton);
-
-                    // update the UVs of each vertex
-                    foreach (var wedge in psk.Wedges)
-                    {
-                        LOD.VertexBufferGPUSkin.VertexData[wedge.PointIndex].UV = new Vector2DHalf(wedge.U, wedge.V);
-                    }
-
-                    // update the position and weights of each point
-                    for (int i = 0; i < psk.Points.Count; i++)
-                    {
-                        // replace the position data with that of the psk
-                        // gotta invert that Y, just like we inverted in on import
-                        LOD.VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i] with { Y = psk.Points[i].Y * -1 };
-
-                        // find the chunk containing this point
-                        // TODO optimization: don't look this up every loop; the chunks are ordered non overlapping sequences of verts
-                        var containingChunk = LOD.Chunks.LastOrDefault(x => x.BaseVertexIndex <= i);
-
-                        var newBoneInfluenceIndices = new byte[4];
-                        var newBoneInfluenceWeights = new byte[4];
-                        var influences = weightsByPoint[i].OrderByDescending(x => x.Weight).ToArray();
-                        // sum up all the influences so we can normalize them on import
-                        var sum = influences.Select(x => x.Weight).Aggregate((float runningTotal, float currentValue) => runningTotal + currentValue);
-                        for (int j = 0; j < 4 && j < influences.Length; j++)
-                        {
-                            var influence = influences[j];
-
-                            var boneName = psk.Bones[influence.Bone].Name;
-                            var meshBoneIndex = meshBin.RefSkeleton.FindIndex(x => x.Name == boneName);
-                            var mappedBoneIndex = containingChunk.BoneMap.IndexOf((ushort)meshBoneIndex);
-                            newBoneInfluenceIndices[j] = (byte)mappedBoneIndex;
-                            // normalize, convert to a byte with 0 being none and 255 being full
-                            newBoneInfluenceWeights[j] = (byte)Math.Round(influence.Weight * 255f / sum);
-                        }
-                        LOD.VertexBufferGPUSkin.VertexData[i].InfluenceBones = new Influences(newBoneInfluenceIndices[0], newBoneInfluenceIndices[1], newBoneInfluenceIndices[2], newBoneInfluenceIndices[3]);
-                        LOD.VertexBufferGPUSkin.VertexData[i].InfluenceWeights = new Influences(newBoneInfluenceWeights[0], newBoneInfluenceWeights[1], newBoneInfluenceWeights[2], newBoneInfluenceWeights[3]);
-                    }
-
-                    // remove the extra LODs; we are not handling them correctly anyway
-                    meshBin.LODModels = [meshBin.LODModels[0]];
-
-                    meshExport.WriteBinary(meshBin);
+                    ShowError("the number of vertices in the mesh (LOD 0) and the psk must match.");
+                    return;
                 }
+
+                if (psk.Points.Count != psk.Wedges.Count)
+                {
+                    ShowError("Can't import this psk; number of points and wedges differ. You probably created new material or UV seams, which will break morph targets");
+                    return;
+                }
+
+
+                // make sure the skeletons match; we may need to update that from the psk so positions, rotations, etc match
+                foreach (var bone in meshBin.RefSkeleton)
+                {
+                    var pskBone = psk.Bones.FirstOrDefault(x => x.Name == bone.Name);
+                    bone.Position = pskBone.Position with { Y = -pskBone.Position.Y };
+                    bone.Orientation = pskBone.Rotation with { Y = -pskBone.Rotation.Y };
+                    // TODO I could probably have it update the structure but it seems super unlikely anyone would actually want to do that
+                }
+
+
+                SetNumMaterialSlots(meshBin, psk.Materials.Count);
+
+                var LOD = meshBin.LODModels[0];
+
+                var weightsByPoint = psk.Weights.GroupBy(x => x.Point).ToDictionary(g => g.Key, g => g.ToList());
+
+                SetupSectionsAndChunks(psk, LOD, weightsByPoint, meshBin.RefSkeleton);
+
+                // update the UVs of each vertex
+                foreach (var wedge in psk.Wedges)
+                {
+                    LOD.VertexBufferGPUSkin.VertexData[wedge.PointIndex].UV = new Vector2DHalf(wedge.U, wedge.V);
+                }
+
+                // update the position and weights of each point
+                for (int i = 0; i < psk.Points.Count; i++)
+                {
+                    // replace the position data with that of the psk
+                    // gotta invert that Y, just like we inverted in on import
+                    LOD.VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i] with { Y = psk.Points[i].Y * -1 };
+
+                    // find the chunk containing this point
+                    // TODO optimization: don't look this up every loop; the chunks are ordered non overlapping sequences of verts
+                    var containingChunk = LOD.Chunks.LastOrDefault(x => x.BaseVertexIndex <= i);
+
+                    var newBoneInfluenceIndices = new byte[4];
+                    var newBoneInfluenceWeights = new byte[4];
+                    var influences = weightsByPoint[i].OrderByDescending(x => x.Weight).ToArray();
+                    // sum up all the influences so we can normalize them on import
+                    var sum = influences.Select(x => x.Weight).Aggregate((float runningTotal, float currentValue) => runningTotal + currentValue);
+                    for (int j = 0; j < 4 && j < influences.Length; j++)
+                    {
+                        var influence = influences[j];
+
+                        var boneName = psk.Bones[influence.Bone].Name;
+                        var meshBoneIndex = meshBin.RefSkeleton.FindIndex(x => x.Name == boneName);
+                        var mappedBoneIndex = containingChunk.BoneMap.IndexOf((ushort)meshBoneIndex);
+                        newBoneInfluenceIndices[j] = (byte)mappedBoneIndex;
+                        // normalize, convert to a byte with 0 being none and 255 being full
+                        newBoneInfluenceWeights[j] = (byte)Math.Round(influence.Weight * 255f / sum);
+                    }
+                    LOD.VertexBufferGPUSkin.VertexData[i].InfluenceBones = new Influences(newBoneInfluenceIndices[0], newBoneInfluenceIndices[1], newBoneInfluenceIndices[2], newBoneInfluenceIndices[3]);
+                    LOD.VertexBufferGPUSkin.VertexData[i].InfluenceWeights = new Influences(newBoneInfluenceWeights[0], newBoneInfluenceWeights[1], newBoneInfluenceWeights[2], newBoneInfluenceWeights[3]);
+                }
+
+                // remove the extra LODs; we are not handling them correctly anyway
+                meshBin.LODModels = [meshBin.LODModels[0]];
+
+                meshExport.WriteBinary(meshBin);
             }
         }
 
@@ -1075,19 +1119,12 @@ defaultproperties
             public int maxBoneInfluences;
         }
 
-        public static void ReplaceBMFDataFromPsk(PackageEditorWindow pew)
+        public static void ReplaceBMFDataFromPskAndPsa(PackageEditorWindow pew)
         {
             if (GetSelectedItem(pew, "BioMorphFace", out var bmfExport))
             {
-                var d = new OpenFileDialog
+               if (GetPskFromFile(pew, out var psk, out _))
                 {
-                    Filter = "PSK|*.psk",
-                    Title = "Select a psk file"
-                };
-                if (d.ShowDialog() == true)
-                {
-                    var psk = PSK.FromFile(d.FileName);
-
                     var bmfBin = bmfExport.GetBinaryData<BioMorphFace>();
 
                     Vector3[] vertexPos = new Vector3[psk.Points.Count];
@@ -1100,6 +1137,25 @@ defaultproperties
                     bmfBin.LODs = [[.. vertexPos]];
 
                     bmfExport.WriteBinary(bmfBin);
+                }
+                if (GetPsaFromFile(pew, out var psa, out _))
+                {
+                    // make sure there is at least one keyframe in this psa
+                    if (psa.Keys.Count >= psa.Bones.Count)
+                    {
+                        var finalSkel = new ArrayProperty<StructProperty>("m_aFinalSkeleton");
+                        for (int i = 0; i < psa.Bones.Count; i++)
+                        {
+                            var bone = psa.Bones[i];
+                            var boneKeyframe = psa.Keys[i];
+                            if (Vector3.Distance(bone.Position, boneKeyframe.Position) > 0.001)
+                            {
+                                var offsetBonePos = new StructProperty("OffsetBonePos", false, Vector3ToStructProperty(boneKeyframe.Position, "vPos"), new NameProperty(bone.Name, "nName"));
+                                finalSkel.Add(offsetBonePos);
+                            }
+                        }
+                        bmfExport.WriteProperty(finalSkel);
+                    }
                 }
             }
             else
