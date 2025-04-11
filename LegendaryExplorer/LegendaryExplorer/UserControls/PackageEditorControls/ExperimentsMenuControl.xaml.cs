@@ -1341,9 +1341,9 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.ImportRonToBmf(GetPEWindow());
         }
 
-        private void UpdateRonFromPsk_Click(object sender, RoutedEventArgs e)
+        private void UpdateRonFromPskAndPsa_Click(object sender, RoutedEventArgs e)
         {
-            PackageEditorExperimentsSquid.UpdateRonFromPsk(GetPEWindow());
+            PackageEditorExperimentsSquid.UpdateRonFromPskAndPsa(GetPEWindow());
         }
 
         private void MorphFaceToMesh_Click(object sender, RoutedEventArgs e)
@@ -1356,9 +1356,9 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.ReplaceMeshDataFromPsk(GetPEWindow());
         }
 
-        private void AddNewMorphTargetFromPsk_Click(object sender, RoutedEventArgs e)
+        private void AddNewMorphTargetFromPskAndPsa_Click(object sender, RoutedEventArgs e)
         {
-            PackageEditorExperimentsSquid.ImportPskAsMorphTarget(GetPEWindow());
+            PackageEditorExperimentsSquid.ImportPskAndPsaAsMorphTarget(GetPEWindow());
         }
 
         private void ExportMorphTargetSetToBlender_Click(object sender, RoutedEventArgs e)

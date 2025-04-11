@@ -1150,7 +1150,7 @@ defaultproperties
                             var boneKeyframe = psa.Keys[i];
                             if (Vector3.Distance(bone.Position, boneKeyframe.Position) > 0.001)
                             {
-                                var offsetBonePos = new StructProperty("OffsetBonePos", false, Vector3ToStructProperty(boneKeyframe.Position, "vPos"), new NameProperty(bone.Name, "nName"));
+                                var offsetBonePos = new StructProperty("OffsetBonePos", false, Vector3ToStructProperty(boneKeyframe.Position with { Y = -boneKeyframe.Position.Y }, "vPos"), new NameProperty(bone.Name, "nName"));
                                 finalSkel.Add(offsetBonePos);
                             }
                         }
@@ -1318,30 +1318,36 @@ defaultproperties
                 prop.GetProp<FloatProperty>("A").Value);
         }
 
-        public static void UpdateRonFromPsk(PackageEditorWindow pew)
+        public static void UpdateRonFromPskAndPsa(PackageEditorWindow pew)
         {
-            // select a ron file to update
-            var ronDialog = new OpenFileDialog
+            if (GetHeadmorphFromFile(pew, out var headMorph, out var ronFilePath))
             {
-                Filter = "RON|*.ron",
-                Title = "Select a ron file"
-            };
-            if (ronDialog.ShowDialog() == true)
-            {
-                var pskDialog = new OpenFileDialog
+                if (GetPskFromFile(pew, out var psk, out _))
                 {
-                    Filter = "PSK|*.psk",
-                    Title = "Select a psk file"
-                };
-                if (pskDialog.ShowDialog() == true)
-                {
-                    var headMorph = HeadMorph.FromRonFile(ronDialog.FileName);
-                    var psk = PSK.FromFile(pskDialog.FileName);
-
-                    headMorph.Lod0Vertices = psk.Points;
-
-                    headMorph.ToRonFile(ronDialog.FileName);
+                    headMorph.Lod0Vertices = new List<Vector3>(psk.Points.Count);
+                    for (int i = 0; i < psk.Points.Count; i++)
+                    {
+                        headMorph.Lod0Vertices.Add(psk.Points[i] with { Y = -psk.Points[i].Y });
+                    }
                 }
+                if (GetPsaFromFile(pew, out var psa, out _))
+                {
+                    // make sure there is at least one keyframe in this psa
+                    if (psa.Keys.Count >= psa.Bones.Count)
+                    {
+                        headMorph.OffsetBones.Clear();
+                        for (int i = 0; i < psa.Bones.Count; i++)
+                        {
+                            var bone = psa.Bones[i];
+                            var boneKeyframe = psa.Keys[i];
+                            if (Vector3.Distance(bone.Position, boneKeyframe.Position) > 0.001)
+                            {
+                                headMorph.OffsetBones.Add(bone.Name, boneKeyframe.Position with { Y = -boneKeyframe.Position.Y });
+                            }
+                        }
+                    }
+                }
+                headMorph.ToRonFile(ronFilePath);
             }
         }
 
@@ -1461,7 +1467,7 @@ defaultproperties
             }
         }
 
-        public static void ImportPskAsMorphTarget(PackageEditorWindow pew)
+        public static void ImportPskAndPsaAsMorphTarget(PackageEditorWindow pew)
         {
             if (!GetSelectedItem(pew, "MorphTargetSet", out var morphTargetSet))
             {
@@ -1479,58 +1485,89 @@ defaultproperties
 
             var baseMeshBinary = baseMesh.GetBinaryData<SkeletalMesh>();
 
-            var d = new OpenFileDialog
+            // using bitwise | so it evaluates the second even if the first evaluates to true
+            if (GetPskFromFile(pew, out var psk, out var pskName) | GetPsaFromFile(pew, out var psa, out var psaName))
             {
-                Filter = "PSK|*.psk",
-                Title = "Select a psk file"
-            };
-            if (d.ShowDialog() == true)
-            {
-                var psk = PSK.FromFile(d.FileName);
+                var morphTargetName = Path.GetFileNameWithoutExtension(pskName ?? psaName);
 
-                if (psk.Points.Count != baseMeshBinary.LODModels[0].NumVertices)
-                {
-                    ShowError("the number of vertices in the base mesh (LOD 0) and the psk must match.");
-                    return;
-                }
-
-                if (psk.Points.Count != psk.Wedges.Count)
-                {
-                    ShowError("Can't use this psk; number of points and wedges differ.");
-                    return;
-                }
-
-                // now make a new MorphTarget with the name of the psk
-                var newMorphTarget = ExportCreator.CreateExport(pew.Pcc, Path.GetFileNameWithoutExtension(d.FileName), "MorphTarget", morphTargetSet, indexed: false);
-                var newMorphTargetBin = new MorphTarget
-                {
-                    MorphLODModels = [new MorphTarget.MorphLODModel()]
-                };
-                newMorphTargetBin.MorphLODModels[0].NumBaseMeshVerts = psk.Points.Count;
-
-                List<MorphTarget.MorphVertex> vertDeltas = [];
-
-                for (int i = 0; i < psk.Points.Count; i++)
-                {
-                    // gotta flip the y part of the position
-                    psk.Points[i] = new Vector3(psk.Points[i].X, psk.Points[i].Y * -1, psk.Points[i].Z);    
-
-                    if (!ApproximatelyEqual(baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position, psk.Points[i]))
-                    {
-                        vertDeltas.Add(new MorphTarget.MorphVertex()
-                        {
-                            SourceIdx = (ushort)i,
-                            PositionDelta = psk.Points[i] - baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position
-                        });
-                    }
-                }
-
-                newMorphTargetBin.MorphLODModels[0].Vertices = [.. vertDeltas];
-
-                newMorphTarget.WriteBinary(newMorphTargetBin);
                 var targets = morphTargetSet.GetProperty<ArrayProperty<ObjectProperty>>("Targets");
-                targets.Add(new ObjectProperty(newMorphTarget.UIndex));
-                morphTargetSet.WriteProperty(targets);
+                // get or create a morph target with the name of the psa/psk, along with the binary data
+                var morphTarget = targets.Select(x => pew.Pcc.GetEntry(x.Value)).FirstOrDefault(x => x.ObjectName == morphTargetName && x.ClassName == "MorphTarget") as ExportEntry;
+                MorphTarget morphTargetBin = morphTarget?.GetBinaryData<MorphTarget>();
+                if (morphTarget == null)
+                {
+                    // create the new export
+                    morphTarget = ExportCreator.CreateExport(pew.Pcc, morphTargetName, "MorphTarget", morphTargetSet, indexed: false);
+                    // set up the skeleton of the binary data
+                    morphTargetBin = new MorphTarget
+                    {
+                        MorphLODModels = [new MorphTarget.MorphLODModel()]
+                    };
+                    morphTargetBin.MorphLODModels[0].NumBaseMeshVerts = psk.Points.Count;
+
+                    // add it to the morph target set
+                    targets.Add(new ObjectProperty(morphTarget.UIndex));
+                    morphTargetSet.WriteProperty(targets);
+                }
+
+                if (psk != null)
+                {
+                    if (psk.Points.Count != baseMeshBinary.LODModels[0].NumVertices)
+                    {
+                        ShowError("the number of vertices in the base mesh (LOD 0) and the psk must match.");
+                        return;
+                    }
+
+                    if (psk.Points.Count != psk.Wedges.Count)
+                    {
+                        ShowError("Can't use this psk; number of points and wedges differ.");
+                        return;
+                    }
+
+                    List<MorphTarget.MorphVertex> vertDeltas = [];
+
+                    for (int i = 0; i < psk.Points.Count; i++)
+                    {
+                        // gotta flip the y part of the position
+                        psk.Points[i] = new Vector3(psk.Points[i].X, psk.Points[i].Y * -1, psk.Points[i].Z);
+
+                        // TODO I could more simply represent this with a distance call and comparison
+                        if (!ApproximatelyEqual(baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position, psk.Points[i]))
+                        {
+                            vertDeltas.Add(new MorphTarget.MorphVertex()
+                            {
+                                SourceIdx = (ushort)i,
+                                PositionDelta = psk.Points[i] - baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position
+                            });
+                        }
+
+                        // TODO anything with vertex normal deltas once we can export those?
+                    }
+
+                    morphTargetBin.MorphLODModels[0].Vertices = [.. vertDeltas];
+                }
+
+                if (psa != null && psa.Keys.Count >= psa.Bones.Count)
+                {
+                    List<MorphTarget.BoneOffset> boneOffsets = [];
+                    for (int i = 0; i < psa.Bones.Count; i++)
+                    {
+                        var bone = psa.Bones[i];
+                        var boneKeyframe = psa.Keys[i];
+                        if (Vector3.Distance(bone.Position, boneKeyframe.Position) > 0.001)
+                        {
+                            var offset = boneKeyframe.Position - bone.Position;
+                            boneOffsets.Add(new MorphTarget.BoneOffset
+                            {
+                                Bone = bone.Name,
+                                Offset = offset with { Y = -offset.Y }
+                            });
+                        }
+                    }
+                    morphTargetBin.BoneOffsets = [.. boneOffsets];
+                }
+
+                morphTarget.WriteBinary(morphTargetBin);
             }
         }
 

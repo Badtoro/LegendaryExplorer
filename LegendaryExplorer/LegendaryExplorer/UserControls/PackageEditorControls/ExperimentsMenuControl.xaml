@@ -181,13 +181,13 @@
         <MenuItem Header="Convert BioMorphFace to a unique mesh" Click="MorphFaceToMesh_Click" ToolTip="Converts a BioMoprhFace to a new mesh with the vertices and materials applied, which can then be edited in external programs"/>
         <MenuItem Header="Convert Head Mesh to Have Separate Eye Materials" Click="MakeHeterochromia_Click" ToolTip="Converts a head mesh to have separate eye materials while maintaining vertex count and order. This will affect all LODs. Make sure the materials are properly mapped and show up correctly in preview."/>
         <MenuItem Header="Replace mesh data from psk" Click="ReplaceMeshFromPSK_Click" ToolTip="Replaces some of the mesh data from a psk to avoid needing to go through UModel, which  messes up vertex count and order. only use if you need it."/>
-        <MenuItem Header="Add a new MorphTarget from a psk + psa" Click="AddNewMorphTargetFromPsk_Click" ToolTip="Converts a psk to a morph target as a delta to the base mesh. select a morphTargetSet to use this. "/>
+        <MenuItem Header="Add a new MorphTarget from a psk + psa" Click="AddNewMorphTargetFromPskAndPsa_Click" ToolTip="Converts a psk to a morph target as a delta to the base mesh. select a morphTargetSet to use this. "/>
         <MenuItem Header="Export MorphTargetSet to psk + psa" Click="ExportMorphTargetSetToBlender_Click" ToolTip="Exports a MorphTargetSet to a psk+psa that can be imported to Blender as the base mesh with shape keys. select a morphTargetSet to use this. "/>
         <MenuItem Header="Export BioMorphFace to psk + PSA" Click="ExportBmfToPskAndPsa_Click" ToolTip="Exports a BioMorphFace into a psk and a psa for import into 3D modeling programs."/>
         <MenuItem Header="import psk + psa to BioMorphFace" Click="ImportPskAndPsaToBmf_Click" ToolTip="Applies the vetex positions from a psk file onto a BioMorphFace. "/>
         <MenuItem Header="import ron to BioMorphFace" Click="ImportRonToBmf_Click" ToolTip="Imports a Ron file as a BioMorphFace; assets will be linked if they are in the file. "/>
         <MenuItem Header="export BioMorphFace to ron" Click="ExportBmfToRon_Click" ToolTip="Export a BioMorphFace to a ron file"/>
-        <MenuItem Header="replace ron vertex + bone data from psk + psa" Click="UpdateRonFromPsk_Click" ToolTip="Updates the vertex positions in a ron file with those from a psk"/>
+        <MenuItem Header="replace ron vertex + bone data from psk + psa" Click="UpdateRonFromPskAndPsa_Click" ToolTip="Updates the vertex positions in a ron file with those from a psk"/>
         <!-- <MenuItem Header="Smooth Mesh Seams" Click="SmoothMeshSeams_Click" ToolTip="Attempts to smooth seams between two meshes by copying the vertex normals from one mesh to the other where vertices are in the same positions. "/> -->
     </MenuItem>
     <MenuItem Header="Other people's box of Legos">
