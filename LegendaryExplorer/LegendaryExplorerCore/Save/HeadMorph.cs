@@ -173,7 +173,7 @@ namespace LegendaryExplorerCore.Save
         private static KeyValuePair<string, string> GetKeyedString(string[] keyValSplit)
         {
             var fn = keyValSplit[0].Trim().Trim('"');
-            var off = keyValSplit[1].Trim().Trim(',');
+            var off = keyValSplit[1].Trim().Trim(',').Trim('"');
             return new KeyValuePair<string, string>(fn, off);
         }
 
