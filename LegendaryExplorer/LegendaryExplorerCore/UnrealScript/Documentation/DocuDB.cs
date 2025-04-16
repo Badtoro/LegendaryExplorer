@@ -8,6 +8,7 @@ using LegendaryExplorerCore.Misc;
 using LegendaryExplorerCore.Misc.ME3Tweaks;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.Unreal.BinaryConverters;
+using LegendaryExplorerCore.UnrealScript.Analysis.Visitors;
 using LegendaryExplorerCore.UnrealScript.Language.Tree;
 using Newtonsoft.Json;
 
@@ -170,10 +171,12 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 
             if (classDef is Class cls)
             {
+                dce.ParentClass = cls.Parent?.Name;
+                dce.Package = cls.Package; // is this right?
                 // Variables
                 foreach (var v in cls.VariableDeclarations)
                 {
-                    dce.Variables.Add(v.Name, new DocuMemberEntry());
+                    dce.Variables.Add(v.Name, new DocuMemberEntry() {MemberType = v.VarType.Name});
                 }
 
 
@@ -182,6 +185,8 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
                 {
                     var func = new DocuFunctionEntry();
                     func.FunctionMembers = new();
+                    func.ReturnType = v.ReturnType?.Name ?? "None";
+                    func.FunctionSignature = CodeBuilderVisitor.GetFunctionSignature(v);
                     foreach (var param in v.Parameters)
                     {
                         func.FunctionMembers.Add(param.Name, new DocuMemberEntry());
@@ -387,6 +392,12 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         public string ParentClass { get; set; }
 
         /// <summary>
+        /// Package this class is part of
+        /// </summary>
+        [JsonProperty("package")]
+        public string Package { get; set; }
+
+        /// <summary>
         /// Variable members of this class
         /// </summary>
         [JsonProperty("variables")]
@@ -468,6 +479,16 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         /// </summary>
         [JsonProperty("signature_members")]
         public CaseInsensitiveDictionary<DocuMemberEntry> FunctionMembers { get; set; }
+
+        /// <summary>
+        /// The return type for the function. Can technically be found in members...
+        /// </summary>
+        [JsonProperty("returntype")]
+        public string ReturnType { get; set; }
+
+
+        [JsonProperty("signature")]
+        public string FunctionSignature { get; set; }
     }
 
     public class DocuEnumValueEntry
@@ -489,6 +510,12 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         /// </summary>
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string MemberName { get; set; }
+
+        /// <summary>
+        /// Type of this member
+        /// </summary>
+        [JsonProperty("type")]
+        public string MemberType { get; set; }
 
         /// <summary>
         /// Contains the text description of this object.

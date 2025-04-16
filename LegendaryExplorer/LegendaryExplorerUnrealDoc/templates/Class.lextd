@@ -1,0 +1,27 @@
+﻿<h2 class="title">Class %LD_CLASSNAME%</h2>
+%LD_INHERITANCETREE%
+<hr>
+<p>%LD_DESCRIPTION%</p>
+
+	<!-- VARIABLES-->
+	<h3>Variables</h3>
+	<table>
+	<tr>
+		<th>Type</th>
+		<th>Name</th>
+		<th>Description</th>
+	</tr>
+	%LD_MEMBERLIST%
+</table>
+
+	<!-- FUNCTIONS-->
+	<h3>Functions</h3>
+	<table>
+	<tr>
+		<th>Return type</th>
+		<th>Signature</th>
+		<th>Description</th>
+	</tr>
+	%LD_FUNCTIONLIST%
+</table>
+
