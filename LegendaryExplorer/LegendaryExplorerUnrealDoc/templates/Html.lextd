@@ -1,7 +1,12 @@
 ﻿<html>
 	<head>
+		<meta property="og:type" content="website" />
 		<title>%LD_TITLE%</title>
-		<description>%LD_DESCRIPTION%</description>
+		<meta name="og:title" content="%LD_TITLE%"/>
+		<meta name="description" content="%LD_DESCRIPTION%"/>
+		<meta name="og:description" content="%LD_DESCRIPTION%"/>
+		<meta name="og:url" content="https://me3tweaks.github.io/LegendaryExplorer/unrealdoc/%LD_GAME%/%LD_RELPATH%"/>
+		<meta name="og:image" content="https://me3tweaks.github.io/idk.png"/>
 		<link rel="stylesheet" href="%LD_RELPATH%lexdoc.css">
 		<script type="text/javascript">
 			document.addEventListener('DOMContentLoaded', function() {
@@ -59,7 +64,7 @@
 <li><a href="Constructor.html" target="_top">No&nbsp;Frames</a></li>
 </ul>
 <ul class="navList" id="allclasses_navbar_top">
-<li><a href="../../../allclasses-noframe.html">All&nbsp;Classes</a></li>
+<li><a href="%LD_RELPATH%classes/index.html">All&nbsp;Classes</a></li>
 </ul>
 <div>
 <script type="text/javascript"><!--
@@ -92,7 +97,8 @@
 <!--   -->
 </a></div>
 <!-- ========= END OF TOP NAVBAR ========= -->
-
+<div>
 		%LD_CONTENT%
+</div>
 	</body>
 </html>

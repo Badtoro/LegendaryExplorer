@@ -255,7 +255,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             dType.Members = new();
             foreach (var eValue in tStruct.VariableDeclarations)
             {
-                dType.Members[eValue.Name] = new DocuMemberEntry();
+                dType.Members[eValue.Name] = new DocuMemberEntry() { MemberType = eValue.VarType.Name};
             }
 
             // Need to enumerate type entries.

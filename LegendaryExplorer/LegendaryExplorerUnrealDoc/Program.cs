@@ -33,7 +33,7 @@ namespace LegendaryExplorerUnrealDoc
             {
                 return 0;
             }
-         
+
             return -1;
         }
 
@@ -81,13 +81,13 @@ namespace LegendaryExplorerUnrealDoc
                 Console.WriteLine($"\tGenerating enum html");
                 foreach (var enumD in db.EnumDocumentation)
                 {
-                    OutputEnumDocumentation(htmlPath, enumD);
+                    OutputEnumDocumentation(htmlPath, db, enumD);
                 }
 
                 Console.WriteLine($"\tGenerating struct html");
                 foreach (var structD in db.StructDocumentation)
                 {
-                    OutputStructDocumentation(htmlPath, structD);
+                    OutputStructDocumentation(htmlPath, db, structD);
                 }
 
                 File.Copy(Path.Combine(AppContext.BaseDirectory, "css", "lexdoc.css"), Path.Combine(htmlPath, "lexdoc.css"));
@@ -128,10 +128,14 @@ namespace LegendaryExplorerUnrealDoc
             sb.AppendLine("<;ul>");
 
             index = index.Replace("%LD_LIST%", sb.ToString());
+            index = index.Replace("%LD_LISTTYPE%", subpath.UpperFirst());
+
 
             html = html.Replace("%LD_CONTENT%", index);
             html = html.Replace("%LD_RELPATH%", "../");
             html = html.Replace("%LD_GAME%", db.Game.ToString());
+            html = html.Replace("%LD_TITLE%", $"All {subpath.UpperFirst()}");
+            html = html.Replace("%LD_DESCRIPTION%", $"List of all {subpath} in {db.Game}.");
 
             File.WriteAllText(outputPath, html);
         }
@@ -153,6 +157,8 @@ namespace LegendaryExplorerUnrealDoc
             MEMBER_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "MemberRow.lextd"));
             FUNCTIONROW_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionRow.lextd"));
             FUNCTIONSPEC_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionSpec.lextd"));
+            ENUM_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Enum.lextd"));
+            STRUCT_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Struct.lextd"));
         }
 
         private static void OutputClassDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuClassEntry> classD)
@@ -358,12 +364,124 @@ namespace LegendaryExplorerUnrealDoc
             return null;
         }
 
-        private static void OutputStructDocumentation(string htmlPath, KeyValuePair<string, DocuStructEntry> structD)
+        private static void OutputStructDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuStructEntry> structD)
         {
+            var outFile = Path.Combine(htmlPath, "structs", $"{structD.Key}.html");
+
+            var html = HTML_TEMPLATE;
+
+
+            var content = STRUCT_TEMPLATE;
+
+            // Can structs inherit...?
+            //var inheritanceTree = BuildInheritanceTree(db, structD.Key);
+            //content = content.Replace("%LD_INHERITANCETREE%", inheritanceTree);
+            //content = content.Replace("%LD_CLASSNAME%", structD.Key);
+
+            #region VARIABLES
+            {
+                StringBuilder memberHtml = new StringBuilder();
+                string rowClass = "row";
+                foreach (var member in structD.Value.Members)
+                {
+                    var mrow = MEMBER_TEMPLATE;
+
+                    string typeText = GetTypeText(db, member.Value.MemberType);
+
+
+                    mrow = mrow.Replace("%LD_MEMBERTYPE%", typeText);
+                    mrow = mrow.Replace("%LD_MEMBERNAME%", member.Key);
+                    mrow = mrow.Replace("%LD_MEMBERDOC%", member.Value.MemberDocumentation);
+
+                    // Formatting
+                    mrow = mrow.Replace("%LD_ROWCLASS%", $"{rowClass}Color");
+
+                    memberHtml.AppendLine(mrow);
+
+                    if (rowClass == "row")
+                    {
+                        rowClass = "alt";
+                    }
+                    else
+                    {
+                        rowClass = "row";
+                    }
+                }
+
+                content = content.Replace("%LD_MEMBERLIST%", memberHtml.ToString());
+            }
+            #endregion
+
+            // Install content
+            html = html.Replace("%LD_CONTENT%", content);
+
+            // Shared on page
+            html = html.Replace("%LD_TITLE%", structD.Key);
+            html = html.Replace("%LD_DESCRIPTION%", structD.Value.MemberDocumentation);
+            html = html.Replace("%LD_GAME%", db.Game.ToString());
+
+            // We are one folder deep.
+            html = html.Replace("%LD_RELPATH%", "../");
+
+            File.WriteAllText(outFile, html);
+
         }
 
-        private static void OutputEnumDocumentation(string htmlPath, KeyValuePair<string, DocuEnumEntry> enumD)
+        private static void OutputEnumDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuEnumEntry> enumD)
         {
+            var outFile = Path.Combine(htmlPath, "enums", $"{enumD.Key}.html");
+
+            var html = HTML_TEMPLATE;
+
+            var content = ENUM_TEMPLATE;
+
+            #region VALUES
+            {
+                StringBuilder memberHtml = new StringBuilder();
+                string rowClass = "row";
+                foreach (var member in enumD.Value.EnumValues)
+                {
+                    var mrow = MEMBER_TEMPLATE;
+
+                    // MEMBERTYPE is the first column.
+                    mrow = mrow.Replace("%LD_MEMBERTYPE%", member.Value.EnumValue.ToString());
+                    mrow = mrow.Replace("%LD_MEMBERNAME%", member.Key);
+                    mrow = mrow.Replace("%LD_MEMBERDOC%", member.Value.MemberDocumentation);
+
+                    // Formatting
+                    mrow = mrow.Replace("%LD_ROWCLASS%", $"{rowClass}Color");
+
+                    memberHtml.AppendLine(mrow);
+
+                    if (rowClass == "row")
+                    {
+                        rowClass = "alt";
+                    }
+                    else
+                    {
+                        rowClass = "row";
+                    }
+                }
+
+                content = content.Replace("%LD_MEMBERLIST%", memberHtml.ToString());
+            }
+            #endregion
+
+            content = content.Replace("%LD_ENUMNAME%", enumD.Key);
+
+            // Install content
+            html = html.Replace("%LD_CONTENT%", content);
+
+            // Shared on page
+            html = html.Replace("%LD_TITLE%", enumD.Key);
+            html = html.Replace("%LD_DESCRIPTION%", enumD.Value.MemberDocumentation);
+            html = html.Replace("%LD_GAME%", db.Game.ToString());
+
+            // We are one folder deep.
+            html = html.Replace("%LD_RELPATH%", "../");
+
+            File.WriteAllText(outFile, html);
+
         }
     }
 }
