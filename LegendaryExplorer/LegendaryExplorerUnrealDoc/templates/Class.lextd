@@ -1,5 +1,7 @@
-﻿<h2 class="title">Class %LD_CLASSNAME%</h2>
+﻿<div class="header">
+<h2 class="title">Class %LD_CLASSNAME%</h2>
 %LD_INHERITANCETREE%
+</div>
 <hr>
 <p>%LD_DESCRIPTION%</p>
 
