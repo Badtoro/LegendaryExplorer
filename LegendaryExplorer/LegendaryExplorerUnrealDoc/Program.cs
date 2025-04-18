@@ -123,6 +123,7 @@ namespace LegendaryExplorerUnrealDoc
 
             html = html.Replace("%LD_CONTENT%", index);
             html = html.Replace("%LD_RELPATH%", "../");
+            html = html.Replace("%LD_GAME%", db.Game.ToString());
 
             File.WriteAllText(outputPath, html);
         }
