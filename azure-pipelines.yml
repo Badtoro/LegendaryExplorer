@@ -63,10 +63,11 @@ steps:
       }
 
       # Build docs
-      & $buildDir\\LegendaryExplorerUnrealDoc.exe -i $inputDir -o $outputDir
+      & $buildDir\LegendaryExplorerUnrealDoc.exe -i $inputDir -o $outputDir
 
       # Commit docs
       Write-Host Changing to Github pages branch for publishing.
+      git fetch --depth 1 origin gh-pages
       git checkout gh-pages
 
       Write-Host Cleaning out existing documentation...
@@ -79,6 +80,9 @@ steps:
 
       Write-Host "Copying documentation to repo..."
       Copy-Item -Path "$($outputDir)\*" -Destination .\unrealdoc -Recurse
+
+      git config user.email "me3tweaks-auto@me3tweaks.com"
+      git config user.name "ME3Tweaks-UnrealDoc"
 
       Write-Host "Adding documentation files to tracked files..."
       git add .\unrealdoc\*
