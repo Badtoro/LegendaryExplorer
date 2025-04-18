@@ -10,6 +10,7 @@
 		<link rel="stylesheet" href="%LD_RELPATH%lexdoc.css">
 		<script type="text/javascript">
 			document.addEventListener('DOMContentLoaded', function() {
+				document.title = document.title + " - %LD_GAME% - Legendary Explorer UnrealDoc"
 				var url = window.location.href.substring(window.location.protocol.length + 2);
 				var gameidx = url.indexOf("/%LD_GAME%/");
 				var baseurl = url.substring(0, gameidx + 5);
@@ -64,7 +65,9 @@
 <li><a href="Constructor.html" target="_top">No&nbsp;Frames</a></li>
 </ul>
 <ul class="navList" id="allclasses_navbar_top">
-<li><a href="%LD_RELPATH%classes/index.html">All&nbsp;Classes</a></li>
+	<li><a href="%LD_RELPATH%classes/index.html">All&nbsp;Classes</a></li>
+	<li><a href="%LD_RELPATH%structs/index.html">All&nbsp;Structs</a></li>
+	<li><a href="%LD_RELPATH%enums/index.html">All&nbsp;Enums</a></li>
 </ul>
 <div>
 <script type="text/javascript"><!--

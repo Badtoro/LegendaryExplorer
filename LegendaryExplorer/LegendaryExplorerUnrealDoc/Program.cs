@@ -83,12 +83,15 @@ namespace LegendaryExplorerUnrealDoc
                 {
                     OutputEnumDocumentation(htmlPath, db, enumD);
                 }
+                GenerateIndexPage(htmlPath, db, "enums");
 
                 Console.WriteLine($"\tGenerating struct html");
                 foreach (var structD in db.StructDocumentation)
                 {
                     OutputStructDocumentation(htmlPath, db, structD);
                 }
+                GenerateIndexPage(htmlPath, db, "structs");
+
 
                 File.Copy(Path.Combine(AppContext.BaseDirectory, "css", "lexdoc.css"), Path.Combine(htmlPath, "lexdoc.css"));
             }
