@@ -415,6 +415,9 @@ namespace LegendaryExplorerUnrealDoc
             }
             #endregion
 
+            content = content.Replace("%LD_STRUCTNAME%", structD.Key);
+
+
             // Install content
             html = html.Replace("%LD_CONTENT%", content);
 
