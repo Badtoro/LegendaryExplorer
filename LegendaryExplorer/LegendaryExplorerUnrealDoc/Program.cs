@@ -138,12 +138,12 @@ namespace LegendaryExplorerUnrealDoc
 
         private static void LoadTemplates()
         {
-            INDEX_TEMPLATE = File.ReadAllText("templates/index.lextd");
-            HTML_TEMPLATE = File.ReadAllText("templates/Html.lextd");
-            CLASS_TEMPLATE = File.ReadAllText("templates/Class.lextd");
-            MEMBER_TEMPLATE = File.ReadAllText("templates/MemberRow.lextd");
-            FUNCTIONROW_TEMPLATE = File.ReadAllText("templates/FunctionRow.lextd");
-            FUNCTIONSPEC_TEMPLATE = File.ReadAllText("templates/FunctionSpec.lextd");
+            INDEX_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "index.lextd"));
+            HTML_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Html.lextd"));
+            CLASS_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Class.lextd"));
+            MEMBER_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "MemberRow.lextd"));
+            FUNCTIONROW_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionRow.lextd"));
+            FUNCTIONSPEC_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionSpec.lextd"));
         }
 
         private static void OutputClassDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuClassEntry> classD)
