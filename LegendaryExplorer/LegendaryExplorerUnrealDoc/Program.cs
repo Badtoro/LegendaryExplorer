@@ -82,7 +82,7 @@ namespace LegendaryExplorerUnrealDoc
                     OutputStructDocumentation(htmlPath, structD);
                 }
 
-                File.Copy("css/lexdoc.css", Path.Combine(htmlPath, "lexdoc.css"));
+                File.Copy(Path.Combine(AppContext.BaseDirectory, "css", "lexdoc.css"), Path.Combine(htmlPath, "lexdoc.css"));
             }
         }
 
