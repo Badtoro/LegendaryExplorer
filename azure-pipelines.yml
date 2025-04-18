@@ -58,6 +58,7 @@ steps:
       $currentBranch = git branch --show-current
       if ($currentBranch -ne "UnrealDoc") {
           Write-Host Changing to UnrealDoc branch for documentation build.
+          git fetch --depth 1 origin UnrealDoc
           git switch UnrealDoc
       }
 
