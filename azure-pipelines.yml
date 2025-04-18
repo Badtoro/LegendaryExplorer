@@ -24,6 +24,7 @@ variables:
   doxygenUrl: "https://www.doxygen.nl/files/doxygen-1.9.5.windows.x64.bin.zip"
   doxygenWorkingDir: '$(Pipeline.Workspace)\Documentation\Doxygen'
   doxygenOutputDir: '$(Pipeline.Workspace)\Documentation\Output'
+  unrealDocOutputDir: '$(Pipeline.Workspace)\UnrealDoc\Output'
 
 steps:
 - checkout: self
@@ -34,6 +35,59 @@ steps:
 #- task: CmdLine@2
 #  inputs:
 #    script: 'tree "C:\Program Files (x86)\Microsoft Visual Studio" /F /A'
+
+- task: PowerShell@2
+  displayName: "Build UnrealDoc, commit to GitHub Pages"
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'DocuDB'))
+  inputs:
+    targetType: 'inline'
+    script: |
+      # This is here right now to avoid long iteration times
+      # Variables
+      $buildDir = "$(Build.SourcesDirectory)\UnrealDocBuild"
+      $unrealDocProj = "$(Build.SourcesDirectory)\LegendaryExplorer\LegendaryExplorerUnrealDoc\LegendaryExplorerUnrealDoc.csproj"
+      $inputDir = "$(Build.SourcesDirectory)\DocSources" # After branch change
+      $outputDir = "$(Build.SourcesDirectory)\BuiltDocs" # Where docs get built
+
+      # Build UnrealDoc so we can run it after switching branches.
+      dotnet publish $unrealDocProj -o $buildDir -c Release
+
+      # Checkout UnrealDoc branch
+      $currentBranch = git branch --show-current
+      if ($currentBranch -ne "UnrealDoc") {
+          Write-Host Changing to UnrealDoc branch for documentation build.
+          git switch UnrealDoc
+      }
+
+      # Build docs
+      & $buildDir\\LegendaryExplorerUnrealDoc.exe -i $inputDir -o $outputDir
+
+      # Commit docs
+      Write-Host Changing to Github pages branch for publishing.
+      git checkout gh-pages
+
+      Write-Host Cleaning out existing documentation...
+      if(Test-Path .\unrealdoc\)
+      {
+          Remove-Item .\unrealdoc\* -Recurse
+      } else {
+          New-Item .\unrealdoc -ItemType Directory
+      }
+
+      Write-Host "Copying documentation to repo..."
+      Copy-Item -Path "$($outputDir)\*" -Destination .\unrealdoc -Recurse
+
+      Write-Host "Adding documentation files to tracked files..."
+      git add .\unrealdoc\*
+      git add .\unrealdoc\**\*
+
+      Write-Host "Commiting new documentation..."
+      git commit -m "Update UnrealDoc [pipeline build]"
+
+      Write-Host "Pushing new documentation to public repo..."
+      git push origin gh-pages
+      git switch DocuDB # DEBUGGING - RESTORE BRANCH.
+
 
 # Change artifact name when the version major/minor changes
 - task: PowerShell@2
@@ -258,6 +312,28 @@ steps:
       git add .\nightly\**\*
       git commit -m "Update documentation [skip ci]"
       git push origin gh-pages
+
+- task: PowerShell@2
+  displayName: "Build documentation, commit to GitHub Pages"
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'Beta'))
+  inputs:
+    targetType: 'inline'
+    script: |
+      git config user.email "me3tweaks-auto@me3tweaks.com"
+      git config user.name "ME3Tweaks-LEC-Documentation"
+      $(doxygenWorkingDir)\doxygen.exe $(Build.SourcesDirectory)\Documentation\DoxygenConfigAzurePipelines
+      git restore $(Build.SourcesDirectory)\LegendaryExplorer\LegendaryExplorerCore\Libraries\Windows\TexConverter.dll
+      git checkout gh-pages
+      if(Test-Path .\nightly\)
+      {
+        Remove-Item .\nightly\* -Recurse
+      }
+      Copy-Item -Path "$(doxygenOutputDir)\html\*" -Destination .\nightly -Recurse
+      git add .\nightly\*
+      git add .\nightly\**\*
+      git commit -m "Update documentation [skip ci]"
+      git push origin gh-pages
+
 
 # Notify ME3Tweaks that a new beta build has been built
 - task: PowerShell@2
