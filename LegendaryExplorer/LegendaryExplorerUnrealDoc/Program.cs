@@ -43,7 +43,18 @@ namespace LegendaryExplorerUnrealDoc
         static void BuildDocs(CLIOptions options)
         {
             LoadTemplates();
-            MEGame[] games = [MEGame.LE3];
+
+            var inputDirs = Directory.GetDirectories(options.InputFolder);
+            var games = new List<MEGame>();
+            foreach (var inputDir in inputDirs)
+            {
+                if (Enum.TryParse<MEGame>(Path.GetFileName(inputDir), out var game))
+                {
+                    Console.WriteLine($"Detected documentation source for {game}");
+                    games.Add(game);
+                }
+            }
+
             foreach (var game in games)
             {
                 Console.WriteLine($"Generating documentation for {game}");
