@@ -1,8 +1,11 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
+using CommandLine;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.UnrealScript.Analysis.Visitors;
 using LegendaryExplorerCore.UnrealScript.Documentation;
+using LegendaryExplorerUnrealDoc.debug;
 
 namespace LegendaryExplorerUnrealDoc
 {
@@ -11,21 +14,40 @@ namespace LegendaryExplorerUnrealDoc
         // For compiling docs.
         static int Main(string[] args)
         {
-            if (args.Length != 1)
-                return 1;
+            bool success = false;
+            Parser.Default.ParseArguments<CLIOptions>(args)
+                .WithParsed<CLIOptions>(o =>
+                {
+#if DEBUG
+                    // Test only.
+                    Console.WriteLine("Generating dbs...");
+                    Testing.GenerateBlankDocuDBs();
+#endif
+                    BuildDocs(o);
+                    Console.WriteLine("Documentation built.");
+                    success = true;
+                })
+                .WithNotParsed(x =>
+                {
+                    Console.WriteLine("Invalid arguments specified.");
+                });
 
-            BuildDocs(args[0]);
-            return 0;
+            if (success)
+            {
+                return 0;
+            }
+         
+            return -1;
         }
 
-        static void BuildDocs(string outputFolder)
+        static void BuildDocs(CLIOptions options)
         {
             LoadTemplates();
             MEGame[] games = [MEGame.LE3];
             foreach (var game in games)
             {
                 Console.WriteLine($"Generating documentation for {game}");
-                var htmlPath = Path.Combine(outputFolder, game.ToString());
+                var htmlPath = Path.Combine(options.OutputFolder, game.ToString());
                 Directory.CreateDirectory(Path.Combine(htmlPath, "classes"));
                 Directory.CreateDirectory(Path.Combine(htmlPath, "enums"));
                 Directory.CreateDirectory(Path.Combine(htmlPath, "structs"));
@@ -38,13 +60,15 @@ namespace LegendaryExplorerUnrealDoc
                 }
 
                 Console.WriteLine($"\tLoading documentation files");
-                DocuDB db = DocuDB.LoadDocuDB(MEGame.LE3, $@"C:\Users\mgame\AppData\Roaming\LegendaryExplorer\DocuDBs\{game}");
+                DocuDB db = DocuDB.LoadDocuDB(game, Path.Combine(options.InputFolder, game.ToString()));
 
                 Console.WriteLine($"\tGenerating class html");
                 foreach (var classD in db.ClassDocumentation)
                 {
                     OutputClassDocumentation(htmlPath, db, classD);
                 }
+
+                GenerateIndexPage(htmlPath, db, "classes");
 
                 Console.WriteLine($"\tGenerating enum html");
                 foreach (var enumD in db.EnumDocumentation)
@@ -62,7 +86,49 @@ namespace LegendaryExplorerUnrealDoc
             }
         }
 
+        private static void GenerateIndexPage(string htmlPath, DocuDB db, string subpath)
+        {
+            var inputPath = Path.Combine(htmlPath, subpath);
+            var outputPath = Path.Combine(inputPath, "index.html");
+
+            var html = HTML_TEMPLATE;
+            var index = INDEX_TEMPLATE;
+
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("<ul>");
+            switch (subpath)
+            {
+                case "classes":
+                    foreach (var cls in db.ClassDocumentation)
+                    {
+                        sb.AppendLine($"<li><a data-type=\"class\">{cls.Key}</a></li>");
+                    }
+                    break;
+                case "structs":
+                    foreach (var cls in db.StructDocumentation)
+                    {
+                        sb.AppendLine($"<li><a data-type=\"struct\">{cls.Key}</a></li>");
+                    }
+                    break;
+                case "enums":
+                    foreach (var cls in db.EnumDocumentation)
+                    {
+                        sb.AppendLine($"<li><a data-type=\"enum\">{cls.Key}</a></li>");
+                    }
+                    break;
+            }
+            sb.AppendLine("<;ul>");
+
+            index = index.Replace("%LD_LIST%", sb.ToString());
+
+            html = html.Replace("%LD_CONTENT%", index);
+            html = html.Replace("%LD_RELPATH%", "../");
+
+            File.WriteAllText(outputPath, html);
+        }
+
         private static string HTML_TEMPLATE;
+        private static string INDEX_TEMPLATE;
         private static string CLASS_TEMPLATE;
         private static string FUNCTIONROW_TEMPLATE;
         private static string FUNCTIONSPEC_TEMPLATE;
@@ -72,12 +138,12 @@ namespace LegendaryExplorerUnrealDoc
 
         private static void LoadTemplates()
         {
+            INDEX_TEMPLATE = File.ReadAllText("templates/index.lextd");
             HTML_TEMPLATE = File.ReadAllText("templates/Html.lextd");
             CLASS_TEMPLATE = File.ReadAllText("templates/Class.lextd");
             MEMBER_TEMPLATE = File.ReadAllText("templates/MemberRow.lextd");
             FUNCTIONROW_TEMPLATE = File.ReadAllText("templates/FunctionRow.lextd");
             FUNCTIONSPEC_TEMPLATE = File.ReadAllText("templates/FunctionSpec.lextd");
-
         }
 
         private static void OutputClassDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuClassEntry> classD)
@@ -103,11 +169,8 @@ namespace LegendaryExplorerUnrealDoc
                 {
                     var mrow = MEMBER_TEMPLATE;
 
-                    string typeText = member.Value.MemberType;
-                    if (db.ClassDocumentation.TryGetValue(member.Value.MemberType, out var ci))
-                    {
-                        typeText = $"<a href=\"{member.Value.MemberType}.html\">{member.Value.MemberType}</a>";
-                    }
+                    string typeText = GetTypeText(db, member.Value.MemberType);
+
 
                     mrow = mrow.Replace("%LD_MEMBERTYPE%", typeText);
                     mrow = mrow.Replace("%LD_MEMBERNAME%", member.Key);
@@ -157,7 +220,31 @@ namespace LegendaryExplorerUnrealDoc
                         sig = sig.Substring(sig.IndexOf(' ') + 1);
                     }
 
-                    mrow = mrow.Replace("%LD_FUNCTIONSIGNATURE%", sig);
+                    var buildingSig = sig[..(sig.IndexOf('(') + 1)];
+
+                    // HTML-ify the params.
+                    // This is a hack.
+                    var parms = sig[(sig.IndexOf('(') + 1)..^1].Split(',');
+                    foreach (var parm in parms)
+                    {
+                        var parm2 = parm.Trim();
+                        // Debug.WriteLine(parm2);
+                        var words = parm2.Split(' ');
+
+                        string param = "";
+                        foreach (var word in words)
+                        {
+                            param += " " + GetTypeText(db, word);
+                        }
+
+                        buildingSig += param.Trim() + ", ";
+                    }
+
+                    buildingSig = buildingSig.TrimEnd(',', ' ');
+                    buildingSig += ')';
+
+
+                    mrow = mrow.Replace("%LD_FUNCTIONSIGNATURE%", buildingSig);
                     mrow = mrow.Replace("%LD_FUNCTIONDOC%", member.Value.MemberDocumentation);
 
                     // Formatting
@@ -187,11 +274,37 @@ namespace LegendaryExplorerUnrealDoc
             // Shared on page
             html = html.Replace("%LD_TITLE%", classD.Key);
             html = html.Replace("%LD_DESCRIPTION%", classD.Value.ClassDocumentation);
+            html = html.Replace("%LD_GAME%", db.Game.ToString());
 
             // We are one folder deep.
             html = html.Replace("%LD_RELPATH%", "../");
 
             File.WriteAllText(outFile, html);
+        }
+
+        /// <summary>
+        /// Looks at database to see if the given value is a member type we can link to
+        /// </summary>
+        /// <param name="valueMemberType"></param>
+        /// <returns></returns>
+        private static string GetTypeText(DocuDB db, string type)
+        {
+            if (db.ClassDocumentation.TryGetValue(type, out var ci))
+            {
+                return $"<a data-type=\"class\">{type}</a>";
+            }
+
+            if (db.EnumDocumentation.TryGetValue(type, out var ei))
+            {
+                return $"<a data-type=\"enum\">{type}</a>";
+            }
+
+            if (db.StructDocumentation.TryGetValue(type, out var si))
+            {
+                return $"<a data-type=\"struct\">{type}</a>";
+            }
+
+            return type;
         }
 
         private static string? BuildInheritanceTree(DocuDB db, string classKey)

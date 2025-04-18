@@ -2,7 +2,31 @@
 	<head>
 		<title>%LD_TITLE%</title>
 		<description>%LD_DESCRIPTION%</description>
-		 <link rel="stylesheet" href="%LD_RELPATH%lexdoc.css"> 
+		<link rel="stylesheet" href="%LD_RELPATH%lexdoc.css">
+		<script type="text/javascript">
+			document.addEventListener('DOMContentLoaded', function() {
+				var url = window.location.href.substring(window.location.protocol.length + 2);
+				var gameidx = url.indexOf("/%LD_GAME%/");
+				var baseurl = url.substring(gameidx + 5);
+				console.log(baseurl);
+				var typelinks = document.querySelectorAll('[data-type]');
+				for (const element of typelinks) {
+					var type = element.dataset.type;
+					var value = element.textContent;
+					switch(type){
+						case 'class':
+							element.href = baseurl + 'classes/' + value + '.html';
+							break;
+						case 'struct':
+							element.href = baseurl + 'structs/' + value + '.html';
+							break;
+						case 'enum':
+							element.href = baseurl + 'enums/' + value + '.html';
+							break;
+					}
+				}
+			}, false);
+		</script>
 	</head>
 	<body>
 	<!-- ========= START OF TOP NAVBAR ======= -->

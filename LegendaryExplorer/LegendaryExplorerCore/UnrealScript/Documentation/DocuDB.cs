@@ -59,7 +59,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             if (Directory.Exists(filePath))
             {
                 // Loading loose DB
-                loaded = new DocuDB();
+                loaded = new DocuDB() { Game = game};
                 
                 // Loose load classes
                 loaded.ClassDocumentation = new();
@@ -76,7 +76,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
                     loaded.EnumDocumentation[fname] = JsonConvert.DeserializeObject<DocuEnumEntry>(File.ReadAllText(f));
                 }
 
-                loaded.EnumDocumentation = new();
+                loaded.StructDocumentation = new();
                 foreach (var f in Directory.GetFiles(Path.Combine(filePath, "structs"), "*.json"))
                 {
                     var fname = Path.GetFileNameWithoutExtension(f);
@@ -101,6 +101,9 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             LoadedDBs[game] = loaded;
             return loaded;
         }
+
+        [JsonProperty("game")]
+        public MEGame Game { get; set; }
 
 #if DEBUG
 
@@ -147,7 +150,6 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
                         if (db.ClassDocumentation.ContainsKey(fx.Name))
                             continue;
 
-                        Debug.WriteLine($"{fx.Name}: {fx.Type}");
                         var classD = GenerateDocuClass(db, fx);
                         db.ClassDocumentation[fx.Name] = classD;
                     }
