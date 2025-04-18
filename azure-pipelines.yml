@@ -88,6 +88,9 @@ steps:
 
       Write-Host "Pushing new documentation to public repo..."
       git push origin gh-pages
+
+      # Restore files before branch switch
+      git restore $(Build.SourcesDirectory)\LegendaryExplorer\LegendaryExplorerCore\Libraries\Windows\TexConverter.dll
       git switch DocuDB # DEBUGGING - RESTORE BRANCH.
 
 
