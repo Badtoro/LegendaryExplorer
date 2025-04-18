@@ -4,26 +4,7 @@
 </div>
 <hr>
 <p>%LD_DESCRIPTION%</p>
-
-	<!-- VARIABLES-->
-	<h3>Variables</h3>
-	<table class="membersummary">
-	<tr>
-		<th>Type</th>
-		<th>Name</th>
-		<th>Description</th>
-	</tr>
-	%LD_MEMBERLIST%
-</table>
-
-	<!-- FUNCTIONS-->
-	<h3>Functions</h3>
-	<table class="membersummary">
-	<tr>
-		<th>Return type</th>
-		<th>Signature</th>
-		<th>Description</th>
-	</tr>
-	%LD_FUNCTIONLIST%
+%LD_VARIABLECONTAINER%
+%LD_FUNCTIONCONTAINER%
 </table>
 

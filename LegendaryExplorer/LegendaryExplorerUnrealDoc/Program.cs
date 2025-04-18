@@ -151,6 +151,8 @@ namespace LegendaryExplorerUnrealDoc
         private static string ENUM_TEMPLATE;
         private static string STRUCT_TEMPLATE;
         private static string MEMBER_TEMPLATE;
+        private static string VARIABLECONTAINER_TEMPLATE;
+        private static string FUNCTIONCONTAINER_TEMPLATE;
 
         private static void LoadTemplates()
         {
@@ -162,6 +164,9 @@ namespace LegendaryExplorerUnrealDoc
             FUNCTIONSPEC_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionSpec.lextd"));
             ENUM_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Enum.lextd"));
             STRUCT_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Struct.lextd"));
+            VARIABLECONTAINER_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "VariableContainer.lextd"));
+            FUNCTIONCONTAINER_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionContainer.lextd"));
+
         }
 
         private static void OutputClassDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuClassEntry> classD)
@@ -179,8 +184,9 @@ namespace LegendaryExplorerUnrealDoc
             content = content.Replace("%LD_CLASSNAME%", classD.Key);
 
             #region VARIABLES
-
+            if (classD.Value.Variables.Any())
             {
+                // Has variables
                 StringBuilder memberHtml = new StringBuilder();
                 string rowClass = "row";
                 foreach (var member in classD.Value.Variables)
@@ -209,13 +215,19 @@ namespace LegendaryExplorerUnrealDoc
                     }
                 }
 
-                content = content.Replace("%LD_MEMBERLIST%", memberHtml.ToString());
+                content = content.Replace("%LD_VARIABLECONTAINER%", VARIABLECONTAINER_TEMPLATE.Replace("%LD_MEMBERLIST%", memberHtml.ToString()));
+            }
+            else
+            {
+                // No variables
+                content = content.Replace("%LD_VARIABLECONTAINER%", "<h3>Variables</h3><p>This class has no defined variables.</p>");
             }
             #endregion
 
             #region FUNCTIONS
-
+            if (classD.Value.Functions.Any())
             {
+                // Has functions
                 StringBuilder functionHtml = new StringBuilder();
                 string rowClass = "row";
                 foreach (var member in classD.Value.Functions)
@@ -280,7 +292,12 @@ namespace LegendaryExplorerUnrealDoc
                     }
                 }
 
-                content = content.Replace("%LD_FUNCTIONLIST%", functionHtml.ToString());
+                content = content.Replace("%LD_FUNCTIONCONTAINER%", FUNCTIONCONTAINER_TEMPLATE.Replace("%LD_FUNCTIONLIST%", functionHtml.ToString()));
+            }
+            else
+            {
+                // No functions
+                content = content.Replace("%LD_FUNCTIONCONTAINER%", "<h3>Functions</h3><p>This class has no defined functions.</p>");
             }
 
             #endregion

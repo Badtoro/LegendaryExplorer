@@ -1,0 +1,10 @@
+﻿<!-- VARIABLES-->
+<h3>Variables</h3>
+<table class="membersummary">
+	<tr>
+		<th>Type</th>
+		<th>Name</th>
+		<th>Description</th>
+	</tr>
+	%LD_MEMBERLIST%
+</table>
