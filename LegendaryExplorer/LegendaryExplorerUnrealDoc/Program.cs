@@ -1,11 +1,8 @@
-﻿using System.Diagnostics;
-using System.Text;
+﻿using System.Text;
 using CommandLine;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Packages;
-using LegendaryExplorerCore.UnrealScript.Analysis.Visitors;
 using LegendaryExplorerCore.UnrealScript.Documentation;
-using LegendaryExplorerUnrealDoc.debug;
 
 namespace LegendaryExplorerUnrealDoc
 {
@@ -21,7 +18,7 @@ namespace LegendaryExplorerUnrealDoc
 #if DEBUG
                     // Test only.
                     Console.WriteLine("Generating dbs...");
-                    Testing.GenerateBlankDocuDBs();
+                    LegendaryExplorerUnrealDoc.debug.Testing.GenerateBlankDocuDBs();
 #endif
                     BuildDocs(o);
                     Console.WriteLine("Documentation built.");
