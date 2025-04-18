@@ -30,7 +30,9 @@ steps:
 - checkout: self
   clean: true
   persistCredentials: true
-  submodules: recursive 
+  submodules: recursive
+  fetchDepth: 1
+  fetchTags: false
 # DEBUG for Find Text Transform
 #- task: CmdLine@2
 #  inputs:
