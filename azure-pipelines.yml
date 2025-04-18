@@ -318,28 +318,6 @@ steps:
       git commit -m "Update documentation [skip ci]"
       git push origin gh-pages
 
-- task: PowerShell@2
-  displayName: "Build documentation, commit to GitHub Pages"
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'Beta'))
-  inputs:
-    targetType: 'inline'
-    script: |
-      git config user.email "me3tweaks-auto@me3tweaks.com"
-      git config user.name "ME3Tweaks-LEC-Documentation"
-      $(doxygenWorkingDir)\doxygen.exe $(Build.SourcesDirectory)\Documentation\DoxygenConfigAzurePipelines
-      git restore $(Build.SourcesDirectory)\LegendaryExplorer\LegendaryExplorerCore\Libraries\Windows\TexConverter.dll
-      git checkout gh-pages
-      if(Test-Path .\nightly\)
-      {
-        Remove-Item .\nightly\* -Recurse
-      }
-      Copy-Item -Path "$(doxygenOutputDir)\html\*" -Destination .\nightly -Recurse
-      git add .\nightly\*
-      git add .\nightly\**\*
-      git commit -m "Update documentation [skip ci]"
-      git push origin gh-pages
-
-
 # Notify ME3Tweaks that a new beta build has been built
 - task: PowerShell@2
   displayName: 'Notify ME3Tweaks'
