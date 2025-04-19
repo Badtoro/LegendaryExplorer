@@ -2,9 +2,10 @@
 <h2 class="title">Class %LD_CLASSNAME%</h2>
 %LD_INHERITANCETREE%
 </div>
+<div class="contentContainer">
 <hr>
 <p>%LD_DESCRIPTION%</p>
 %LD_VARIABLECONTAINER%
 %LD_FUNCTIONCONTAINER%
 </table>
-
+</div>

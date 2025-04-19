@@ -1,16 +1,18 @@
 ﻿<div class="header">
 	<h2 class="title">Struct %LD_STRUCTNAME%</h2>
+	<p>Defined in %LD_STRUCTCLASSDEF%</p>
 </div>
-<hr>
-<p>%LD_DESCRIPTION%</p>
-
-	<!-- VARIABLES-->
-	<h3>Variables</h3>
-	<table class="membersummary">
-	<tr>
-		<th>Type</th>
-		<th>Name</th>
-		<th>Description</th>
-	</tr>
-	%LD_MEMBERLIST%
-</table>
+<div class="contentContainer">
+	<hr>
+	<p>%LD_DESCRIPTION%</p>
+		<!-- VARIABLES-->
+		<h3>Variables</h3>
+		<table class="membersummary">
+		<tr>
+			<th class="colFirst">Type</th>
+			<th class="colSecond">Name</th>
+			<th class="colLast">Description</th>
+		</tr>
+		%LD_MEMBERLIST%
+	</table>
+</div>

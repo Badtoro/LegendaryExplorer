@@ -2,9 +2,9 @@
 <h3>Functions</h3>
 <table class="membersummary">
 	<tr>
-		<th>Return type</th>
-		<th>Signature</th>
-		<th>Description</th>
+		<th class="colFirst">Return type</th>
+		<th class="colSecond">Signature</th>
+		<th class="colLast">Description</th>
 	</tr>
 	%LD_FUNCTIONLIST%
 </table>

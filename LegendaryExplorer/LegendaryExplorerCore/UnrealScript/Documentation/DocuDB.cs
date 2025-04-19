@@ -252,6 +252,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         private static DocuStructEntry GenerateDocuStruct(DocuDB db, Struct tStruct)
         {
             DocuStructEntry dType = new();
+            dType.DefinedInClass = (tStruct.Outer as Class)?.Name; // This should always be not-null...
             dType.Members = new();
             foreach (var eValue in tStruct.VariableDeclarations)
             {
@@ -441,8 +442,15 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 
     public class DocuStructEntry
     {
-        // Structs, Enums
+        // Does this keep order? It matters for immutable structs
+        [JsonProperty("members")]
         public CaseInsensitiveDictionary<DocuMemberEntry> Members { get; set; } = new();
+
+        /// <summary>
+        /// Which class this struct is defined in
+        /// </summary>
+        [JsonProperty("classdef")]
+        public string DefinedInClass { get; set; }
 
         // Const doesn't have any members
         /// <summary>

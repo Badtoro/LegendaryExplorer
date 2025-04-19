@@ -2,9 +2,9 @@
 <h3>Variables</h3>
 <table class="membersummary">
 	<tr>
-		<th>Type</th>
-		<th>Name</th>
-		<th>Description</th>
+		<th class="colFirst">Type</th>
+		<th class="colSecond">Name</th>
+		<th class="colLast">Description</th>
 	</tr>
 	%LD_MEMBERLIST%
 </table>

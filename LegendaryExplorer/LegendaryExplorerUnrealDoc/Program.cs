@@ -433,7 +433,7 @@ namespace LegendaryExplorerUnrealDoc
             #endregion
 
             content = content.Replace("%LD_STRUCTNAME%", structD.Key);
-
+            content = content.Replace("%LD_STRUCTCLASSDEF%", GetTypeText(db, structD.Value.DefinedInClass));
 
             // Install content
             html = html.Replace("%LD_CONTENT%", content);
@@ -450,6 +450,12 @@ namespace LegendaryExplorerUnrealDoc
 
         }
 
+        /// <summary>
+        /// Outputs enum documentation
+        /// </summary>
+        /// <param name="htmlPath"></param>
+        /// <param name="db"></param>
+        /// <param name="enumD"></param>
         private static void OutputEnumDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuEnumEntry> enumD)
         {
             var outFile = Path.Combine(htmlPath, "enums", $"{enumD.Key}.html");
