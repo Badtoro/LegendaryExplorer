@@ -53,8 +53,10 @@
 <li><a href="../../../index-files/index-1.html">Index</a></li>
 <li><a href="../../../help-doc.html">Help</a></li>
 </ul>
-<div class="aboutLanguage"><strong>Legendary Explorer<br>DocuDB</strong></div>
-<img src="%LD_RELPATH%Images/%LD_GAME%_Icon.ico"></img>
+<div class="navimages">
+	<img class="navimage" src="%LD_RELPATH%images/gameicons/%LD_GAME%_Icon.ico">
+	<img class="navimage" src="%LD_RELPATH%images/docudb.png">
+</div>
 </div>
 <div class="subNav">
 <ul class="navList">

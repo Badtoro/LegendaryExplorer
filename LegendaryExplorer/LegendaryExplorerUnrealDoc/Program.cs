@@ -104,6 +104,8 @@ namespace LegendaryExplorerUnrealDoc
                 {
                     File.Copy(img, Path.Combine(outIconsPath, Path.GetFileName(img)));
                 }
+
+                File.Copy(Path.Combine(AppContext.BaseDirectory, "images", "docudb.png"), Path.Combine(outIconsPath, Path.Combine(htmlPath, "images", "docudb.png")));
             }
         }
 
