@@ -92,8 +92,18 @@ namespace LegendaryExplorerUnrealDoc
                 }
                 GenerateIndexPage(htmlPath, db, "structs");
 
+                // Copy files.
 
+                // CSS
                 File.Copy(Path.Combine(AppContext.BaseDirectory, "css", "lexdoc.css"), Path.Combine(htmlPath, "lexdoc.css"));
+
+                // Images
+                var imagesPath = Path.Combine(AppContext.BaseDirectory, "images", "gameicons");
+                var outIconsPath = Directory.CreateDirectory(Path.Combine(htmlPath, "images", "gameicons")).FullName;
+                foreach (var img in Directory.GetFiles(imagesPath))
+                {
+                    File.Copy(img, Path.Combine(outIconsPath, Path.GetFileName(img)));
+                }
             }
         }
 
