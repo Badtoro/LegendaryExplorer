@@ -393,38 +393,65 @@ namespace LegendaryExplorerUnrealDoc
 
             var content = STRUCT_TEMPLATE;
 
-            // Can structs inherit...?
-            //var inheritanceTree = BuildInheritanceTree(db, structD.Key);
-            //content = content.Replace("%LD_INHERITANCETREE%", inheritanceTree);
-            //content = content.Replace("%LD_CLASSNAME%", structD.Key);
+
+            if (structD.Value.Extends != null)
+            {
+                content = content.Replace("%LD_STRUCTEXTENSIONINFO%", $"<p class=\"structextends\">Extends {GetTypeText(db, structD.Value.Extends)}</p>");
+            }
+            else
+            {
+                content = content.Replace("%LD_STRUCTEXTENSIONINFO%", "");
+            }
 
             #region VARIABLES
             {
                 StringBuilder memberHtml = new StringBuilder();
                 string rowClass = "row";
-                foreach (var member in structD.Value.Members)
+
+                var inheritanceStack = new Stack<(string, DocuStructEntry)>();
+                inheritanceStack.Add((structD.Key, structD.Value));
+
+                var se = structD.Value.Extends;
+                while (se != null)
                 {
-                    var mrow = MEMBER_TEMPLATE;
+                    var parentEntry = db.StructDocumentation[se];
+                    inheritanceStack.Add((se, parentEntry));
+                    se = parentEntry.Extends;
+                }
 
-                    string typeText = GetTypeText(db, member.Value.MemberType);
-
-
-                    mrow = mrow.Replace("%LD_MEMBERTYPE%", typeText);
-                    mrow = mrow.Replace("%LD_MEMBERNAME%", member.Key);
-                    mrow = mrow.Replace("%LD_MEMBERDOC%", member.Value.MemberDocumentation);
-
-                    // Formatting
-                    mrow = mrow.Replace("%LD_ROWCLASS%", $"{rowClass}Color");
-
-                    memberHtml.AppendLine(mrow);
-
-                    if (rowClass == "row")
+                foreach (var entry in inheritanceStack)
+                {
+                    foreach (var member in entry.Item2.Members)
                     {
-                        rowClass = "alt";
-                    }
-                    else
-                    {
-                        rowClass = "row";
+                        var mrow = MEMBER_TEMPLATE;
+
+                        string typeText = GetTypeText(db, member.Value.MemberType);
+
+                        mrow = mrow.Replace("%LD_MEMBERTYPE%", typeText);
+                        mrow = mrow.Replace("%LD_MEMBERNAME%", member.Key);
+
+                        var memberDoc = member.Value.MemberDocumentation;
+                        if (entry.Item1 != structD.Key)
+                        {
+                            // List parent struct items
+                            memberDoc = $"(Defined in {entry.Item1}) {memberDoc}";
+                        }
+
+                        mrow = mrow.Replace("%LD_MEMBERDOC%", memberDoc);
+
+                        // Formatting
+                        mrow = mrow.Replace("%LD_ROWCLASS%", $"{rowClass}Color");
+
+                        memberHtml.AppendLine(mrow);
+
+                        if (rowClass == "row")
+                        {
+                            rowClass = "alt";
+                        }
+                        else
+                        {
+                            rowClass = "row";
+                        }
                     }
                 }
 

@@ -7,6 +7,7 @@ using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Misc;
 using LegendaryExplorerCore.Misc.ME3Tweaks;
 using LegendaryExplorerCore.Packages;
+using LegendaryExplorerCore.Unreal;
 using LegendaryExplorerCore.Unreal.BinaryConverters;
 using LegendaryExplorerCore.UnrealScript.Analysis.Visitors;
 using LegendaryExplorerCore.UnrealScript.Language.Tree;
@@ -253,6 +254,11 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         {
             DocuStructEntry dType = new();
             dType.DefinedInClass = (tStruct.Outer as Class)?.Name; // This should always be not-null...
+            dType.Modifiers = tStruct.Flags;
+            if (tStruct.Parent != null)
+            {
+                dType.Extends = tStruct.Parent.Name;
+            }
             dType.Members = new();
             foreach (var eValue in tStruct.VariableDeclarations)
             {
@@ -452,12 +458,24 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         [JsonProperty("classdef")]
         public string DefinedInClass { get; set; }
 
+        /// <summary>
+        /// Which struct this one extends, if any
+        /// </summary>
+        [JsonProperty("extends")]
+        public string Extends { get; set; }
+
         // Const doesn't have any members
         /// <summary>
         /// Contains the text description of this object.
         /// </summary>
         [JsonProperty("documentation")]
         public string MemberDocumentation { get; set; }
+
+        /// <summary>
+        /// Struct modifiers
+        /// </summary>
+        [JsonProperty("modifiers")]
+        public UnrealFlags.ScriptStructFlags Modifiers { get; set; }
     }
 
 
