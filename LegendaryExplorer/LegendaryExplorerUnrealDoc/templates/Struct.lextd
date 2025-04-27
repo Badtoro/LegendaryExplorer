@@ -1,5 +1,5 @@
 ﻿<div class="header">
-	<h2 class="title">Struct %LD_STRUCTNAME%</h2>
+	<h2 class="title">Struct <i>%LD_STRUCTNAME%</i></h2>
 	%LD_STRUCTEXTENSIONINFO%
 	<p>Defined in %LD_STRUCTCLASSDEF%</p>
 </div>

@@ -583,3 +583,7 @@ div.contentContainer ul.blockList li.blockList h2{
     z-index: 200;
     margin-top: -10px;
 }
+
+.hide {
+    display: hidden;
+}

@@ -1,8 +1,10 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 using CommandLine;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.UnrealScript.Documentation;
+using static LegendaryExplorerCore.Unreal.UnrealFlags;
 
 namespace LegendaryExplorerUnrealDoc
 {
@@ -17,8 +19,8 @@ namespace LegendaryExplorerUnrealDoc
                 {
 #if DEBUG
                     // Test only.
-                    Console.WriteLine("Generating dbs...");
-                    LegendaryExplorerUnrealDoc.debug.Testing.GenerateBlankDocuDBs();
+                    //Console.WriteLine("Generating dbs...");
+                    //LegendaryExplorerUnrealDoc.debug.Testing.GenerateBlankDocuDBs();
 #endif
                     BuildDocs(o);
                     Console.WriteLine("Documentation built.");
@@ -92,20 +94,154 @@ namespace LegendaryExplorerUnrealDoc
                 }
                 GenerateIndexPage(htmlPath, db, "structs");
 
-                // Copy files.
+                Console.WriteLine($"\tGenerating packages html");
+                GeneratePackagesPage(htmlPath, db);
 
-                // CSS
-                File.Copy(Path.Combine(AppContext.BaseDirectory, "css", "lexdoc.css"), Path.Combine(htmlPath, "lexdoc.css"));
+                Console.WriteLine($"\tGenerating game homepage html");
+                GenerateGameHomepage(htmlPath, db);
 
-                // Images
-                var imagesPath = Path.Combine(AppContext.BaseDirectory, "images", "gameicons");
-                var outIconsPath = Directory.CreateDirectory(Path.Combine(htmlPath, "images", "gameicons")).FullName;
-                foreach (var img in Directory.GetFiles(imagesPath))
+            }
+
+            // Shared content
+
+
+
+            // Copy files.
+
+            // CSS
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "css", "lexdoc.css"), Path.Combine(options.OutputFolder, "lexdoc.css"), true);
+
+            // Images
+            var imagesPath = Path.Combine(AppContext.BaseDirectory, "images", "gameicons");
+            var outIconsPath = Directory.CreateDirectory(Path.Combine(options.OutputFolder, "images", "gameicons")).FullName;
+            foreach (var img in Directory.GetFiles(imagesPath))
+            {
+                File.Copy(img, Path.Combine(outIconsPath, Path.GetFileName(img)), true);
+            }
+
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "images", "home.jpg"), Path.Combine(outIconsPath, Path.Combine(options.OutputFolder, "images", "home.jpg")), true);
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "images", "docudb.png"), Path.Combine(outIconsPath, Path.Combine(options.OutputFolder, "images", "docudb.png")), true);
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "images", "favicon.ico"), Path.Combine(outIconsPath, Path.Combine(options.OutputFolder, "images", "favicon.ico")), true);
+
+            OutputHomePage(options.OutputFolder);
+        }
+
+        private static void GenerateGameHomepage(string htmlPath, DocuDB db)
+        {
+            var outputPath = Path.Combine(htmlPath, "index.html");
+
+            var html = HTML_TEMPLATE;
+            var index = GAME_HOME_TEMPLATE;
+
+            html = html.Replace("%LD_CONTENT%", index);
+            html = html.Replace("%LD_RELPATH%", "");
+            html = html.Replace("%LD_GAME%", db.Game.ToString());
+            html = html.Replace("%LD_TITLE%", $"{db.Game} DocuDB");
+            html = html.Replace("%LD_DESCRIPTION%", $"Homepage for community documentation for {db.Game} UnrealScript");
+            html = html.Replace("%LD_NAV_ITEMS%", "");
+            html = html.Replace("%LD_EDIT_BULLET%", "");
+
+            SaveFile(htmlPath,  outputPath, html);
+        }
+
+        private static void GeneratePackagesPage(string htmlPath, DocuDB db)
+        {
+            var packagesPath = Path.Combine(htmlPath, "packages");
+            Directory.CreateDirectory(packagesPath);
+
+            List<string> packages;
+            // Index page
+            {
+                var html = HTML_TEMPLATE;
+                var index = INDEX_TEMPLATE;
+
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("<ul>");
+
+                // Structs are always in classes, so this will get them all.
+                packages = db.ClassDocumentation.Values.Select(x => x.Package).Distinct().OrderBy(x => x).ToList();
+                foreach (var package in packages)
                 {
-                    File.Copy(img, Path.Combine(outIconsPath, Path.GetFileName(img)));
+                    sb.AppendLine($"<li><a href=\"{package}.html\">{package}</a></href>");
                 }
 
-                File.Copy(Path.Combine(AppContext.BaseDirectory, "images", "docudb.png"), Path.Combine(outIconsPath, Path.Combine(htmlPath, "images", "docudb.png")));
+                sb.AppendLine("</ul>");
+
+                index = index.Replace("%LD_LIST%", sb.ToString());
+                index = index.Replace("%LD_LISTTYPE%", "Packages");
+
+                html = html.Replace("%LD_CONTENT%", index);
+                html = html.Replace("%LD_RELPATH%", "../");
+                html = html.Replace("%LD_GAME%", db.Game.ToString());
+                html = html.Replace("%LD_TITLE%", "Package list");
+                html = html.Replace("%LD_DESCRIPTION%", $"List of packages containing UnrealScript in {db.Game}.");
+                html = html.Replace("%LD_NAV_ITEMS%", "");
+                html = html.Replace("%LD_EDIT_BULLET%", "");
+
+                var outputPath = Path.Combine(packagesPath, "index.html");
+                SaveFile(htmlPath, outputPath, html);
+
+            }
+            // Generate each package page
+            foreach (var package in packages)
+            {
+                var html = HTML_TEMPLATE;
+                var content = PACKAGE_CONTENT_TEMPLATE;
+
+                {
+                    // CLASSES
+                    StringBuilder sb = new StringBuilder();
+                    var classes = db.ClassDocumentation.Where(x => x.Value.Package == package).OrderBy(x => x.Key).ToList();
+                    sb.AppendLine("<ul>");
+                    foreach (var cls in classes)
+                    {
+                        sb.AppendLine($"<li><a href=\"../classes/{cls.Key}.html\">{cls.Key}</a></href></li>");
+                    }
+
+                    sb.AppendLine("</ul>");
+
+                    content = content.Replace("%LD_CLASSESLIST%", sb.ToString());
+                }
+
+                {
+                    // STRUCTS
+                    StringBuilder sb = new StringBuilder();
+                    var structs = db.StructDocumentation.Where(x => db.ClassDocumentation[x.Value.DefinedInClass].Package == package).OrderBy(x => x.Key).ToList();
+                    if (structs.Any())
+                    {
+                        sb.AppendLine("<ul>");
+                        foreach (var stct in structs)
+                        {
+                            sb.AppendLine($"<li><a href=\"../structs/{stct.Key}.html\">{stct.Key}</a></href></li>");
+                        }
+                        sb.AppendLine("</ul>");
+                    }
+                    else
+                    {
+                        sb.AppendLine("<p>This package does not define any structs.</p>");
+                    }
+
+                    content = content.Replace("%LD_STRUCTSLIST%", sb.ToString());
+
+                    content = content.Replace("%LD_PACKAGENAME%", package);
+                }
+
+                html = html.Replace("%LD_CONTENT%", content);
+                html = html.Replace("%LD_RELPATH%", "../");
+                html = html.Replace("%LD_GAME%", db.Game.ToString());
+                html = html.Replace("%LD_TITLE%", $"{package} content");
+                html = html.Replace("%LD_DESCRIPTION%", $"List of UnrealScript content contained within {package}.");
+
+                // Navigation.
+                string navItems = "";
+                navItems += "<li><a href=\"#classes\">Classes&nbsp;</a></li>";
+                navItems += "<li><a href=\"#structs\">Structs&nbsp;</a></li>";
+
+                html = html.Replace("%LD_NAV_ITEMS%", navItems);
+                html = html.Replace("%LD_EDIT_BULLET%", "");
+
+                var outputPath = Path.Combine(packagesPath, $"{package}.html");
+                SaveFile(htmlPath, outputPath, html);
             }
         }
 
@@ -140,7 +276,7 @@ namespace LegendaryExplorerUnrealDoc
                     }
                     break;
             }
-            sb.AppendLine("<;ul>");
+            sb.AppendLine("</ul>");
 
             index = index.Replace("%LD_LIST%", sb.ToString());
             index = index.Replace("%LD_LISTTYPE%", subpath.UpperFirst());
@@ -151,16 +287,23 @@ namespace LegendaryExplorerUnrealDoc
             html = html.Replace("%LD_GAME%", db.Game.ToString());
             html = html.Replace("%LD_TITLE%", $"All {subpath.UpperFirst()}");
             html = html.Replace("%LD_DESCRIPTION%", $"List of all {subpath} in {db.Game}.");
+            html = html.Replace("%LD_NAV%", $"List of all {subpath} in {db.Game}.");
+            html = html.Replace("%LD_NAV_ITEMS%", "");
+            html = html.Replace("%LD_EDIT_BULLET%", "");
 
-            File.WriteAllText(outputPath, html);
+            SaveFile(htmlPath, outputPath, html);
         }
 
+        private static string HOME_TEMPLATE;
+        private static string GAME_HOME_TEMPLATE;
         private static string HTML_TEMPLATE;
+        private static string PACKAGE_CONTENT_TEMPLATE;
         private static string INDEX_TEMPLATE;
         private static string CLASS_TEMPLATE;
         private static string FUNCTIONROW_TEMPLATE;
         private static string FUNCTIONSPEC_TEMPLATE;
         private static string ENUM_TEMPLATE;
+        private static string ENUMROW_TEMPLATE;
         private static string STRUCT_TEMPLATE;
         private static string MEMBER_TEMPLATE;
         private static string VARIABLECONTAINER_TEMPLATE;
@@ -168,6 +311,9 @@ namespace LegendaryExplorerUnrealDoc
 
         private static void LoadTemplates()
         {
+            PACKAGE_CONTENT_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "PackageContent.lextd"));
+            GAME_HOME_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "GameHome.lextd"));
+            HOME_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Home.lextd"));
             INDEX_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "index.lextd"));
             HTML_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Html.lextd"));
             CLASS_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Class.lextd"));
@@ -175,15 +321,15 @@ namespace LegendaryExplorerUnrealDoc
             FUNCTIONROW_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionRow.lextd"));
             FUNCTIONSPEC_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionSpec.lextd"));
             ENUM_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Enum.lextd"));
+            ENUMROW_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "EnumRow.lextd"));
             STRUCT_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "Struct.lextd"));
             VARIABLECONTAINER_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "VariableContainer.lextd"));
             FUNCTIONCONTAINER_TEMPLATE = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "templates", "FunctionContainer.lextd"));
-
         }
 
         private static void OutputClassDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuClassEntry> classD)
         {
-            var outFile = Path.Combine(htmlPath, "classes", $"{classD.Key}.html");
+            var outputPath = Path.Combine(htmlPath, "classes", $"{classD.Key}.html");
 
             var html = HTML_TEMPLATE;
 
@@ -193,11 +339,19 @@ namespace LegendaryExplorerUnrealDoc
             var inheritanceTree = BuildInheritanceTree(db, classD.Key);
 
             content = content.Replace("%LD_INHERITANCETREE%", inheritanceTree);
+            var modifiers = ConvertModifers(classD.Value.ClassFlags);
+            if (classD.Value.ConfigName != null)
+            {
+                modifiers = modifiers.Replace("Config", $"Config({classD.Value.ConfigName})");
+            }
+            content = content.Replace("%LD_MODIFIERS%", modifiers);
             content = content.Replace("%LD_CLASSNAME%", classD.Key);
 
+            string navItems = "";
             #region VARIABLES
             if (classD.Value.Variables.Any())
             {
+                navItems += "<li><a href=\"#variables\">Variables&nbsp;</a></li>";
                 // Has variables
                 StringBuilder memberHtml = new StringBuilder();
                 string rowClass = "row";
@@ -205,9 +359,11 @@ namespace LegendaryExplorerUnrealDoc
                 {
                     var mrow = MEMBER_TEMPLATE;
 
+                    var memberModifier = "";
+                    var flags = (EPropertyFlags)member.Value.Flags;
+                    mrow = mrow.Replace("%LD_MEMBERMODIFIER%", string.Join(" ", flags.GetFlags()));
+
                     string typeText = GetTypeText(db, member.Value.MemberType);
-
-
                     mrow = mrow.Replace("%LD_MEMBERTYPE%", typeText);
                     mrow = mrow.Replace("%LD_MEMBERNAME%", member.Key);
                     mrow = mrow.Replace("%LD_MEMBERDOC%", member.Value.MemberDocumentation);
@@ -240,6 +396,8 @@ namespace LegendaryExplorerUnrealDoc
             if (classD.Value.Functions.Any())
             {
                 // Has functions
+                navItems += "<li><a href=\"#functions\">Functions&nbsp;</a></li>";
+
                 StringBuilder functionHtml = new StringBuilder();
                 string rowClass = "row";
                 foreach (var member in classD.Value.Functions)
@@ -314,7 +472,6 @@ namespace LegendaryExplorerUnrealDoc
 
             #endregion
 
-
             // Install content
             html = html.Replace("%LD_CONTENT%", content);
 
@@ -326,7 +483,25 @@ namespace LegendaryExplorerUnrealDoc
             // We are one folder deep.
             html = html.Replace("%LD_RELPATH%", "../");
 
-            File.WriteAllText(outFile, html);
+            // Navigation links
+            html = html.Replace("%LD_NAV_ITEMS%", navItems);
+
+            // Edit this page
+            var editLi = $"<li id=\"update_page_bullet\" title=\"Edit this documentation\"><a id=\"update_page\" href=\"https://github.com/ME3Tweaks/LegendaryExplorer/edit/UnrealDoc/DocSources/{db.Game}/classes/{classD.Key}.json\" target=\"_blank\">Edit</a></li>";
+            html = html.Replace("%LD_EDIT_BULLET%", editLi);
+
+            SaveFile(htmlPath, outputPath, html);
+        }
+
+        private static string ConvertModifers(Enum classFlags)
+        {
+            string str = "";
+            foreach (var cf in classFlags.GetFlags())
+            {
+                str += cf + " ";
+            }
+
+            return str.Trim();
         }
 
         /// <summary>
@@ -398,7 +573,7 @@ namespace LegendaryExplorerUnrealDoc
 
         private static void OutputStructDocumentation(string htmlPath, DocuDB db, KeyValuePair<string, DocuStructEntry> structD)
         {
-            var outFile = Path.Combine(htmlPath, "structs", $"{structD.Key}.html");
+            var outputPath = Path.Combine(htmlPath, "structs", $"{structD.Key}.html");
 
             var html = HTML_TEMPLATE;
 
@@ -485,8 +660,22 @@ namespace LegendaryExplorerUnrealDoc
             // We are one folder deep.
             html = html.Replace("%LD_RELPATH%", "../");
 
-            File.WriteAllText(outFile, html);
+            // Navigation.
+            string navItems = "";
+            navItems += "<li><a href=\"#values\">Variables&nbsp;</a></li>";
+            html = html.Replace("%LD_NAV_ITEMS%", navItems);
 
+            // Edit this page
+            var editLi = $"<li id=\"update_page_bullet\" title=\"Edit this documentation\"><a id=\"update_page\" href=\"https://github.com/ME3Tweaks/LegendaryExplorer/edit/UnrealDoc/DocSources/{db.Game}/structs/{structD.Key}.json\" target=\"_blank\">Edit</a></li>";
+            html = html.Replace("%LD_EDIT_BULLET%", editLi);
+
+            SaveFile(htmlPath, outputPath, html);
+        }
+
+        private static void OutputHomePage(string htmlPath)
+        {
+            var outputPath = Path.Combine(htmlPath, "index.html");
+            SaveFile(htmlPath, outputPath, HOME_TEMPLATE);
         }
 
         /// <summary>
@@ -509,10 +698,9 @@ namespace LegendaryExplorerUnrealDoc
                 string rowClass = "row";
                 foreach (var member in enumD.Value.EnumValues)
                 {
-                    var mrow = MEMBER_TEMPLATE;
+                    var mrow = ENUMROW_TEMPLATE;
 
-                    // MEMBERTYPE is the first column.
-                    mrow = mrow.Replace("%LD_MEMBERTYPE%", member.Value.EnumValue.ToString());
+                    mrow = mrow.Replace("%LD_ENUMINDEX%", member.Value.EnumValue.ToString());
                     mrow = mrow.Replace("%LD_MEMBERNAME%", member.Key);
                     mrow = mrow.Replace("%LD_MEMBERDOC%", member.Value.MemberDocumentation);
 
@@ -548,8 +736,30 @@ namespace LegendaryExplorerUnrealDoc
             // We are one folder deep.
             html = html.Replace("%LD_RELPATH%", "../");
 
-            File.WriteAllText(outFile, html);
+            // Navigation.
+            string navItems = "";
+            navItems += "<li><a href=\"#values\">Values&nbsp;</a></li>";
+            html = html.Replace("%LD_NAV_ITEMS%", navItems);
 
+
+            // Edit this page
+            var editLi = $"<li id=\"update_page_bullet\" title=\"Edit this documentation\"><a id=\"update_page\" href=\"https://github.com/ME3Tweaks/LegendaryExplorer/edit/UnrealDoc/DocSources/{db.Game}/enums/{enumD.Key}.json\" target=\"_blank\">Edit</a></li>";
+            html = html.Replace("%LD_EDIT_BULLET%", editLi);
+
+            SaveFile(htmlPath, outFile, html);
+        }
+
+        /// <summary>
+        /// Saves a page, inserting the %LD_SUBPATH% variable
+        /// </summary>
+        /// <param name="basePath"></param>
+        /// <param name="path"></param>
+        /// <param name="contents"></param>
+        private static void SaveFile(string basePath, string path, string contents)
+        {
+            var subPath = Path.GetRelativePath(basePath, path).Replace("\\","/");
+            contents = contents.Replace("%LD_SUBPATH%", subPath);
+            File.WriteAllText(path, contents);
         }
     }
 }

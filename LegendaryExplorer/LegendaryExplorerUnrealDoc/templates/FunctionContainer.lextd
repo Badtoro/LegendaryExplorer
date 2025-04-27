@@ -1,5 +1,5 @@
 ﻿<!-- FUNCTIONS-->
-<h3>Functions</h3>
+<h3 id="functions">Functions</h3>
 <table class="membersummary">
 	<tr>
 		<th class="colFirst">Return type</th>

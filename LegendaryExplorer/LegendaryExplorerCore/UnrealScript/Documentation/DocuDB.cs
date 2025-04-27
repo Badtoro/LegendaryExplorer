@@ -12,6 +12,7 @@ using LegendaryExplorerCore.Unreal.BinaryConverters;
 using LegendaryExplorerCore.UnrealScript.Analysis.Visitors;
 using LegendaryExplorerCore.UnrealScript.Language.Tree;
 using Newtonsoft.Json;
+using static LegendaryExplorerCore.Unreal.UnrealFlags;
 
 namespace LegendaryExplorerCore.UnrealScript.Documentation
 {
@@ -60,8 +61,8 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             if (Directory.Exists(filePath))
             {
                 // Loading loose DB
-                loaded = new DocuDB() { Game = game};
-                
+                loaded = new DocuDB() { Game = game };
+
                 // Loose load classes
                 loaded.ClassDocumentation = new();
                 foreach (var f in Directory.GetFiles(Path.Combine(filePath, "classes"), "*.json"))
@@ -174,12 +175,18 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 
             if (classDef is Class cls)
             {
+                dce.ClassFlags = cls.Flags;
+                dce.ConfigName = cls.ConfigName;
                 dce.ParentClass = cls.Parent?.Name;
                 dce.Package = cls.Package; // is this right?
                 // Variables
                 foreach (var v in cls.VariableDeclarations)
                 {
-                    dce.Variables.Add(v.Name, new DocuMemberEntry() {MemberType = v.VarType.Name});
+                    dce.Variables.Add(v.Name, new DocuMemberEntry()
+                    {
+                        MemberType = v.VarType.Name,
+                        Flags = (long)v.Flags
+                    });
                 }
 
 
@@ -192,7 +199,11 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
                     func.FunctionSignature = CodeBuilderVisitor.GetFunctionSignature(v);
                     foreach (var param in v.Parameters)
                     {
-                        func.FunctionMembers.Add(param.Name, new DocuMemberEntry());
+                        func.FunctionMembers.Add(param.Name, new DocuMemberEntry()
+                        {
+                            MemberType = param.VarType.Name,
+                            Flags = (long)param.Flags
+                        });
                     }
                     dce.Functions.Add(v.Name, func);
                 }
@@ -228,7 +239,11 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
                         func.FunctionMembers = new();
                         foreach (var param in v.Parameters)
                         {
-                            func.FunctionMembers.Add(param.Name, new DocuMemberEntry());
+                            func.FunctionMembers.Add(param.Name, new DocuMemberEntry()
+                            {
+                                MemberType = param.VarType.Name,
+                                Flags = (long) param.Flags
+                            });
                         }
                         dState.Functions.Add(v.Name, func);
                     }
@@ -262,7 +277,11 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             dType.Members = new();
             foreach (var eValue in tStruct.VariableDeclarations)
             {
-                dType.Members[eValue.Name] = new DocuMemberEntry() { MemberType = eValue.VarType.Name};
+                dType.Members[eValue.Name] = new DocuMemberEntry()
+                {
+                    MemberType = eValue.VarType.Name,
+                    Flags = (long)eValue.Flags,
+                };
             }
 
             // Need to enumerate type entries.
@@ -427,6 +446,18 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         /// <summary>
         /// Contains the text description of this class.
         /// </summary>
+        [JsonProperty("classflags")]
+        public EClassFlags ClassFlags { get; set; }
+
+        /// <summary>
+        /// If class is marked config, it reads from this file
+        /// </summary>
+        [JsonProperty("configname")]
+        public string ConfigName { get; set; }
+
+        /// <summary>
+        /// Contains the text description of this class.
+        /// </summary>
         [JsonProperty("documentation")]
         public string ClassDocumentation { get; set; }
     }
@@ -550,5 +581,11 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         /// </summary>
         [JsonProperty("documentation")]
         public string MemberDocumentation { get; set; }
+
+        /// <summary>
+        /// Flags on this member, stored as a long.
+        /// </summary>
+        [JsonProperty("flags")]
+        public long Flags { get; set; }
     }
 }
