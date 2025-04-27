@@ -625,6 +625,10 @@ namespace LegendaryExplorerUnrealDoc
                         }
 
                         mrow = mrow.Replace("%LD_MEMBERDOC%", memberDoc);
+                        var memberModifier = "";
+                        var flags = (EPropertyFlags)member.Value.Flags;
+                        mrow = mrow.Replace("%LD_MEMBERMODIFIER%", string.Join(" ", flags.GetFlags()));
+
 
                         // Formatting
                         mrow = mrow.Replace("%LD_ROWCLASS%", $"{rowClass}Color");
