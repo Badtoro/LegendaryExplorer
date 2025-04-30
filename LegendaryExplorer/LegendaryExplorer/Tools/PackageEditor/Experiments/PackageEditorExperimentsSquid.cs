@@ -848,7 +848,7 @@ defaultproperties
         {
             var d = new OpenFileDialog
             {
-                Filter = "PSK|*.psk",
+                Filter = "PSK|*.psk;*.pskx",
                 Title = "Select a psk file"
             };
             if (d.ShowDialog() == true)
@@ -922,6 +922,16 @@ defaultproperties
                 foreach (var wedge in psk.Wedges)
                 {
                     LOD.VertexBufferGPUSkin.VertexData[wedge.PointIndex].UV = new Vector2DHalf(wedge.U, wedge.V);
+                }
+
+                if (psk.VertexNormals != null)
+                {
+                    // import the vector normals and replace them
+                    for (int i = 0; i < psk.VertexNormals.Count; i++)
+                    {
+                        var vertNorm = psk.VertexNormals[i] with { Y = -psk.VertexNormals[i].Y };
+                        LOD.VertexBufferGPUSkin.VertexData[i].TangentZ = (PackedNormal)Vector3.Normalize(vertNorm);
+                    }
                 }
 
                 // update the position and weights of each point

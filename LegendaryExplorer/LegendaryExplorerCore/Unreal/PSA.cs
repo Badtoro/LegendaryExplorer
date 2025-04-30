@@ -341,5 +341,33 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
             }
         }
+
+        // read the next string without advancing the stream; allows you to essentially look ahead a bit to tell what you should read next
+        public bool TryReadString(out string s)
+        {
+            if (!IsLoading)
+            {
+                s = string.Empty;
+                return false;
+            }
+
+            var pos = ms.Position;
+
+            try
+            {
+                s = ms.ReadStringASCIINull();
+                return true;
+            }
+            
+            catch (EndOfStreamException)
+            {
+                s = string.Empty;
+                return false;
+            }
+            finally
+            {
+                ms.JumpTo(pos);
+            }
+        }
     }
 }
