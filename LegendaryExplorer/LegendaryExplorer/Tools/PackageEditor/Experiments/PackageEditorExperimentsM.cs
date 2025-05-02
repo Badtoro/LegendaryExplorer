@@ -41,6 +41,7 @@ using LegendaryExplorerCore.Gammtek.Extensions;
 using LegendaryExplorerCore.Pathing;
 using LegendaryExplorerCore.Shaders;
 using LegendaryExplorerCore.UDK;
+using LegendaryExplorer.SharedUI.Controls;
 
 //using ImageMagick;
 
@@ -2192,10 +2193,13 @@ defaultproperties
                 }
                 else
                 {
-                    MessageBox.Show(
-                        $"Could not resolve import: {exp2.InstancedFullPath}.\nFix your setup and try again.\nOr maybe this is just importable?\nOr maybe the code is just bugged.");
+                    var continueAnways = MessageBox.Show($"Could not resolve import: {exp2.InstancedFullPath}.\nFix your setup and try again.\nOr maybe this is just importable?\nOr maybe the code is just bugged. Try anyways?", "Import will not resolve", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                    if (continueAnways == MessageBoxResult.Yes)
+                    {
+                        EntryImporter.ConvertExportToImport(exp2);
                 }
             }
+        }
         }
 
         private static Dictionary<string, IMEPackage> TestPatchPackageMap = null;
@@ -3901,6 +3905,27 @@ defaultproperties
                 using FileStream fs = File.Create(AppDirectories.GetObjectDatabasePath(game));
                 objectDB.Serialize(fs);
             }).ContinueWithOnUIThread(_ => { pe.EndBusy(); });
+        }
+
+        public static void SearchObjectDB(PackageEditorWindow pe)
+        {
+            var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you to load the object instance db for.", "Object DB Loader",
+                                    new[] { "ME1", "ME2", "ME3", "LE1", "LE2", "LE3" }, "LE3", getDefaultValueFunc: () => pe.Pcc?.Game.ToString());
+            if (!Enum.TryParse<MEGame>(gameStr, out var game))
+                return;
+
+            var searchTerm = PromptDialog.Prompt(pe, "Enter instanced full path to find", "ObjectInstanceDB Search");
+            if (string.IsNullOrWhiteSpace(searchTerm))
+                return;
+
+
+            string objectDBPath = AppDirectories.GetObjectDatabasePath(game);
+            using FileStream fs = File.OpenRead(objectDBPath);
+            var objectDB = ObjectInstanceDB.Deserialize(game, fs);
+
+            var foundObjs = objectDB.GetFilesContainingObject(searchTerm);
+            var ld = new ListDialog(foundObjs ?? [], "Found objects", $"The following objects with the name '{searchTerm}' were found, in the listed files:", pe);
+            ld.Show();
         }
 
         public static void SearchObjectInfos(PackageEditorWindow pe)
