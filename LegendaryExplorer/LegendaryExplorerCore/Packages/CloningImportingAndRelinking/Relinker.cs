@@ -1190,5 +1190,26 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 
             Relinker.RelinkAll(new RelinkerOptionsPackage() { CrossPackageMap = relinkMap, ForceSamePackageImportRelink = true });
         }
+
+
+        /// <summary>
+        /// Redirects a single object to another one.
+        /// </summary>
+        /// <param name="source">Source object</param>
+        /// <param name="dest">Dest object</param>
+        public static void RepointObject(IEntry source, IEntry dest)
+        {
+            if (source.FileRef != dest.FileRef)
+            {
+                throw new Exception("Cannot point to objects outside of same package.");
+            }
+
+            var objectMap = new ListenableDictionary<IEntry, IEntry>
+            {
+                { source, dest },
+            };
+
+            RelinkSamePackage(source.FileRef, objectMap);
+        }
     }
 }
