@@ -21,7 +21,7 @@ namespace LegendaryExplorer.Misc
         public static string GetDocumentationForClassMember(MEGame game, string className, NameReference propertyName)
         {
             var db = LoadDocuDB(game);
-            if (db.ClassDocumentation.TryGetValue(className, out var cls) && cls.Variables.TryGetValue(propertyName.Instanced, out var member))
+            if (db?.ClassDocumentation != null && db.ClassDocumentation.TryGetValue(className, out var cls) && cls.Variables.TryGetValue(propertyName.Instanced, out var member))
             {
                 return member.MemberDocumentation;
             }
