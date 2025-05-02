@@ -378,7 +378,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 
             //Relink Properties
             // NOTES: this used to be relinkingExport, not source, Changed near end of jan 2021 - Mgamerz - Due to ported items possibly not having way to reference original items
-            
+
             // 01/19/2025 - If classes have changed, we take dest, not source, as otherwise we will bring across wrong properties.
             PropertyCollection props = relinkingExport.ClassName.CaseInsensitiveEquals(sourceExport.ClassName) ? sourceExport.GetProperties() : relinkingExport.GetProperties();
             bool removedProperties = false;

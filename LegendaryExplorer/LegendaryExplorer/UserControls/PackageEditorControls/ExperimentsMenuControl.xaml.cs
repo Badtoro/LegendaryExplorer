@@ -292,6 +292,12 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
                 MessageBox.Show(GetPEWindow(), $"Done. Took {sw.Elapsed.TotalSeconds} seconds");
             });
         }
+
+        private void ObjectInstanceDBSearch_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsM.SearchObjectDB(GetPEWindow());
+        }
+
         private void ObjectInfosSearch_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsM.SearchObjectInfos(GetPEWindow());
