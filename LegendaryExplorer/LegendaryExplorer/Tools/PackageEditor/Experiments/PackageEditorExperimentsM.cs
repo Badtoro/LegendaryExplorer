@@ -4048,7 +4048,7 @@ defaultproperties
 
             if (result == MessageBoxResult.Yes)
             {
-                var p = PackageResynthesizer.ResynthesizePackage(peWindow.Pcc, new PackageCache());
+                var p = PackageResynthesizer.ResynthesizePackage(peWindow.Pcc, new PackageCache(), true);
                 p.Save();
             }
         }
