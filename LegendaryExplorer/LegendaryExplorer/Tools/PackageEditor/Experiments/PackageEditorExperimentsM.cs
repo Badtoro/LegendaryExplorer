@@ -42,6 +42,7 @@ using LegendaryExplorerCore.Pathing;
 using LegendaryExplorerCore.Shaders;
 using LegendaryExplorerCore.UDK;
 using LegendaryExplorerCore.UnrealScript.Documentation;
+using LegendaryExplorer.SharedUI.Controls;
 
 //using ImageMagick;
 
