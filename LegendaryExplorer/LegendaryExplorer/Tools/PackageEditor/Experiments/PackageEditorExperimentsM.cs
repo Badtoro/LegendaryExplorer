@@ -2363,6 +2363,20 @@ defaultproperties
             Debug.WriteLine(string.Join('\n', set));
         }
 
+        private static void ConvertOutsideOfPackageToImports(PackageEditorWindow pe)
+        {
+            if (pe.TryGetSelectedExport(out var packageExp) && packageExp.ClassName == "Package")
+            {
+                var itemsToIgnore = new List<ExportEntry>();
+                itemsToIgnore.AddRange(pe.Pcc.Exports.Where(x => x.GetRoot() != packageExp));
+
+                foreach(var exp in itemsToIgnore)
+                {
+                    EntryImporter.ConvertExportToImport(exp);
+                }
+            }
+        }
+
         public static void MScanner(PackageEditorWindow pe)
         {
             //GenUObjDB();
