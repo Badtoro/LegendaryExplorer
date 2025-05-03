@@ -62,6 +62,46 @@ namespace LegendaryExplorer.Tools.AssetDatabase.Scanners
                     }
                 }
             }
+       
+            // Don't inventory BMICs.
+            if (e.Export.IsA("MaterialInstance") && e.ClassName != "BioMaterialInstanceConstant")
+            {
+                var matUsage = new MatUsage(e.FileKey, e.Export.UIndex, e.IsDlc);
+                if (db.GeneratedMats.TryGetValue(e.AssetKey, out MaterialRecord eMat))
+                {
+                    lock (eMat)
+                    {
+                        eMat.Usages.Add(matUsage);
+                    }
+                }
+                else
+                {
+                    var mSets = GetMaterialSettings(e, db);
+                    string parent;
+                    if (e.Export.Game == MEGame.ME1 && e.FileName.EndsWith(".upk"))
+                    {
+                        parent = Path.GetFileNameWithoutExtension(e.FileName);
+                    }
+                    else
+                    {
+                        parent = GetTopParentPackage(e.Export);
+                    }
+
+                    var objectNameInstanced = e.ObjectNameInstanced;
+
+                    var NewMat = new MaterialRecord(objectNameInstanced, parent, e.IsDlc, mSets);
+                    NewMat.Usages.Add(matUsage);
+                    if (!db.GeneratedMats.TryAdd(e.AssetKey, NewMat))
+                    {
+                        var mat = db.GeneratedMats[e.AssetKey];
+                        lock (mat)
+                        {
+                            mat.Usages.Add(matUsage);
+                        }
+                    }
+                }
+
+            }
         }
 
         private List<MatSetting> GetMaterialSettings(ExportScanInfo e, ConcurrentAssetDB db)
@@ -137,6 +177,18 @@ namespace LegendaryExplorer.Tools.AssetDatabase.Scanners
                         mSets.Add(pSet);
                     }
                 }
+            }
+
+            if (e.Export.IsA("MaterialInstance"))
+            {
+                // Get the parent mat.
+                var parent = e.Export.GetProperty<ObjectProperty>("Parent");
+                if (parent != null && e.Export.FileRef.TryGetEntry(parent.Value, out var entry))
+                {
+                    mSets.Add(new MatSetting("Parent", parent.Name, null));
+                }
+
+                mSets.Add(new MatSetting("IsInstance", "true", null));
             }
 
             return mSets;

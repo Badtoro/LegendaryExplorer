@@ -378,7 +378,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 
             //Relink Properties
             // NOTES: this used to be relinkingExport, not source, Changed near end of jan 2021 - Mgamerz - Due to ported items possibly not having way to reference original items
-            
+
             // 01/19/2025 - If classes have changed, we take dest, not source, as otherwise we will bring across wrong properties.
             PropertyCollection props = relinkingExport.ClassName.CaseInsensitiveEquals(sourceExport.ClassName) ? sourceExport.GetProperties() : relinkingExport.GetProperties();
             bool removedProperties = false;
@@ -1189,6 +1189,27 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             }
 
             Relinker.RelinkAll(new RelinkerOptionsPackage() { CrossPackageMap = relinkMap, ForceSamePackageImportRelink = true });
+        }
+
+
+        /// <summary>
+        /// Redirects a single object to another one.
+        /// </summary>
+        /// <param name="source">Source object</param>
+        /// <param name="dest">Dest object</param>
+        public static void RepointObject(IEntry source, IEntry dest)
+        {
+            if (source.FileRef != dest.FileRef)
+            {
+                throw new Exception("Cannot point to objects outside of same package.");
+            }
+
+            var objectMap = new ListenableDictionary<IEntry, IEntry>
+            {
+                { source, dest },
+            };
+
+            RelinkSamePackage(source.FileRef, objectMap);
         }
     }
 }

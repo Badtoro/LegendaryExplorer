@@ -62,9 +62,24 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 var dbDir = Path.Combine(AppDirectories.DocuDBsFolder, game.ToString());
                 Directory.CreateDirectory(dbDir);
 
+                var classesDir = Directory.CreateDirectory(Path.Combine(dbDir, "classes")).FullName;
                 foreach (var cls in db.ClassDocumentation)
                 {
-                    var outPath = Path.Combine(dbDir, $"{cls.Key}.json");
+                    var outPath = Path.Combine(classesDir, $"{cls.Key}.json");
+                    File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
+                }
+
+                var structs = Directory.CreateDirectory(Path.Combine(dbDir, "structs")).FullName;
+                foreach (var cls in db.StructDocumentation)
+                {
+                    var outPath = Path.Combine(structs, $"{cls.Key}.json");
+                    File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
+                }
+
+                var enums = Directory.CreateDirectory(Path.Combine(dbDir, "enums")).FullName;
+                foreach (var cls in db.EnumDocumentation)
+                {
+                    var outPath = Path.Combine(enums, $"{cls.Key}.json");
                     File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
                 }
             }
@@ -2348,6 +2363,20 @@ defaultproperties
             Debug.WriteLine(string.Join('\n', set));
         }
 
+        private static void ConvertOutsideOfPackageToImports(PackageEditorWindow pe)
+        {
+            if (pe.TryGetSelectedExport(out var packageExp) && packageExp.ClassName == "Package")
+            {
+                var itemsToIgnore = new List<ExportEntry>();
+                itemsToIgnore.AddRange(pe.Pcc.Exports.Where(x => x.GetRoot() != packageExp));
+
+                foreach(var exp in itemsToIgnore)
+                {
+                    EntryImporter.ConvertExportToImport(exp);
+                }
+            }
+        }
+
         public static void MScanner(PackageEditorWindow pe)
         {
             //GenUObjDB();
@@ -3892,6 +3921,27 @@ defaultproperties
             }).ContinueWithOnUIThread(_ => { pe.EndBusy(); });
         }
 
+        public static void SearchObjectDB(PackageEditorWindow pe)
+        {
+            var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you to load the object instance db for.", "Object DB Loader",
+                                    new[] { "ME1", "ME2", "ME3", "LE1", "LE2", "LE3" }, "LE3", getDefaultValueFunc: () => pe.Pcc?.Game.ToString());
+            if (!Enum.TryParse<MEGame>(gameStr, out var game))
+                return;
+
+            var searchTerm = PromptDialog.Prompt(pe, "Enter instanced full path to find", "ObjectInstanceDB Search");
+            if (string.IsNullOrWhiteSpace(searchTerm))
+                return;
+
+
+            string objectDBPath = AppDirectories.GetObjectDatabasePath(game);
+            using FileStream fs = File.OpenRead(objectDBPath);
+            var objectDB = ObjectInstanceDB.Deserialize(game, fs);
+
+            var foundObjs = objectDB.GetFilesContainingObject(searchTerm);
+            var ld = new ListDialog(foundObjs ?? [], "Found objects", $"The following objects with the name '{searchTerm}' were found, in the listed files:", pe);
+            ld.Show();
+        }
+
         public static void SearchObjectInfos(PackageEditorWindow pe)
         {
             var searchTerm = PromptDialog.Prompt(pe, "Enter key value to search", "ObjectInfos Search");
@@ -4037,7 +4087,7 @@ defaultproperties
 
             if (result == MessageBoxResult.Yes)
             {
-                var p = PackageResynthesizer.ResynthesizePackage(peWindow.Pcc, new PackageCache());
+                var p = PackageResynthesizer.ResynthesizePackage(peWindow.Pcc, new PackageCache(), true);
                 p.Save();
             }
         }
