@@ -228,5 +228,8 @@
         <MenuItem Header="Build LE2 Object Database" Click="ChonkyDB_BuildLE2GameDB"/>
         <MenuItem Header="Build ME3 Object Database" Click="ChonkyDB_BuildME3GameDB"/>
         <MenuItem Header="Build LE3 Object Database" Click="ChonkyDB_BuildLE3GameDB"/>
+        <Separator/>
+        <MenuItem Header="Search for object instances" Click="ObjectInstanceDBSearch_Click"/>
+
     </MenuItem>
 </MenuItem>

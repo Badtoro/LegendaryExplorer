@@ -42,6 +42,7 @@ using LegendaryExplorerCore.Pathing;
 using LegendaryExplorerCore.Shaders;
 using LegendaryExplorerCore.UDK;
 using LegendaryExplorerCore.UnrealScript.Documentation;
+using LegendaryExplorer.SharedUI.Controls;
 
 //using ImageMagick;
 
@@ -62,9 +63,24 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 var dbDir = Path.Combine(AppDirectories.DocuDBsFolder, game.ToString());
                 Directory.CreateDirectory(dbDir);
 
+                var classesDir = Directory.CreateDirectory(Path.Combine(dbDir, "classes")).FullName;
                 foreach (var cls in db.ClassDocumentation)
                 {
-                    var outPath = Path.Combine(dbDir, $"{cls.Key}.json");
+                    var outPath = Path.Combine(classesDir, $"{cls.Key}.json");
+                    File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
+                }
+
+                var structs = Directory.CreateDirectory(Path.Combine(dbDir, "structs")).FullName;
+                foreach (var cls in db.StructDocumentation)
+                {
+                    var outPath = Path.Combine(structs, $"{cls.Key}.json");
+                    File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
+                }
+
+                var enums = Directory.CreateDirectory(Path.Combine(dbDir, "enums")).FullName;
+                foreach (var cls in db.EnumDocumentation)
+                {
+                    var outPath = Path.Combine(enums, $"{cls.Key}.json");
                     File.WriteAllText(outPath, JsonConvert.SerializeObject(cls.Value, Formatting.Indented));
                 }
             }
@@ -2178,8 +2194,11 @@ defaultproperties
                 }
                 else
                 {
-                    MessageBox.Show(
-                        $"Could not resolve import: {exp2.InstancedFullPath}.\nFix your setup and try again.\nOr maybe this is just importable?\nOr maybe the code is just bugged.");
+                    var continueAnways = MessageBox.Show($"Could not resolve import: {exp2.InstancedFullPath}.\nFix your setup and try again.\nOr maybe this is just importable?\nOr maybe the code is just bugged. Try anyways?", "Import will not resolve", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                    if (continueAnways == MessageBoxResult.Yes)
+                    {
+                        EntryImporter.ConvertExportToImport(exp2);
+                    }
                 }
             }
         }
@@ -2345,10 +2364,24 @@ defaultproperties
             Debug.WriteLine(string.Join('\n', set));
         }
 
+        private static void ConvertOutsideOfPackageToImports(PackageEditorWindow pe)
+        {
+            if (pe.TryGetSelectedExport(out var packageExp) && packageExp.ClassName == "Package")
+            {
+                var itemsToIgnore = new List<ExportEntry>();
+                itemsToIgnore.AddRange(pe.Pcc.Exports.Where(x => x.GetRoot() != packageExp));
+
+                foreach(var exp in itemsToIgnore)
+                {
+                    EntryImporter.ConvertExportToImport(exp);
+                }
+            }
+        }
+
         public static void MScanner(PackageEditorWindow pe)
         {
-            //GenUObjDB();
-            GenTexDB();
+            ConvertOutsideOfPackageToImports(pe);
+            return;
             MessageBox.Show("DONE");
             return;
 
@@ -2979,34 +3012,34 @@ defaultproperties
             var packageToObjList = new CaseInsensitiveDictionary<CaseInsensitiveDictionary<string>>();
 
             var backupPath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3);
-            foreach (var packageF in Directory.GetFiles(backupPath, "*.pcc", SearchOption.AllDirectories))
-            {
-                var package = MEPackageHandler.UnsafePartialLoad(packageF, x => false);
-                List<ExportEntry> objects = null;
-                if (!isA)
+                foreach (var packageF in Directory.GetFiles(backupPath, "*.pcc", SearchOption.AllDirectories))
                 {
-                    objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && x.ClassName == objectType && x.GetRoot().ObjectName != "TheWorld").ToList();
-                }
-                else
-                {
-                    objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && (x.Parent == null || x.Parent.ClassName == "Package") && x.IsA(objectType) && x.GetRoot().ObjectName != "TheWorld").ToList();
-                }
-
-
-                foreach (var obj in objects) // This might need changed later.
-                {
-                    var linker = obj.GetLinker();
-                    if (!packageToObjList.TryGetValue(linker, out var objs))
+                    var package = MEPackageHandler.UnsafePartialLoad(packageF, x => false);
+                    List<ExportEntry> objects = null;
+                    if (!isA)
                     {
-                        objs = packageToObjList[linker] = new CaseInsensitiveDictionary<string>();
+                        objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && x.ClassName == objectType && x.GetRoot().ObjectName != "TheWorld").ToList();
+                    }
+                    else
+                    {
+                        objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && (x.Parent == null || x.Parent.ClassName == "Package") && x.IsA(objectType) && x.GetRoot().ObjectName != "TheWorld").ToList();
                     }
 
-                    if (!objs.TryGetValue(obj.MemoryFullPath, out _))
+
+                    foreach (var obj in objects) // This might need changed later.
                     {
-                        objs[obj.MemoryFullPath] = package.FilePath;
+                        var linker = obj.GetLinker();
+                        if (!packageToObjList.TryGetValue(linker, out var objs))
+                        {
+                            objs = packageToObjList[linker] = new CaseInsensitiveDictionary<string>();
+                        }
+
+                        if (!objs.TryGetValue(obj.MemoryFullPath, out _))
+                        {
+                            objs[obj.MemoryFullPath] = package.FilePath;
+                        }
                     }
                 }
-            }
 
             var outJ = JsonConvert.SerializeObject(packageToObjList);
             File.WriteAllText($@"S:\Milan\UDK\PackageMappingFor{objectType}.json", outJ);
@@ -3889,6 +3922,27 @@ defaultproperties
             }).ContinueWithOnUIThread(_ => { pe.EndBusy(); });
         }
 
+        public static void SearchObjectDB(PackageEditorWindow pe)
+        {
+            var gameStr = InputComboBoxWPF.GetValue(null, "Choose game you to load the object instance db for.", "Object DB Loader",
+                                    new[] { "ME1", "ME2", "ME3", "LE1", "LE2", "LE3" }, "LE3", getDefaultValueFunc: () => pe.Pcc?.Game.ToString());
+            if (!Enum.TryParse<MEGame>(gameStr, out var game))
+                return;
+
+            var searchTerm = PromptDialog.Prompt(pe, "Enter instanced full path to find", "ObjectInstanceDB Search");
+            if (string.IsNullOrWhiteSpace(searchTerm))
+                return;
+
+
+            string objectDBPath = AppDirectories.GetObjectDatabasePath(game);
+            using FileStream fs = File.OpenRead(objectDBPath);
+            var objectDB = ObjectInstanceDB.Deserialize(game, fs);
+
+            var foundObjs = objectDB.GetFilesContainingObject(searchTerm);
+            var ld = new ListDialog(foundObjs ?? [], "Found objects", $"The following objects with the name '{searchTerm}' were found, in the listed files:", pe);
+            ld.Show();
+        }
+
         public static void SearchObjectInfos(PackageEditorWindow pe)
         {
             var searchTerm = PromptDialog.Prompt(pe, "Enter key value to search", "ObjectInfos Search");
@@ -4034,7 +4088,7 @@ defaultproperties
 
             if (result == MessageBoxResult.Yes)
             {
-                var p = PackageResynthesizer.ResynthesizePackage(peWindow.Pcc, new PackageCache());
+                var p = PackageResynthesizer.ResynthesizePackage(peWindow.Pcc, new PackageCache(), true);
                 p.Save();
             }
         }
