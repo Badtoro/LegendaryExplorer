@@ -2177,10 +2177,13 @@ defaultproperties
                 }
                 else
                 {
-                    MessageBox.Show(
-                        $"Could not resolve import: {exp2.InstancedFullPath}.\nFix your setup and try again.\nOr maybe this is just importable?\nOr maybe the code is just bugged.");
+                    var continueAnways = MessageBox.Show($"Could not resolve import: {exp2.InstancedFullPath}.\nFix your setup and try again.\nOr maybe this is just importable?\nOr maybe the code is just bugged. Try anyways?", "Import will not resolve", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                    if (continueAnways == MessageBoxResult.Yes)
+                    {
+                        EntryImporter.ConvertExportToImport(exp2);
                 }
             }
+        }
         }
 
         private static Dictionary<string, IMEPackage> TestPatchPackageMap = null;
