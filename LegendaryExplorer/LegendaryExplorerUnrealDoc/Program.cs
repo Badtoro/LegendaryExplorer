@@ -70,6 +70,7 @@ namespace LegendaryExplorerUnrealDoc
                 }
 
                 Console.WriteLine($"\tLoading documentation files");
+                // Load source DocuDB.
                 DocuDB db = DocuDB.LoadDocuDB(game, Path.Combine(options.InputFolder, game.ToString()));
 
                 Console.WriteLine($"\tGenerating class html");
@@ -100,6 +101,12 @@ namespace LegendaryExplorerUnrealDoc
                 Console.WriteLine($"\tGenerating game homepage html");
                 GenerateGameHomepage(htmlPath, db);
 
+                // Binary output.
+                Console.WriteLine($"\tSerializing Binary DocuDB");
+                Directory.CreateDirectory(options.BinaryOutputFolder);
+                var outPath = Path.Combine(options.BinaryOutputFolder, $"DocuDB_{game}.bin");
+                var binary = BinaryDocuDB.Serialize(db);
+                binary.WriteToFile(outPath);
             }
 
             // Shared content
@@ -141,7 +148,7 @@ namespace LegendaryExplorerUnrealDoc
             html = html.Replace("%LD_NAV_ITEMS%", "");
             html = html.Replace("%LD_EDIT_BULLET%", "");
 
-            SaveFile(htmlPath,  outputPath, html);
+            SaveFile(htmlPath, outputPath, html);
         }
 
         private static void GeneratePackagesPage(string htmlPath, DocuDB db)
@@ -761,7 +768,7 @@ namespace LegendaryExplorerUnrealDoc
         /// <param name="contents"></param>
         private static void SaveFile(string basePath, string path, string contents)
         {
-            var subPath = Path.GetRelativePath(basePath, path).Replace("\\","/");
+            var subPath = Path.GetRelativePath(basePath, path).Replace("\\", "/");
             contents = contents.Replace("%LD_SUBPATH%", subPath);
             File.WriteAllText(path, contents);
         }
