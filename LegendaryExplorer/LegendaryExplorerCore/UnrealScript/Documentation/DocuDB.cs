@@ -289,7 +289,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             return dType;
         }
 #endif
-        public string GetDocumentation(string className, string memberName, string subMemberName = null)
+        public virtual string GetDocumentation(string className, string memberName, string subMemberName = null)
         {
             if (ClassDocumentation.TryGetValue(className, out var cls))
             {
@@ -328,7 +328,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             return null;
         }
 
-        public string GetDocumentation(IEntry obj)
+        public virtual string GetDocumentation(IEntry obj)
         {
             // Determine: Are we under a class or struct (including state)?
             // If so, we should return the member documentation.
