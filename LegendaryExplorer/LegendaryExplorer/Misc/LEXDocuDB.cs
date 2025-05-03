@@ -42,7 +42,7 @@ namespace LegendaryExplorer.Misc
                 default:
                     {
                         // This prevents File.Exists() calls since the db file doesn't exist in exec.
-                        var emptyDb = DocuDB.GenerateInitialDB(game); ;
+                        var emptyDb = DocuDB.GetEmptyDB(game); ;
                         DocuDB.AddLoadedDb(game, emptyDb);
                         return emptyDb;
                     }
