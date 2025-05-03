@@ -11,9 +11,9 @@ using System.Threading.Tasks;
 namespace LegendaryExplorerCore.UnrealScript.Documentation
 {
     /// <summary>
-    /// Serialized version of a DocuDB object, with less information, as it is used in tools that have access to that info already.
+    /// Serializes and deserializes a binary version of a DocuDB object, with less information, as it is used in tools that have access to that info already.
     /// </summary>
-    public class BinaryDocuDB : DocuDB
+    public static class BinaryDocuDB
     {
         /// <summary>
         /// Bump this when the format changes.
@@ -27,7 +27,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
         /// Serializes a source DocuDB to binary format.
         /// </summary>
         /// <param name="db"></param>
-        public MemoryStream Serialize()
+        public static MemoryStream Serialize(DocuDB db)
         {
             MemoryStream bin = new MemoryStream();
 
@@ -40,7 +40,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 
             // Class Documentation
             // Only serialize classes that have documentation to reduce size
-            var classesToWrite = ClassDocumentation.Where(x =>
+            var classesToWrite = db.ClassDocumentation.Where(x =>
                 x.Value.ClassDocumentation != null ||
                 x.Value.Variables.Any(x => x.Value.MemberDocumentation != null) || // Variables
                 x.Value.Functions.Any(x => x.Value.MemberDocumentation != null || x.Value.FunctionMembers.Any(y => y.Value.MemberDocumentation != null)) || // Variables
@@ -54,14 +54,14 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 
             // Enum Documentation
             // Only serialize enums that have documentation to reduce size
-            var enumsToWrite = EnumDocumentation.Where(x => x.Value.MemberDocumentation != null).ToList();
+            var enumsToWrite = db.EnumDocumentation.Where(x => x.Value.MemberDocumentation != null).ToList();
             bin.WriteInt32(enumsToWrite.Count);
             foreach (var enumDoc in enumsToWrite)
             {
                 WriteEnum(bin, enumDoc);
             }
 
-            var structsToWrite = StructDocumentation.Where(x =>
+            var structsToWrite = db.StructDocumentation.Where(x =>
                        x.Value.MemberDocumentation != null ||
                        x.Value.Members.Any(x => x.Value.MemberDocumentation != null) // Variables
                    ).ToList();
@@ -76,7 +76,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             return bin;
         }
 
-        private void WriteClass(MemoryStream bin, KeyValuePair<string, DocuClassEntry> classDoc)
+        private static void WriteClass(MemoryStream bin, KeyValuePair<string, DocuClassEntry> classDoc)
         {
             bin.WriteUnrealStringUnicode(classDoc.Key);
             bin.WriteUnrealStringUnicode(classDoc.Value.ClassDocumentation);
@@ -104,7 +104,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             }
         }
 
-        private void WriteStruct(MemoryStream bin, KeyValuePair<string, DocuStructEntry> structDoc)
+        private static void WriteStruct(MemoryStream bin, KeyValuePair<string, DocuStructEntry> structDoc)
         {
             bin.WriteUnrealStringUnicode(structDoc.Key);
             bin.WriteUnrealStringUnicode(structDoc.Value.MemberDocumentation);
@@ -118,7 +118,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             }
         }
 
-        private void WriteEnum(MemoryStream bin, KeyValuePair<string, DocuEnumEntry> enumDoc)
+        private static void WriteEnum(MemoryStream bin, KeyValuePair<string, DocuEnumEntry> enumDoc)
         {
             bin.WriteUnrealStringUnicode(enumDoc.Key);
             bin.WriteUnrealStringUnicode(enumDoc.Value.MemberDocumentation);
@@ -133,14 +133,14 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             }
         }
 
-        private void WriteState(MemoryStream bin, KeyValuePair<string, DocuStateEntry> state)
+        private static void WriteState(MemoryStream bin, KeyValuePair<string, DocuStateEntry> state)
         {
             bin.WriteUnrealStringUnicode(state.Key);
             bin.WriteUnrealStringUnicode(state.Value.MemberDocumentation);
             WriteFunctions(bin, state.Value.Functions);
         }
 
-        private void WriteFunctions(MemoryStream bin, CaseInsensitiveDictionary<DocuFunctionEntry> functions)
+        private static void WriteFunctions(MemoryStream bin, CaseInsensitiveDictionary<DocuFunctionEntry> functions)
         {
             var funcsToWrite = functions.Where(x => x.Value.MemberDocumentation != null || x.Value.FunctionMembers.Any(y => y.Value.MemberDocumentation != null)).ToList();
             bin.WriteInt32(funcsToWrite.Count);
@@ -159,7 +159,7 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
             }
         }
 
-        private void WriteMember(MemoryStream bin, KeyValuePair<string, DocuMemberEntry> variable)
+        private static void WriteMember(MemoryStream bin, KeyValuePair<string, DocuMemberEntry> variable)
         {
             bin.WriteUnrealStringUnicode(variable.Key);
             bin.WriteUnrealStringUnicode(variable.Value.MemberDocumentation);
