@@ -36,8 +36,6 @@ using LegendaryExplorer.Tools.AssetDatabase.Filters;
 using LegendaryExplorer.Tools.AssetViewer;
 using LegendaryExplorer.Tools.LiveLevelEditor;
 using LegendaryExplorer.Tools.PlotDatabase;
-using LegendaryExplorer.UserControls.ExportLoaderControls;
-using LegendaryExplorer.UserControls.ExportLoaderControls.MaterialEditor;
 using LegendaryExplorerCore.Memory;
 using LegendaryExplorerCore.PlotDatabase;
 
@@ -49,8 +47,9 @@ namespace LegendaryExplorer.Tools.AssetDatabase
     public partial class AssetDatabaseWindow : TrackingNotifyPropertyChangedWindowBase
     {
         #region Declarations
-
-        public const string dbCurrentBuild = "8.0"; //If changes are made that invalidate old databases edit this.
+        // v9.0: Textures now use .IsTexture() to get more texture class types. Add MaterialInstances to Materials.
+        public const string dbCurrentBuild = "9.0"; //If changes are made that invalidate old databases edit this.
+        
         private int previousView { get; set; }
         private int _currentView;
         public int currentView
@@ -1051,7 +1050,7 @@ namespace LegendaryExplorer.Tools.AssetDatabase
 
             IMEPackage package = null;
             ExportEntry exportEntry = null;
-            if(tool != "CndEd") // don't try to OpenMEPackage on a .cnd file
+            if (tool != "CndEd") // don't try to OpenMEPackage on a .cnd file
             {
                 if (Path.GetFileName(filePath) == "Default.sfar")
                 {
@@ -1067,7 +1066,7 @@ namespace LegendaryExplorer.Tools.AssetDatabase
                 {
                     package = MEPackageHandler.OpenMEPackage(filePath);
                 }
-                if(package.TryGetUExport(uindex, out var goodExport)) exportEntry = goodExport;
+                if (package.TryGetUExport(uindex, out var goodExport)) exportEntry = goodExport;
             }
 
             switch (tool)
