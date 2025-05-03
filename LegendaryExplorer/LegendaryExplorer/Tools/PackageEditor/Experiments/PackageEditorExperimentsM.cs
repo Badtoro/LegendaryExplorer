@@ -2197,9 +2197,9 @@ defaultproperties
                     if (continueAnways == MessageBoxResult.Yes)
                     {
                         EntryImporter.ConvertExportToImport(exp2);
+                    }
                 }
             }
-        }
         }
 
         private static Dictionary<string, IMEPackage> TestPatchPackageMap = null;
@@ -2379,8 +2379,8 @@ defaultproperties
 
         public static void MScanner(PackageEditorWindow pe)
         {
-            //GenUObjDB();
-            GenTexDB();
+            ConvertOutsideOfPackageToImports(pe);
+            return;
             MessageBox.Show("DONE");
             return;
 
@@ -3011,34 +3011,34 @@ defaultproperties
             var packageToObjList = new CaseInsensitiveDictionary<CaseInsensitiveDictionary<string>>();
 
             var backupPath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3);
-            foreach (var packageF in Directory.GetFiles(backupPath, "*.pcc", SearchOption.AllDirectories))
-            {
-                var package = MEPackageHandler.UnsafePartialLoad(packageF, x => false);
-                List<ExportEntry> objects = null;
-                if (!isA)
+                foreach (var packageF in Directory.GetFiles(backupPath, "*.pcc", SearchOption.AllDirectories))
                 {
-                    objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && x.ClassName == objectType && x.GetRoot().ObjectName != "TheWorld").ToList();
-                }
-                else
-                {
-                    objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && (x.Parent == null || x.Parent.ClassName == "Package") && x.IsA(objectType) && x.GetRoot().ObjectName != "TheWorld").ToList();
-                }
-
-
-                foreach (var obj in objects) // This might need changed later.
-                {
-                    var linker = obj.GetLinker();
-                    if (!packageToObjList.TryGetValue(linker, out var objs))
+                    var package = MEPackageHandler.UnsafePartialLoad(packageF, x => false);
+                    List<ExportEntry> objects = null;
+                    if (!isA)
                     {
-                        objs = packageToObjList[linker] = new CaseInsensitiveDictionary<string>();
+                        objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && x.ClassName == objectType && x.GetRoot().ObjectName != "TheWorld").ToList();
+                    }
+                    else
+                    {
+                        objects = package.Exports.Where(x => !x.IsDefaultObject && !x.IsArchetype && (x.Parent == null || x.Parent.ClassName == "Package") && x.IsA(objectType) && x.GetRoot().ObjectName != "TheWorld").ToList();
                     }
 
-                    if (!objs.TryGetValue(obj.MemoryFullPath, out _))
+
+                    foreach (var obj in objects) // This might need changed later.
                     {
-                        objs[obj.MemoryFullPath] = package.FilePath;
+                        var linker = obj.GetLinker();
+                        if (!packageToObjList.TryGetValue(linker, out var objs))
+                        {
+                            objs = packageToObjList[linker] = new CaseInsensitiveDictionary<string>();
+                        }
+
+                        if (!objs.TryGetValue(obj.MemoryFullPath, out _))
+                        {
+                            objs[obj.MemoryFullPath] = package.FilePath;
+                        }
                     }
                 }
-            }
 
             var outJ = JsonConvert.SerializeObject(packageToObjList);
             File.WriteAllText($@"S:\Milan\UDK\PackageMappingFor{objectType}.json", outJ);

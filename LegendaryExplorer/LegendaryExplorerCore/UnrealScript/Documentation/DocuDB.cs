@@ -46,6 +46,23 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 
         public DocuDB() { }
 
+        public static DocuDB GetEmptyDB(MEGame game)
+        {
+            return new DocuDB()
+            {
+                ClassDocumentation = new(),
+                EnumDocumentation = new(),
+                StructDocumentation = new(),
+                Game = game
+            };
+        }
+
+        public static DocuDB GetLoadedDB(MEGame game)
+        {
+            if (LoadedDBs.TryGetValue(game, out var db)) return db;
+            return null;
+        }
+
         /// <summary>
         /// Fetches a documentation database, loading it if it isn't already loaded.
         /// </summary>
@@ -110,11 +127,11 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 #if DEBUG
 
         /// <summary>
-        /// Generates a blank database based on classes found in the game.
+        /// Generates a documentation-less database based on classes found in the game.
         /// </summary>
         /// <param name="game"></param>
         /// <returns></returns>
-        public static DocuDB GetEmptyDB(MEGame game)
+        public static DocuDB GenerateInitialDB(MEGame game)
         {
             DocuDB db = new DocuDB();
 
@@ -405,6 +422,11 @@ namespace LegendaryExplorerCore.UnrealScript.Documentation
 
 
             return null;
+        }
+
+        public static void AddLoadedDb(MEGame game, DocuDB loadedDb)
+        {
+            LoadedDBs[game] = loadedDb;
         }
     }
 
