@@ -41,6 +41,7 @@ using LegendaryExplorerCore.Gammtek.Extensions;
 using LegendaryExplorerCore.Pathing;
 using LegendaryExplorerCore.Shaders;
 using LegendaryExplorerCore.UDK;
+using LegendaryExplorerCore.UnrealScript.Documentation;
 
 //using ImageMagick;
 

@@ -17,6 +17,7 @@ using System.IO;
 using System.Numerics;
 using static LegendaryExplorerCore.Unreal.PSA;
 using LegendaryExplorerCore.Save;
+using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
@@ -358,7 +359,8 @@ defaultproperties
                     return;
                 }
                 // add a new material slot to split the right eye into
-                var newMaterialIndex = AddMaterialSlot(meshBinary);
+                SetNumMaterialSlots(meshBinary, meshBinary.Materials.Length + 1);
+                var newMaterialIndex = meshBinary.Materials.Length + 1;
 
                 // from there, find the section we need to modify
                 foreach (var lod in meshBinary.LODModels)
@@ -494,16 +496,29 @@ defaultproperties
             return materialChoices.IndexOf(mat);
         }
 
-        private static int AddMaterialSlot(SkeletalMesh meshBinary)
+        private static ExportEntry ChooseSkeletalMesh(PackageEditorWindow pew, string prompt)
         {
+            if (EntrySelector.GetEntry<ExportEntry>(pew, pew.Pcc, prompt, exp => exp.ClassName == "SkeletalMesh") is ExportEntry meshExport)
+            {
+                return meshExport;
+            }
+            return null;
+        }
+
+        private static void SetNumMaterialSlots(SkeletalMesh meshBinary, int numMaterials)
+        {
+            if (meshBinary.Materials.Length == numMaterials)
+            {
+                return;
+            }
+
             var tempMaterials = meshBinary.Materials;
-            meshBinary.Materials = new int[meshBinary.Materials.Length + 1];
-            for (int i = 0; i < tempMaterials.Length; i++)
+
+            meshBinary.Materials = new int[numMaterials];
+            for (int i = 0; i < numMaterials && i < tempMaterials.Length; i++)
             {
                 meshBinary.Materials[i] = tempMaterials[i];
             }
-
-            return meshBinary.Materials.Length - 1;
         }
 
         private static void ShowError(string errMsg)
@@ -595,7 +610,7 @@ defaultproperties
                 var baseMeshBin = baseHeadMesh.GetBinaryData<SkeletalMesh>();
 
                 // make most of the psk from the base head mesh
-                var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh.GetBinaryData<SkeletalMesh>());
+                var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh.GetBinaryData<SkeletalMesh>(), 0, true);
 
                 var bmfBin = bmf.GetBinaryData<BioMorphFace>();
 
@@ -756,58 +771,360 @@ defaultproperties
             if (sourceScalars != null) { targetExport.WriteProperty(targetScalars); }
         }
 
-        public static void ReplaceMeshDataFromPsk(PackageEditorWindow pew)
+        // seems promising, but needs more work
+        public static void SmoothMeshSeams(PackageEditorWindow pew)
         {
-            if (GetSelectedMeshBinary(pew, out var meshExport, out var meshBin))
+            // pick two meshes
+            var sourceMesh = ChooseSkeletalMesh(pew, "Choose source mesh (usually a head mesh) which will not be modified in this operation, just used as the source for vertex normals");
+            var targetMesh = ChooseSkeletalMesh(pew, "Choose Target mesh (usually a body with a neck seam or a hair mesh that needs to be seamless with the scalp) which will have its vertex normals updated to match those on the source mesh as part of the operation.");
+
+            if (sourceMesh != null && targetMesh != null)
             {
-                var d = new OpenFileDialog
+                var sourceBin = sourceMesh.GetBinaryData<SkeletalMesh>();
+                var targetBin = targetMesh.GetBinaryData<SkeletalMesh>();
+
+                var sourceVerts = new List<(int vertIndex, GPUSkinVertex vert)>();
+                var targetVerts = new List<(int vertIndex, GPUSkinVertex vert)>();
+
+                for (var i = 0; i < sourceBin.LODModels[0].VertexBufferGPUSkin.VertexData.Length; i++)
                 {
-                    Filter = "PSK|*.psk",
-                    Title = "Select a psk file"
-                };
-                if (d.ShowDialog() == true)
-                {
-                    var psk = PSK.FromFile(d.FileName);
-
-                    if (psk.Points.Count != meshBin.LODModels[0].NumVertices)
-                    {
-                        ShowError("the number of vertices in the mesh (LOD 0) and the psk must match.");
-                        return;
-                    }
-
-                    if (psk.Points.Count != psk.Wedges.Count)
-                    {
-                        ShowError("Can't import this psk; number of points and wedges differ.");
-                        return;
-                    }
-
-                    for (int i = 0; i < psk.Points.Count; i++)
-                    {
-                        // replace the position data with that of the psk
-                        meshBin.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i];
-                        // gotta invert that Y for whatever reason, like it got inverted on export
-                        meshBin.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position.Y *= -1;
-                        // TODO also replace the UVs and material slot in the future?
-                    }
-
-                    meshExport.WriteBinary(meshBin);
+                    sourceVerts.Add((i, sourceBin.LODModels[0].VertexBufferGPUSkin.VertexData[i]));
                 }
+
+                for (var i = 0; i < targetBin.LODModels[0].VertexBufferGPUSkin.VertexData.Length; i++)
+                {
+                    targetVerts.Add((i, targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[i]));
+                }
+
+                var overlap = targetVerts.Join(sourceVerts, first => first.vert.Position, second => second.vert.Position, (first, second) => (first.vertIndex, second.vert), new VertComparer()).ToList();
+                // now find which verts are in both sequences comparing by position, returning the ones from 
+                //var intersect = targetVerts.Intersect(sourceVerts, new VertComparer()).ToArray();
+
+                foreach (var (targetIndex, sourceVert) in overlap)
+                {
+                    // copy the position, tanX and tanZ from the source to the target to make the seam match up better.
+                    targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[targetIndex].Position = sourceVert.Position;
+                    //targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[targetIndex].TangentX = sourceVert.TangentX;
+                    targetBin.LODModels[0].VertexBufferGPUSkin.VertexData[targetIndex].TangentZ = sourceVert.TangentZ;
+                }
+
+                targetMesh.WriteBinary(targetBin);
             }
         }
 
-        public static void ReplaceBMFDataFromPsk(PackageEditorWindow pew)
+        private class VertComparer : IEqualityComparer<Vector3>
+        {
+            public bool Equals(Vector3 x, Vector3 y)
+            {
+                return (x - y).Length() < 0.1;
+            }
+
+            public int GetHashCode(Vector3 obj)
+            {
+                return 0;
+            }
+        }
+
+        private static bool GetPsaFromFile(PackageEditorWindow pew, out PSA psa, out string filePath)
+        {
+            var d = new OpenFileDialog
+            {
+                Filter = "PSA|*.psa",
+                Title = "Select a psa file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                psa = PSA.FromFile(d.FileName);
+                filePath = d.FileName;
+                return psa != null;
+            }
+
+            psa = null;
+            filePath = null;
+            return false;
+        }
+
+        private static bool GetPskFromFile(PackageEditorWindow pew, out PSK psk, out string filePath)
+        {
+            var d = new OpenFileDialog
+            {
+                Filter = "PSK|*.psk",
+                Title = "Select a psk file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                psk = PSK.FromFile(d.FileName);
+                filePath = d.FileName;
+                return psk != null;
+            }
+
+            psk = null;
+            filePath = null;
+            return false;
+        }
+
+        private static bool GetHeadmorphFromFile(PackageEditorWindow pew, out HeadMorph headmorph, out string filePath)
+        {
+            var d = new OpenFileDialog
+            {
+                Filter = "RON|*.ron",
+                Title = "Select a ron file"
+            };
+            if (d.ShowDialog() == true)
+            {
+                headmorph = HeadMorph.FromRonFile(d.FileName);
+                filePath = d.FileName;
+                return headmorph != null;
+            }
+
+            headmorph = null;
+            filePath = null;
+            return false;
+        }
+
+        public static void ReplaceMeshDataFromPsk(PackageEditorWindow pew)
+        {
+            if (GetSelectedMeshBinary(pew, out var meshExport, out var meshBin)
+                && GetPskFromFile(pew, out var psk, out _))
+            {
+                if (psk.Points.Count != meshBin.LODModels[0].NumVertices)
+                {
+                    ShowError("the number of vertices in the mesh (LOD 0) and the psk must match.");
+                    return;
+                }
+
+                if (psk.Points.Count != psk.Wedges.Count)
+                {
+                    ShowError("Can't import this psk; number of points and wedges differ. You probably created new material or UV seams, which will break morph targets");
+                    return;
+                }
+
+
+                // make sure the skeletons match; we may need to update that from the psk so positions, rotations, etc match
+                foreach (var bone in meshBin.RefSkeleton)
+                {
+                    var pskBone = psk.Bones.FirstOrDefault(x => x.Name == bone.Name);
+                    bone.Position = pskBone.Position with { Y = -pskBone.Position.Y };
+                    bone.Orientation = pskBone.Rotation with { Y = -pskBone.Rotation.Y };
+                    // TODO I could probably have it update the structure but it seems super unlikely anyone would actually want to do that
+                }
+
+
+                SetNumMaterialSlots(meshBin, psk.Materials.Count);
+
+                var LOD = meshBin.LODModels[0];
+
+                var weightsByPoint = psk.Weights.GroupBy(x => x.Point).ToDictionary(g => g.Key, g => g.ToList());
+
+                SetupSectionsAndChunks(psk, LOD, weightsByPoint, meshBin.RefSkeleton);
+
+                // update the UVs of each vertex
+                foreach (var wedge in psk.Wedges)
+                {
+                    LOD.VertexBufferGPUSkin.VertexData[wedge.PointIndex].UV = new Vector2DHalf(wedge.U, wedge.V);
+                }
+
+                // update the position and weights of each point
+                for (int i = 0; i < psk.Points.Count; i++)
+                {
+                    // replace the position data with that of the psk
+                    // gotta invert that Y, just like we inverted in on import
+                    LOD.VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i] with { Y = psk.Points[i].Y * -1 };
+
+                    // find the chunk containing this point
+                    // TODO optimization: don't look this up every loop; the chunks are ordered non overlapping sequences of verts
+                    var containingChunk = LOD.Chunks.LastOrDefault(x => x.BaseVertexIndex <= i);
+
+                    var newBoneInfluenceIndices = new byte[4];
+                    var newBoneInfluenceWeights = new byte[4];
+                    var influences = weightsByPoint[i].OrderByDescending(x => x.Weight).ToArray();
+                    // sum up all the influences so we can normalize them on import
+                    var sum = influences.Select(x => x.Weight).Aggregate((float runningTotal, float currentValue) => runningTotal + currentValue);
+                    for (int j = 0; j < 4 && j < influences.Length; j++)
+                    {
+                        var influence = influences[j];
+
+                        var boneName = psk.Bones[influence.Bone].Name;
+                        var meshBoneIndex = meshBin.RefSkeleton.FindIndex(x => x.Name == boneName);
+                        var mappedBoneIndex = containingChunk.BoneMap.IndexOf((ushort)meshBoneIndex);
+                        newBoneInfluenceIndices[j] = (byte)mappedBoneIndex;
+                        // normalize, convert to a byte with 0 being none and 255 being full
+                        newBoneInfluenceWeights[j] = (byte)Math.Round(influence.Weight * 255f / sum);
+                    }
+                    LOD.VertexBufferGPUSkin.VertexData[i].InfluenceBones = new Influences(newBoneInfluenceIndices[0], newBoneInfluenceIndices[1], newBoneInfluenceIndices[2], newBoneInfluenceIndices[3]);
+                    LOD.VertexBufferGPUSkin.VertexData[i].InfluenceWeights = new Influences(newBoneInfluenceWeights[0], newBoneInfluenceWeights[1], newBoneInfluenceWeights[2], newBoneInfluenceWeights[3]);
+                }
+
+                // remove the extra LODs; we are not handling them correctly anyway
+                meshBin.LODModels = [meshBin.LODModels[0]];
+
+                meshExport.WriteBinary(meshBin);
+            }
+        }
+
+        private static void SetupSectionsAndChunks(PSK psk, StaticLODModel lod, Dictionary<int, List<PSK.PSKWeight>> weightsByPoint, MeshBone[] refSkeleton)
+        {
+            // the triangles, grouped by material
+            var matGroups = psk.Faces.GroupBy(x => x.MatIndex).OrderBy(x => x.Key).Select(x => x.ToArray()).ToArray();
+
+            // the indices of those triangles in order to put into the mesh binary
+            // yes, the order is intentionally flipped to make sure the normals come out right
+            var indexBuffer = matGroups.SelectMany(x => x).SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]).ToArray();
+
+            // make some pseudo sections from those, tracking the min and max vertex index needed to contain each section of triangles
+            List<MeshSection> sections = [];
+            var startIndex = 0;
+            foreach (var matGroup in matGroups)
+            {
+                var section = new MeshSection
+                {
+                    Triangles = matGroup,
+                    BaseTriIndex = startIndex,
+                    MatIndex = matGroup[0].MatIndex,
+                };
+
+                // calculate the min and max vertex indices within this section
+                var sectionIndices = matGroup.SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]);
+                section.MinVertIndex = sectionIndices.Min();
+                section.MaxVertIndex = sectionIndices.Max();
+
+                sections.Add(section);
+                startIndex += matGroup.Length;
+            }
+
+            // given this, I then need to make the fewest number of chunks with non overlapping vertex ranges
+            // in the best case this means the same number of chunks as sections
+            // in the worst case we fold them into a single chunk
+            // hypothetically we could split the sections to avoid merging chunks but I haven't tested that and it won't work in all cases
+
+            // first, sort the sections by min vert index then max vert index, so we can enumerate them in that order
+            sections = [.. sections.OrderBy(x => x.MinVertIndex).ThenBy(x => x.MaxVertIndex)];
+            List<MeshChunk> chunks = [];
+            chunks.Add(new MeshChunk
+            {
+                VertIndexStart = 0,
+                VertIndexEnd = sections[0].MaxVertIndex,
+                InfluenceBones = []
+            });
+            foreach (var section in sections)
+            {
+                if (section.MinVertIndex > chunks[^1].VertIndexEnd)
+                {
+                    // sections have non overlapping vertices; make a new chunk
+                    chunks.Add(new MeshChunk
+                    {
+                        VertIndexStart = section.MinVertIndex,
+                        VertIndexEnd = section.MaxVertIndex,
+                        InfluenceBones = []
+                    });
+                }
+                else
+                {
+                    // sections have overlapping vertices and we need to combine the chunks
+                    chunks[^1].VertIndexEnd = Math.Max(section.MaxVertIndex, chunks[^1].VertIndexEnd);
+                }
+            }
+
+            // now, assign a chunk index to each section
+            for (var i = 0; i < sections.Count; i++)
+            {
+                sections[i].ChunkIndex = chunks.FindIndex(x => x.VertIndexStart <= sections[i].MinVertIndex && x.VertIndexEnd >= sections[i].MaxVertIndex);
+            }
+
+            // next, we need to see which bones influence each chunk
+            // as well as count the rigid and soft vertices (not positive if that matters in game or not, but I am trying to emulate vanilla as closely as possible)
+            foreach (var chunk in chunks)
+            {
+                for (var i = chunk.VertIndexStart; i <= chunk.VertIndexEnd; i++)
+                {
+                    if (weightsByPoint.TryGetValue(i, out var weights))
+                    {
+                        switch (weights.Count)
+                        {
+                            case <= 1:
+                                chunk.RigidVerts++;
+                                break;
+                            case > 4:
+                                throw new Exception("there are too many bones influencing this vertex, and I don't know how to handle that.");
+                            default:
+                                chunk.SoftVerts++;
+                                break;
+                        }
+                        if (weights.Count > chunk.maxBoneInfluences)
+                        {
+                            chunk.maxBoneInfluences = weights.Count;
+                        }
+                        foreach (var weight in weights)
+                        {
+                            chunk.InfluenceBones.Add((ushort)weight.Bone);
+                        }
+                    }
+                    else
+                    {
+                        // for some reason this vert has no weights, which really seems like a bug, but I will treat it as a rigid vertex
+                        chunk.RigidVerts++;
+                    }
+                }
+                // the indices into the bone mapping array are bytes, so we can't have too many here without splitting the chunk up, which I have not implemented because it is extraorinarily unlikely to come up in real worls usage
+                if (chunk.InfluenceBones.Count > 255)
+                {
+                    throw new Exception("there are too many influence bones in this chunk; Send the psk to Squid and tell him to implement chunk splitting logic.");
+                }
+            }
+
+            ushort GetMeshBoneIndex(ushort pskIndex)
+            {
+                var pskBone = psk.Bones[pskIndex];
+                return (ushort)refSkeleton.FindIndex(x => x.Name == pskBone.Name);
+            }
+
+            // now that this is all done, we can finally add this stuff to the mesh binary
+            lod.IndexBuffer = indexBuffer;
+
+            lod.Sections = [..sections.Select(x => new SkelMeshSection
+            {
+                BaseIndex = (uint)(x.BaseTriIndex * 3),
+                ChunkIndex = (ushort)x.ChunkIndex,
+                MaterialIndex = (ushort)x.MatIndex,
+                NumTriangles = x.Triangles.Length
+            })];
+
+            lod.Chunks = [..chunks.Select(x => new SkelMeshChunk
+            {
+                BaseVertexIndex = (uint)x.VertIndexStart,
+                MaxBoneInfluences = x.maxBoneInfluences,
+                NumRigidVertices = x.RigidVerts,
+                NumSoftVertices = x.SoftVerts,
+                BoneMap = [.. x.InfluenceBones.Select(GetMeshBoneIndex).Order()]
+            })];
+        }
+
+        private class MeshSection
+        {
+            public PSK.PSKTriangle[] Triangles;
+            public int BaseTriIndex;
+            public int ChunkIndex;
+            public int MatIndex;
+            public int MinVertIndex;
+            public int MaxVertIndex;
+        }
+
+        private class MeshChunk
+        {
+            public int VertIndexStart;
+            public int VertIndexEnd;
+            public HashSet<ushort> InfluenceBones;
+            public int RigidVerts;
+            public int SoftVerts;
+            public int maxBoneInfluences;
+        }
+
+        public static void ReplaceBMFDataFromPskAndPsa(PackageEditorWindow pew)
         {
             if (GetSelectedItem(pew, "BioMorphFace", out var bmfExport))
             {
-                var d = new OpenFileDialog
+               if (GetPskFromFile(pew, out var psk, out _))
                 {
-                    Filter = "PSK|*.psk",
-                    Title = "Select a psk file"
-                };
-                if (d.ShowDialog() == true)
-                {
-                    var psk = PSK.FromFile(d.FileName);
-
                     var bmfBin = bmfExport.GetBinaryData<BioMorphFace>();
 
                     Vector3[] vertexPos = new Vector3[psk.Points.Count];
@@ -820,6 +1137,25 @@ defaultproperties
                     bmfBin.LODs = [[.. vertexPos]];
 
                     bmfExport.WriteBinary(bmfBin);
+                }
+                if (GetPsaFromFile(pew, out var psa, out _))
+                {
+                    // make sure there is at least one keyframe in this psa
+                    if (psa.Keys.Count >= psa.Bones.Count)
+                    {
+                        var finalSkel = new ArrayProperty<StructProperty>("m_aFinalSkeleton");
+                        for (int i = 0; i < psa.Bones.Count; i++)
+                        {
+                            var bone = psa.Bones[i];
+                            var boneKeyframe = psa.Keys[i];
+                            if (Vector3.Distance(bone.Position, boneKeyframe.Position) > 0.001)
+                            {
+                                var offsetBonePos = new StructProperty("OffsetBonePos", false, Vector3ToStructProperty(boneKeyframe.Position with { Y = -boneKeyframe.Position.Y }, "vPos"), new NameProperty(bone.Name, "nName"));
+                                finalSkel.Add(offsetBonePos);
+                            }
+                        }
+                        bmfExport.WriteProperty(finalSkel);
+                    }
                 }
             }
             else
@@ -839,7 +1175,7 @@ defaultproperties
             var d = new SaveFileDialog { Filter = "PSK|*.psk" };
             if (d.ShowDialog() == true)
             {
-                PSK.CreateFromSkeletalMesh(skelMeshExport.GetBinaryData<SkeletalMesh>()).ToFile(d.FileName);
+                PSK.CreateFromSkeletalMesh(skelMeshExport.GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
             }
         }
 
@@ -982,30 +1318,36 @@ defaultproperties
                 prop.GetProp<FloatProperty>("A").Value);
         }
 
-        public static void UpdateRonFromPsk(PackageEditorWindow pew)
+        public static void UpdateRonFromPskAndPsa(PackageEditorWindow pew)
         {
-            // select a ron file to update
-            var ronDialog = new OpenFileDialog
+            if (GetHeadmorphFromFile(pew, out var headMorph, out var ronFilePath))
             {
-                Filter = "RON|*.ron",
-                Title = "Select a ron file"
-            };
-            if (ronDialog.ShowDialog() == true)
-            {
-                var pskDialog = new OpenFileDialog
+                if (GetPskFromFile(pew, out var psk, out _))
                 {
-                    Filter = "PSK|*.psk",
-                    Title = "Select a psk file"
-                };
-                if (pskDialog.ShowDialog() == true)
-                {
-                    var headMorph = HeadMorph.FromRonFile(ronDialog.FileName);
-                    var psk = PSK.FromFile(pskDialog.FileName);
-
-                    headMorph.Lod0Vertices = psk.Points;
-
-                    headMorph.ToRonFile(ronDialog.FileName);
+                    headMorph.Lod0Vertices = new List<Vector3>(psk.Points.Count);
+                    for (int i = 0; i < psk.Points.Count; i++)
+                    {
+                        headMorph.Lod0Vertices.Add(psk.Points[i] with { Y = -psk.Points[i].Y });
+                    }
                 }
+                if (GetPsaFromFile(pew, out var psa, out _))
+                {
+                    // make sure there is at least one keyframe in this psa
+                    if (psa.Keys.Count >= psa.Bones.Count)
+                    {
+                        headMorph.OffsetBones.Clear();
+                        for (int i = 0; i < psa.Bones.Count; i++)
+                        {
+                            var bone = psa.Bones[i];
+                            var boneKeyframe = psa.Keys[i];
+                            if (Vector3.Distance(bone.Position, boneKeyframe.Position) > 0.001)
+                            {
+                                headMorph.OffsetBones.Add(bone.Name, boneKeyframe.Position with { Y = -boneKeyframe.Position.Y });
+                            }
+                        }
+                    }
+                }
+                headMorph.ToRonFile(ronFilePath);
             }
         }
 
@@ -1125,7 +1467,7 @@ defaultproperties
             }
         }
 
-        public static void ImportPskAsMorphTarget(PackageEditorWindow pew)
+        public static void ImportPskAndPsaAsMorphTarget(PackageEditorWindow pew)
         {
             if (!GetSelectedItem(pew, "MorphTargetSet", out var morphTargetSet))
             {
@@ -1143,58 +1485,89 @@ defaultproperties
 
             var baseMeshBinary = baseMesh.GetBinaryData<SkeletalMesh>();
 
-            var d = new OpenFileDialog
+            // using bitwise | so it evaluates the second even if the first evaluates to true
+            if (GetPskFromFile(pew, out var psk, out var pskName) | GetPsaFromFile(pew, out var psa, out var psaName))
             {
-                Filter = "PSK|*.psk",
-                Title = "Select a psk file"
-            };
-            if (d.ShowDialog() == true)
-            {
-                var psk = PSK.FromFile(d.FileName);
+                var morphTargetName = Path.GetFileNameWithoutExtension(pskName ?? psaName);
 
-                if (psk.Points.Count != baseMeshBinary.LODModels[0].NumVertices)
-                {
-                    ShowError("the number of vertices in the base mesh (LOD 0) and the psk must match.");
-                    return;
-                }
-
-                if (psk.Points.Count != psk.Wedges.Count)
-                {
-                    ShowError("Can't use this psk; number of points and wedges differ.");
-                    return;
-                }
-
-                // now make a new MorphTarget with the name of the psk
-                var newMorphTarget = ExportCreator.CreateExport(pew.Pcc, Path.GetFileNameWithoutExtension(d.FileName), "MorphTarget", morphTargetSet, indexed: false);
-                var newMorphTargetBin = new MorphTarget
-                {
-                    MorphLODModels = [new MorphTarget.MorphLODModel()]
-                };
-                newMorphTargetBin.MorphLODModels[0].NumBaseMeshVerts = psk.Points.Count;
-
-                List<MorphTarget.MorphVertex> vertDeltas = [];
-
-                for (int i = 0; i < psk.Points.Count; i++)
-                {
-                    // gotta flip the y part of the position
-                    psk.Points[i] = new Vector3(psk.Points[i].X, psk.Points[i].Y * -1, psk.Points[i].Z);    
-
-                    if (!ApproximatelyEqual(baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position, psk.Points[i]))
-                    {
-                        vertDeltas.Add(new MorphTarget.MorphVertex()
-                        {
-                            SourceIdx = (ushort)i,
-                            PositionDelta = psk.Points[i] - baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position
-                        });
-                    }
-                }
-
-                newMorphTargetBin.MorphLODModels[0].Vertices = [.. vertDeltas];
-
-                newMorphTarget.WriteBinary(newMorphTargetBin);
                 var targets = morphTargetSet.GetProperty<ArrayProperty<ObjectProperty>>("Targets");
-                targets.Add(new ObjectProperty(newMorphTarget.UIndex));
-                morphTargetSet.WriteProperty(targets);
+                // get or create a morph target with the name of the psa/psk, along with the binary data
+                var morphTarget = targets.Select(x => pew.Pcc.GetEntry(x.Value)).FirstOrDefault(x => x.ObjectName == morphTargetName && x.ClassName == "MorphTarget") as ExportEntry;
+                MorphTarget morphTargetBin = morphTarget?.GetBinaryData<MorphTarget>();
+                if (morphTarget == null)
+                {
+                    // create the new export
+                    morphTarget = ExportCreator.CreateExport(pew.Pcc, morphTargetName, "MorphTarget", morphTargetSet, indexed: false);
+                    // set up the skeleton of the binary data
+                    morphTargetBin = new MorphTarget
+                    {
+                        MorphLODModels = [new MorphTarget.MorphLODModel()]
+                    };
+                    morphTargetBin.MorphLODModels[0].NumBaseMeshVerts = psk.Points.Count;
+
+                    // add it to the morph target set
+                    targets.Add(new ObjectProperty(morphTarget.UIndex));
+                    morphTargetSet.WriteProperty(targets);
+                }
+
+                if (psk != null)
+                {
+                    if (psk.Points.Count != baseMeshBinary.LODModels[0].NumVertices)
+                    {
+                        ShowError("the number of vertices in the base mesh (LOD 0) and the psk must match.");
+                        return;
+                    }
+
+                    if (psk.Points.Count != psk.Wedges.Count)
+                    {
+                        ShowError("Can't use this psk; number of points and wedges differ.");
+                        return;
+                    }
+
+                    List<MorphTarget.MorphVertex> vertDeltas = [];
+
+                    for (int i = 0; i < psk.Points.Count; i++)
+                    {
+                        // gotta flip the y part of the position
+                        psk.Points[i] = new Vector3(psk.Points[i].X, psk.Points[i].Y * -1, psk.Points[i].Z);
+
+                        // TODO I could more simply represent this with a distance call and comparison
+                        if (!ApproximatelyEqual(baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position, psk.Points[i]))
+                        {
+                            vertDeltas.Add(new MorphTarget.MorphVertex()
+                            {
+                                SourceIdx = (ushort)i,
+                                PositionDelta = psk.Points[i] - baseMeshBinary.LODModels[0].VertexBufferGPUSkin.VertexData[i].Position
+                            });
+                        }
+
+                        // TODO anything with vertex normal deltas once we can export those?
+                    }
+
+                    morphTargetBin.MorphLODModels[0].Vertices = [.. vertDeltas];
+                }
+
+                if (psa != null && psa.Keys.Count >= psa.Bones.Count)
+                {
+                    List<MorphTarget.BoneOffset> boneOffsets = [];
+                    for (int i = 0; i < psa.Bones.Count; i++)
+                    {
+                        var bone = psa.Bones[i];
+                        var boneKeyframe = psa.Keys[i];
+                        if (Vector3.Distance(bone.Position, boneKeyframe.Position) > 0.001)
+                        {
+                            var offset = boneKeyframe.Position - bone.Position;
+                            boneOffsets.Add(new MorphTarget.BoneOffset
+                            {
+                                Bone = bone.Name,
+                                Offset = offset with { Y = -offset.Y }
+                            });
+                        }
+                    }
+                    morphTargetBin.BoneOffsets = [.. boneOffsets];
+                }
+
+                morphTarget.WriteBinary(morphTargetBin);
             }
         }
 
@@ -1241,7 +1614,7 @@ defaultproperties
 
                 // output the special psk into a file with the name of the base head
                 // make most of the psk from the base skeletal mesh
-                var psk = PSK.CreateFromSkeletalMesh(baseMeshBin);
+                var psk = PSK.CreateFromSkeletalMesh(baseMeshBin, 0, true);
 
                 foreach (var target in targets)
                 {
