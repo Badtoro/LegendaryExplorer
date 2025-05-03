@@ -1190,5 +1190,29 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 
             Relinker.RelinkAll(new RelinkerOptionsPackage() { CrossPackageMap = relinkMap, ForceSamePackageImportRelink = true });
         }
+
+        /// <summary>
+        /// Repoints references from one object to another via a same-package relink.
+        /// </summary>
+        /// <param name="sourceEntry">Source entry to repoint</param>
+        /// <param name="destEntry">Value to be repointed to</param>
+        /// <exception cref="Exception">If packages are not the same</exception>
+        public static void RepointObject(IEntry sourceEntry, IEntry destEntry)
+        {
+            if (sourceEntry.FileRef != destEntry.FileRef)
+            {
+                throw new Exception("Cannot relink against different packages");
+            }
+
+            if (sourceEntry == destEntry)
+            {
+                // Do nothing.
+                return;
+            }
+
+            var remap = new ListenableDictionary<IEntry, IEntry>();
+            remap[sourceEntry] = destEntry;
+            RelinkSamePackage(sourceEntry.FileRef, remap);
+        }
     }
 }
