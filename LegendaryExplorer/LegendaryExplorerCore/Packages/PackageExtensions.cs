@@ -1132,22 +1132,17 @@ namespace LegendaryExplorerCore.Packages
         }
 
         /// <summary>
-        /// Adds the specified entry to the object referencer in the package. If there is no object referencer already added then this does nothing.
+        /// Adds the specified export to the object referencer in the package.
         /// </summary>
-        /// <param name="entry">The entry to add. It is not checked if it is already in the list</param>
-        /// <returns>If object reference was added</returns>
-        public static bool AddToObjectReferencer(this IEntry entry)
+        /// <param name="entry">The export to add</param>
+        public static void AddToObjectReferencer(this ExportEntry entry)
         {
-            var referencer = entry.FileRef.Exports.FirstOrDefault(x => x.ClassName == @"ObjectReferencer");
-            if (referencer == null) return false;
-            var refs = referencer.GetProperty<ArrayProperty<ObjectProperty>>(@"ReferencedObjects") ?? new ArrayProperty<ObjectProperty>(@"ReferencedObjects");
-            refs.Add(new ObjectProperty(entry));
-            referencer.WriteProperty(refs);
-            return true;
+            var referencer = entry.FileRef.CreateObjectReferencer();
+            AddObjectsToReferencer(referencer, [entry]);
         }
 
         /// <summary>
-        /// Adds the specified entries to the package's object referencer. If there is no object referencer, one is created.
+        /// Adds the specified entries to the specified object referencer.
         /// </summary>
         /// <param name="referencer">Object referencer object to add references to</param>
         /// <param name="entries">Entries to add</param>
