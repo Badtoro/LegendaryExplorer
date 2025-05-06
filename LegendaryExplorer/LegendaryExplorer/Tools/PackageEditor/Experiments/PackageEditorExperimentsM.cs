@@ -2376,7 +2376,6 @@ defaultproperties
                     EntryImporter.ConvertExportToImport(exp);
                 }
             }
-        }
 
         public static void MScanner(PackageEditorWindow pe)
         {
