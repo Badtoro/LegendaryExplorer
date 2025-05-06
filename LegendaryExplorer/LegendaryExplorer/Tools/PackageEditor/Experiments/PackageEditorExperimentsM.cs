@@ -58,7 +58,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 #if DEBUG
             foreach (var game in (MEGame[])[MEGame.LE2, MEGame.LE3])
             {
-                var db = LegendaryExplorerCore.UnrealScript.Documentation.DocuDB.GetEmptyDB(game);
+                var db = LegendaryExplorerCore.UnrealScript.Documentation.DocuDB.GenerateInitialDB(game);
 
                 var dbDir = Path.Combine(AppDirectories.DocuDBsFolder, game.ToString());
                 Directory.CreateDirectory(dbDir);
@@ -2364,14 +2364,14 @@ defaultproperties
             Debug.WriteLine(string.Join('\n', set));
         }
 
-        private static void ConvertOutsideOfPackageToImports(PackageEditorWindow pe)
+        private static void ConvertOutsideOfPackageToImports(IEntry entry)
         {
-            if (pe.TryGetSelectedExport(out var packageExp) && packageExp.ClassName == "Package")
-            {
-                var itemsToIgnore = new List<ExportEntry>();
-                itemsToIgnore.AddRange(pe.Pcc.Exports.Where(x => x.GetRoot() != packageExp));
+            var linker = entry.GetLinker();
 
-                foreach(var exp in itemsToIgnore)
+                var itemsToIgnore = new List<ExportEntry>();
+            itemsToIgnore.AddRange(entry.FileRef.Exports.Where(x => x.GetLinker() != linker));
+
+            foreach (var exp in itemsToIgnore)
                 {
                     EntryImporter.ConvertExportToImport(exp);
                 }

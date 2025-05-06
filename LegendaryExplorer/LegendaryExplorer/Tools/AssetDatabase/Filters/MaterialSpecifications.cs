@@ -57,7 +57,6 @@ namespace LegendaryExplorer.Tools.AssetDatabase.Filters
             FilterName = filterName;
             IsMaterial = isMaterial;
 
-            // Eventually maybe this should be a setting, so you can turn off MICs and leave that as the default.
             if (!IsMaterial)
             {
                 IsSelected = Settings.AssetDB_HideMICs;
