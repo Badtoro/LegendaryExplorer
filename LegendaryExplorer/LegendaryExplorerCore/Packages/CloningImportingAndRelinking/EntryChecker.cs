@@ -258,9 +258,12 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             foreach (ImportEntry imp in package.Imports)
             {
                 // UDK specific checks.
-                if (imp.ObjectName == "SFXGame" && imp.Parent == null)
+                if (imp.Game == MEGame.UDK)
                 {
-                    item.AddBlockingError("UDK does not work with SFXGame imports!");
+                    if (imp.ObjectName == "SFXGame" && imp.Parent == null)
+                    {
+                        item.AddBlockingError("UDK does not work with SFXGame imports!");
+                    }
                 }
 
                 if (imp.idxLink != 0 && !package.TryGetEntry(imp.idxLink, out _))
