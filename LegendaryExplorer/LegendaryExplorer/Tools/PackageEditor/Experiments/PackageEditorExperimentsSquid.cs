@@ -930,7 +930,9 @@ defaultproperties
                     for (int i = 0; i < psk.VertexNormals.Count; i++)
                     {
                         var vertNorm = psk.VertexNormals[i] with { Y = -psk.VertexNormals[i].Y };
-                        LOD.VertexBufferGPUSkin.VertexData[i].TangentZ = (PackedNormal)Vector3.Normalize(vertNorm);
+                        var packedNorm = (PackedNormal)Vector3.Normalize(vertNorm);
+                        // there is a possible bug in the PackedNormal explicit operator used above where it assigns 128 to W instead of 255, but I didn't want to risk messing things up, so I have not changed it
+                        LOD.VertexBufferGPUSkin.VertexData[i].TangentZ = new PackedNormal(packedNorm.X, packedNorm.Y, packedNorm.Z, 255);
                     }
                 }
 
