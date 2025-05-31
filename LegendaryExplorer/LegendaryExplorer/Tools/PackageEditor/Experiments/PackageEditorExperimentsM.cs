@@ -2379,7 +2379,20 @@ defaultproperties
 
         public static void MScanner(PackageEditorWindow pe)
         {
-            ConvertOutsideOfPackageToImports(pe);
+            if (pe.TryGetSelectedExport(out var sExp))
+            {
+                var outDir = @"Redacted"; 
+                var fileName = sExp.InstancedFullPath + ".pcc";
+                EntryExporter.ExportExportToFile(sExp, Path.Combine(outDir, fileName), out var newEntry);
+                var newExp = newEntry as ExportEntry;
+                ConvertOutsideOfPackageToImports(newEntry);
+                newExp.AddToObjectReferencer();
+                var rPack = PackageResynthesizer.ResynthesizePackage(newEntry.FileRef, new PackageCache(), true);
+                rPack.Save();
+                pe.LoadPackage(rPack);
+            }
+
+
             return;
             MessageBox.Show("DONE");
             return;
