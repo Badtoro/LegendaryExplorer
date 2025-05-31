@@ -1850,7 +1850,9 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             }
             foreach (ExportEntry export in pcc.Exports)
             {
-                if (export.IsClass && export.ObjectName == className)
+                // 05/12/2025 - Change comparison to .Instanced because some vanilla material names
+                // are 'Material' and it is causing relink issues when class has not been resolved yet.
+                if (export.IsClass && export.ObjectName.Instanced == className)
                 {
                     return export;
                 }
