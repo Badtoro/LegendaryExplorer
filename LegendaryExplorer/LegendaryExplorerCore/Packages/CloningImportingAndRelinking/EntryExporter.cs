@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using LegendaryExplorerCore.Helpers;
 using LegendaryExplorerCore.Misc;
-using LegendaryExplorerCore.Unreal;
 using LegendaryExplorerCore.Unreal.ObjectInfo;
+using static LegendaryExplorerCore.Unreal.UnrealFlags;
 
 namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
 {
@@ -269,13 +268,13 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             // Modify the global package by adding a same-named top level package,
             // and repoint everything at the root of the package to have this as a link
             // this way relinker doesn't need changed to import from these files properly
-            if (sourcePackage.FindExport(packagename) == null)
+            if (sourcePackage.FindExport(packagename, "Package") == null)
             {
                 ExportCreator.CreatePackageExport(sourcePackage, packagename);
             }
 
-            var fileRefExp = sourcePackage.FindExport(packagename);
-            var objReferencer = sourcePackage.Exports.FirstOrDefault(x => x.idxLink == 0 && x.ObjectName == "ObjectReferencer" && x.ClassName == "ObjectReferencer");
+            var fileRefExp = sourcePackage.FindExport(packagename, "Package");
+            /*var objReferencer = sourcePackage.Exports.FirstOrDefault(x => x.idxLink == 0 && x.ObjectName == "ObjectReferencer" && x.ClassName == "ObjectReferencer");
             if (objReferencer != null)
             {
                 // We need to enumerate all referenced objects. They are the items unique in this 'package' that are not sourced from others.
@@ -292,6 +291,16 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                     refX.ExportFlags |= UnrealFlags.EExportFlags.ForcedExport;
                 }
             }
+            else
+            {*/
+            // Probably a map
+            // For convenience we just find root objects and nest them
+            foreach (var obj in sourcePackage.Exports.Where(x => x.idxLink == 0 && (x.ExportFlags & EExportFlags.ForcedExport) == 0).ToList())
+            {
+                obj.idxLink = fileRefExp.UIndex;
+                obj.ExportFlags |= EExportFlags.ForcedExport; // Faster than doing children too.
+            }
+            //}
 
             sourcePackage.InvalidateLookupTable();
         }

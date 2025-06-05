@@ -1850,7 +1850,9 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             }
             foreach (ExportEntry export in pcc.Exports)
             {
-                if (export.IsClass && export.ObjectName == className)
+                // 05/12/2025 - Change comparison to .Instanced because some vanilla material names
+                // are 'Material' and it is causing relink issues when class has not been resolved yet.
+                if (export.IsClass && export.ObjectName.Instanced == className)
                 {
                     return export;
                 }
@@ -2220,26 +2222,21 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             };
             export.FileRef.AddImport((ImportEntry)convertedItem);
 
-            // Update all references
-            var referencingEntries = export.GetEntriesThatReferenceThisOne();
-            foreach (var f in referencingEntries)
+            // Repoint the object.
+            Relinker.RepointObject(export, convertedItem);
+
+            // Move any children to the new import
+            var children = export.FileRef.Exports.Where(x => x.idxLink == export.UIndex).OfType<IEntry>().Concat(export.FileRef.Imports.Where(x => x.idxLink == export.UIndex)).ToList();
+            foreach(var child in children)
             {
-                // Make a new map for every iteration since this technically could add some items... somehow...
-                var objectMap = new ListenableDictionary<IEntry, IEntry>
-                {
-                    { export, convertedItem }, // Convert references to import
-                    { f.Key, f.Key } // Force this to relink on itself.
-                };
-                RelinkerOptionsPackage rop = new RelinkerOptionsPackage()
-                {
-                    CrossPackageMap = objectMap
-                };
-                Relinker.RelinkAll(rop);
+                child.idxLink = convertedItem.UIndex;
             }
 
             // Cleanup temporary stuff
             convertedItem.ObjectName = export.ObjectName;
             EntryPruner.TrashEntries(export.FileRef, new[] { export });
+
+
 
             return convertedItem;
         }
