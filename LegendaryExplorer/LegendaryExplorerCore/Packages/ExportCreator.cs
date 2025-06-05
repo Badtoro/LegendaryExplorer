@@ -18,7 +18,7 @@ namespace LegendaryExplorerCore.Packages
         /// <param name="packageName"></param>
         /// <param name="parent"></param>
         /// <returns></returns>
-        public static ImportEntry CreatePackageImport(IMEPackage pcc, NameReference packageName, IEntry parent = null)
+        public static ImportEntry CreatePackageImport(this IMEPackage pcc, NameReference packageName, IEntry parent = null)
         {
             var testName = parent != null ? NameReference.FromInstancedString($"{parent.InstancedFullPath}.{packageName.Instanced}") : packageName;
             var testEntry = pcc.FindImport(testName, "Package");
@@ -43,7 +43,7 @@ namespace LegendaryExplorerCore.Packages
         /// <param name="parent"></param>
         /// <param name="relinkResultsAvailable"></param>
         /// <returns></returns>
-        public static ExportEntry CreatePackageExport(IMEPackage pcc, NameReference packageName, IEntry parent = null, Action<List<EntryStringPair>> relinkResultsAvailable = null, PackageCache cache = null, bool forcedExport = true)
+        public static ExportEntry CreatePackageExport(this IMEPackage pcc, NameReference packageName, IEntry parent = null, Action<List<EntryStringPair>> relinkResultsAvailable = null, PackageCache cache = null, bool forcedExport = true)
         {
             var testName = parent != null ? NameReference.FromInstancedString($"{parent.InstancedFullPath}.{packageName.Instanced}") : packageName;
             var testEntry = pcc.FindExport(testName, "Package");
@@ -66,7 +66,7 @@ namespace LegendaryExplorerCore.Packages
             return exp;
         }
 
-        public static ExportEntry CreateExport(IMEPackage pcc, NameReference name, string className, IEntry parent = null, Action<List<EntryStringPair>> relinkResultsAvailable = null,
+        public static ExportEntry CreateExport(this IMEPackage pcc, NameReference name, string className, IEntry parent = null, Action<List<EntryStringPair>> relinkResultsAvailable = null,
             bool indexed = true,
             bool createWithStack = false,
             byte[] prePropBinary = null,
@@ -92,35 +92,6 @@ namespace LegendaryExplorerCore.Packages
                 exp.ObjectFlags |= UnrealFlags.EObjectFlags.HasStack;
             }
             return exp;
-        }
-
-        /// <summary>
-        /// Creates an ObjectReferencer in the given package. If one exists, that is returned. If this package is marked as map, it will return null. Otherwise, a new one will be created.
-        /// </summary>
-        /// <param name="package">Package to create ObjectReferencer in</param>
-        /// <param name="cache">Cache to speed up performance</param>
-        /// <returns>ObjectReferencer in package; null if a map package</returns>
-        public static ExportEntry CreateObjectReferencer(IMEPackage package, PackageCache cache = null)
-        {
-            if (package.Flags.HasFlag(UnrealFlags.EPackageFlags.Map))
-            {
-                Debug.WriteLine(@"Map packages do not use ObjectReferencer; to keep objects in memory, add root objects to ExtraReferencedObjects in TheWorld's binary.");
-                return null;
-            }
-
-            var objRef = package.Exports.FirstOrDefault(x => x.ClassName == "ObjectReferencer" && !x.IsDefaultObject);
-            if (objRef != null)
-            {
-                return objRef;
-            }
-
-            var rop = new RelinkerOptionsPackage() { Cache = cache };
-            var referencer = new ExportEntry(package, 0, package.GetNextIndexedName("ObjectReferencer"), properties: [new ArrayProperty<ObjectProperty>("ReferencedObjects")])
-            {
-                Class = EntryImporter.EnsureClassIsInFile(package, "ObjectReferencer", rop)
-            };
-            package.AddExport(referencer);
-            return referencer;
         }
     }
 }
