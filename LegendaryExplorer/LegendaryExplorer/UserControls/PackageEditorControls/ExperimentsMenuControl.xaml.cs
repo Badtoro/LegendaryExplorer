@@ -1322,6 +1322,26 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
         #endregion
 
         // EXPERIMENTS: DropTheSquid
+        #region DropTheSquid's Experiments
+
+        private void ExportSelectedToPsx_Click(object sender, RoutedEventArgs e)
+        {
+            // TODO unified export selected item method
+        }
+
+        private void ExportRonToPsx_Click(object sender, RoutedEventArgs e)
+        {
+            // TODO find the appropriate base head, export directly, or show an error if we can't find an appropriate base head
+        }
+
+        private void ImportPskAsNewMesh_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ImportPskAsNewlMesh(GetPEWindow());
+        }
+
+        // I need to simplify the interface for these at some point. 
+        // like, export selected item as psk/psa (works for BioMorphFace, SkeletalMesh, StaticMesh, MorphTargetSet, maybe eventually others)
+        // and then import psk/psa either as a new export or on top of the specific
         private void MakeCustomMorphTargetSet_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.MakeCustomMorphTargetSet(GetPEWindow());
@@ -1391,6 +1411,8 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
         {
             PackageEditorExperimentsSquid.SmoothMeshSeams(GetPEWindow());
         }
+
+        #endregion
 
         // EXPERIMENTS: OTHER PEOPLE ------------------------------------------------------------
         #region Other people's experiments
