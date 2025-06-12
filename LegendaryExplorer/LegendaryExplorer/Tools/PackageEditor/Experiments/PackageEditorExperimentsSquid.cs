@@ -226,11 +226,9 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 {
                     // convert to the new point indices and make sure the order is correct to have the right normals (intentionally flipping 1 and 0)
                     IndexBuffer = [.. matGroups.SelectMany(x => x).SelectMany<PSK.PSKTriangle, ushort>(x => [vertsInWedgeOrder[x.WedgeIdx1].Index, vertsInWedgeOrder[x.WedgeIdx0].Index, vertsInWedgeOrder[x.WedgeIdx2].Index])],
-                    // TODO filter this down to bones that actually have any weighting
+                    // TODO filter this down to bones that actually have any weighting?
                     RequiredBones = Enumerable.Range(0, psk.Bones.Count).Select(x => (byte)x).ToArray()
                 };
-
-                LOD.Size
 
                 // the indices of those triangles in order to put into the mesh binary
                 // yes, the order is intentionally flipped to make sure the normals come out right
@@ -356,7 +354,8 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
                 #endregion
 
-                // TODO ActiveBoneIndices??? LOD size?????
+                #region the rest of the LOD data
+                LOD.ActiveBoneIndices = Enumerable.Range(0, psk.Bones.Count).Select(x => (ushort)x).ToArray();
 
                 // finally, write out the vertex data!
                 LOD.NumVertices = (uint)finalVerts.Length;
@@ -415,7 +414,18 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     }
                 }
 
-                // remove the extra LODs; we are not handling them correctly anyway
+                #endregion
+
+                /* things I have not implemented: 
+                 * net Index (probably not important unless you are doing ME3MP modding, and you can set it manually easily enough)
+                 * Clothing Assets (all null anyway in vanilla)
+                 * LOD size (no idea how to calculate it, and it doesn't actually seem to be important)
+                 * tangent and normal calculations. I actually should do that though. 
+                 * PerPolyBoneKDOPS (no idea what this is, it's mostly empty in vanilla)
+                 * importing to OT1 (the format is slightly different in ways I don't care to implement, though I should disallow this), you can probably use debug build to port into OT1 if you must
+                 * */
+
+                // just write one LOD. we could extend this to multiple in the future if needed, but no one I know of is actually generating multiple LODs
                 meshBin.LODModels = [LOD];
 
                 meshExport.WriteBinary(meshBin);
