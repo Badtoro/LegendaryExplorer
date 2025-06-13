@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Drawing.Charts;
-using LegendaryExplorer.Dialogs;
+﻿using LegendaryExplorer.Dialogs;
 using LegendaryExplorer.Misc.ExperimentsTools;
 using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
 using LegendaryExplorerCore.Helpers;
@@ -214,7 +213,66 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
                 #endregion
 
-                // TODO calculate normals and tangents
+                // TODO calcualte normals if they are not already there; do this pre dupe, actually, so that hard edges can be preserved if desired
+
+                #region calculate tangents
+                // generate tangents using the MikkTSpace algorithm which is used by most tools these days
+
+                // callback to get vertex positions
+                TempVertex GetVert(int face, int vert)
+                {
+                    var tri = psk.Faces[face];
+                    return vert switch
+                    {
+                        0 => vertsInWedgeOrder[tri.WedgeIdx0],
+                        1 => vertsInWedgeOrder[tri.WedgeIdx1],
+                        2 => vertsInWedgeOrder[tri.WedgeIdx2],
+                        _ => throw new IndexOutOfRangeException()
+                    };
+                }
+                void vertPositionHandler(int face, int vertex, out float x, out float y, out float z)
+                {
+                    var vert = GetVert(face, vertex);
+
+                    x = vert.Position.X; y = vert.Position.Y; z = vert.Position.Z;
+                }
+                // callback to get vertex normals
+                void VertNormHandler(int face, int vertex, out float x, out float y, out float z)
+                {
+                    var vert = GetVert(face, vertex);
+
+                    x = vert.Normal.X; y = vert.Normal.Y; z = vert.Normal.Z;
+                }
+                void VertUVHandler(int face, int vertex, out float u, out float v)
+                {
+                    var vert = GetVert(face, vertex);
+
+                    u = vert.U; v = vert.V;
+                }
+                void BasicTangentHandler(int face, int vertex, float x, float y, float z, float sign)
+                {
+                    var vert = GetVert(face, vertex);
+
+                    // this is needed to store the bitangent sign in the Vertex Normal W component. It is important
+                    // it is basically whether the UV mapping at this part of the mesh is mirrored, and everything will look bad if it's not set correctly.
+                    vert.BiTangentSign = sign;
+
+                    // this is the 
+                    vert.Tangent = new Vector3(x, y, z);
+                }
+                Mikktspace.NET.MikkGenerator.GenerateTangentSpace(
+                    // number of faces
+                    psk.Faces.Count,
+                    // number of verts per face; the algorithm supports quads, but it will always be triangles in a psk
+                    _ => 3,
+                    // callbacks to get the position, normal, and UV coordinates of a vertex
+                    vertPositionHandler,
+                    VertNormHandler,
+                    VertUVHandler,
+                    // callback to recieve the results: a tangent and BiNormal sign per vertex
+                    BasicTangentHandler);
+
+                #endregion
 
                 #region sections and chunks
 
@@ -381,14 +439,13 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
                         var vertNorm = tempVert.Normal with { Y = -tempVert.Normal.Y };
                         var packedNorm = (PackedNormal)Vector3.Normalize(vertNorm);
-                        // there is a possible bug in the PackedNormal explicit operator used above where it assigns 128 to W instead of 255, but I didn't want to risk messing things up, so I have not changed it
-                        newVert.TangentZ = new PackedNormal(packedNorm.X, packedNorm.Y, packedNorm.Z, 255);
+                        // the w component of the normal is stores the bitangent sign, indicating whether the UV mapping is mirorred here
+                        var normalW = tempVert.BiTangentSign > 0 ? (byte)255 : (byte)0;
+                        newVert.TangentZ = new PackedNormal(packedNorm.X, packedNorm.Y, packedNorm.Z, normalW);
 
-                        // TODO do I need to invert Y here?
                         var vertTangent = tempVert.Tangent with { Y = -tempVert.Tangent.Y };
                         var packedTangent = (PackedNormal)Vector3.Normalize(vertTangent);
-                        // there is a possible bug in the PackedNormal explicit operator used above where it assigns 128 to W instead of 255, but I didn't want to risk messing things up, so I have not changed it
-                        newVert.TangentX = new PackedNormal(packedTangent.X, packedTangent.Y, packedTangent.Z, 255);
+                        newVert.TangentX = packedTangent;
 
                         // add in the bone influences
                         var newBoneInfluenceIndices = new byte[4];
@@ -432,54 +489,6 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
             }
         }
 
-        //private static IEnumerable<TempVertex> GetVertices(PSK psk)
-        //{
-            
-
-        //    return orderedVerts;
-
-        //    //var orderedVertList = orderedVerts.ToArray();
-
-        //    //for (int i = 0; i < orderedVertList.Length; i++)
-        //    //{
-        //    //    orderedVertList[i].Index = i;
-        //    //}
-
-        //    //psk.Points = [];
-        //    //psk.Weights = [];
-            
-        //    //for (int i = 0; i < orderedVertList.Length; i++)
-        //    //{
-        //    //    var currentVert = orderedVertList[i];
-        //    //    // next, put in the new verts in order
-        //    //    psk.Points.Add(currentVert.Position);
-
-        //    //    // and the weights with updated point indices
-        //    //    foreach (var weight in currentVert.Weights)
-        //    //    {
-        //    //        psk.Weights.Add(new PSK.PSKWeight()
-        //    //        {
-        //    //            Bone = weight.Bone,
-        //    //            Weight = weight.Weight,
-        //    //            Point = i
-        //    //        });
-        //    //    }
-        //    //}
-
-        //    //// update the wedges, maintaining order, but fixing the 
-        //    //psk.Wedges = [];
-        //    //for (int i = 0; i < verts.Count; i++) {
-        //    //    var currentVert = verts[i];
-        //    //    psk.Wedges.Add(new PSK.PSKWedge()
-        //    //    {
-        //    //        MatIndex = (byte)currentVert.MaterialIndex,
-        //    //        PointIndex = (ushort)currentVert.Index,
-        //    //        U = currentVert.U,
-        //    //        V = currentVert.V,
-        //    //    });
-        //    //}
-        //}
-
         private class TempVertex
         {
             public ushort Index { get; set; }
@@ -492,6 +501,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
             public float V { get; set; }
             public byte MaterialIndex { get; set; }
             public List<PSK.PSKWeight> Weights { get; set; }
+            public float BiTangentSign { get; set; }
         }
 
 
@@ -1656,7 +1666,7 @@ defaultproperties
                 ShowError("You must select a SkeletalMesh to use this experiment");
                 return;
             }
-            var d = new SaveFileDialog { Filter = "PSK|*.psk" };
+            var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
             if (d.ShowDialog() == true)
             {
                 PSK.CreateFromSkeletalMesh(skelMeshExport.GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
