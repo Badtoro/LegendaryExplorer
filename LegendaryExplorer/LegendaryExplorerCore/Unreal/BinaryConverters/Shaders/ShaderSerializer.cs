@@ -955,6 +955,18 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 case "FLightFunctionPixelShader":
                     shader = new FLightFunctionPixelShader();
                     break;
+                
+                // These are in GlobalShaderCache but are not in the game's executable.
+                // They are likely editor-only shaders and cannot be used by the game,
+                // but we have to be able to deserialize the GlobalShaderCache so we have to handle it here.
+                case "TMeshPaintPixelShader":
+                case "TMeshPaintVertexShader":
+                    shader = new UnparsedShader
+                    {
+                        ShaderType = shaderType,
+                        Guid = id,
+                    };
+                    break;
                 default:
                     throw new InvalidDataException($"Unexpected shader type: '{shaderType.Name}'");
             }

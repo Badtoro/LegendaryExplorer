@@ -16,7 +16,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
     {
         public readonly EndianReader ms = new(stream) { Endian = pcc?.Endian ?? Endian.Little };
         public readonly bool IsLoading = isLoading;
-        public readonly MEGame Game = pcc?.Game ?? MEGame.Unknown;
+        public MEGame Game { get; init; } = pcc?.Game ?? MEGame.Unknown;
         public readonly PackageCache PackageCache = packageCache;
         public readonly IMEPackage Pcc = pcc;
         public readonly int startOffset = offset;
