@@ -35,7 +35,95 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 var meshExport = ExportCreator.CreateExport(pew.Pcc, Path.GetFileNameWithoutExtension(path), "SkeletalMesh");
                 var meshBin = SkeletalMesh.Create();
 
-                #region skeleton
+                SetupSkeleton(psk, meshBin);
+                SetupBounds(psk, meshBin);
+                SetupMaterials(pew, psk, meshBin);
+                CalculateNormalsIfNeeded(psk);
+
+                GetAllVertices(psk, out List<TempVertex> vertsInWedgeOrder, out TempVertex[] finalVerts);
+                CalcualteTangents(psk, vertsInWedgeOrder);
+
+                StaticLODModel LOD;
+                List<MeshChunk> chunks;
+                SetupSectionsAndChunks(psk, meshBin, vertsInWedgeOrder, finalVerts, out LOD, out chunks);
+
+                #region the rest of the LOD data
+                LOD.ActiveBoneIndices = [.. Enumerable.Range(0, psk.Bones.Count).Select(x => (ushort)x)];
+
+                // finally, write out the vertex data!
+                LOD.NumVertices = (uint)finalVerts.Length;
+
+                LOD.VertexBufferGPUSkin = new SkeletalMeshVertexBuffer
+                {
+                    VertexData = new GPUSkinVertex[finalVerts.Length],
+                    MeshExtension = new Vector3(1, 1, 1)
+                };
+
+                for (int chunkIndex = 0; chunkIndex < LOD.Chunks.Length; chunkIndex++)
+                {
+                    var LODChunk = LOD.Chunks[chunkIndex];
+                    var chunk = chunks[chunkIndex];
+                    for (var i = chunk.VertIndexStart; i <= chunk.VertIndexEnd; i++)
+                    {
+                        var tempVert = finalVerts[i];
+                        var newVert = new GPUSkinVertex
+                        {
+                            UV = new Vector2DHalf(tempVert.U, tempVert.V),
+                            Position = tempVert.Position with { Y = tempVert.Position.Y * -1 }
+                        };
+
+                        var vertNorm = tempVert.Normal with { Y = -tempVert.Normal.Y };
+                        var packedNorm = (PackedNormal)Vector3.Normalize(vertNorm);
+                        // the w component of the normal is stores the bitangent sign, indicating whether the UV mapping is mirorred here
+                        var normalW = tempVert.BiTangentSign > 0 ? (byte)255 : (byte)0;
+                        newVert.TangentZ = new PackedNormal(packedNorm.X, packedNorm.Y, packedNorm.Z, normalW);
+
+                        var vertTangent = tempVert.Tangent with { Y = -tempVert.Tangent.Y };
+                        var packedTangent = (PackedNormal)Vector3.Normalize(vertTangent);
+                        newVert.TangentX = packedTangent;
+
+                        // add in the bone influences
+                        var newBoneInfluenceIndices = new byte[4];
+                        var newBoneInfluenceWeights = new byte[4];
+                        var influences = tempVert.Weights.OrderByDescending(x => x.Weight).ToArray();
+                        // sum up all the influences so we can normalize them on import
+                        var sum = influences.Select(x => x.Weight).Sum();
+                        for (int j = 0; j < 4 && j < influences.Length; j++)
+                        {
+                            var influence = influences[j];
+
+                            var boneName = psk.Bones[influence.Bone].Name;
+                            var meshBoneIndex = meshBin.RefSkeleton.FindIndex(x => x.Name == boneName);
+                            var mappedBoneIndex = LODChunk.BoneMap.IndexOf((ushort)meshBoneIndex);
+                            newBoneInfluenceIndices[j] = (byte)mappedBoneIndex;
+                            // normalize, convert to a byte with 0 being none and 255 being full
+                            newBoneInfluenceWeights[j] = (byte)Math.Round(influence.Weight * 255f / sum);
+                        }
+                        newVert.InfluenceBones = new Influences(newBoneInfluenceIndices[0], newBoneInfluenceIndices[1], newBoneInfluenceIndices[2], newBoneInfluenceIndices[3]);
+                        newVert.InfluenceWeights = new Influences(newBoneInfluenceWeights[0], newBoneInfluenceWeights[1], newBoneInfluenceWeights[2], newBoneInfluenceWeights[3]);
+
+                        LOD.VertexBufferGPUSkin.VertexData[i] = newVert;
+                    }
+                }
+
+                #endregion
+
+                /* things I have not implemented: 
+                 * net Index (probably not important unless you are doing ME3MP modding, and you can set it manually easily enough)
+                 * Clothing Assets (all null anyway in vanilla)
+                 * LOD size (doesn't seem to be important; UDK imports have it set to 0, and I don't know how it is calculated)
+                 * PerPolyBoneKDOPS (no idea what this is, it's mostly empty in vanilla)
+                 * importing to OT1 (the format is slightly different in ways I don't care to implement, though I should disallow this), you can probably use debug build to port into OT1 if you must
+                 * */
+
+                // just write one LOD. we could extend this to multiple in the future if needed, but no one I know of is actually generating multiple LODs
+                meshBin.LODModels = [LOD];
+
+                meshExport.WriteBinary(meshBin);
+            }
+
+            static void SetupSkeleton(PSK psk, SkeletalMesh meshBin)
+            {
                 // set up the skeleton
                 // initialize the array to the right size
                 meshBin.RefSkeleton = new MeshBone[psk.Bones.Count];
@@ -82,11 +170,11 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
                 // now find the maximum depth and set that as the skeletal depth
                 meshBin.SkeletalDepth = skeletalDepth.Max();
+            }
 
-                #endregion
-
-                #region bounds/origin
-                // bounds are important at least for the camera display preview in LEX, and possibly important for when to cull meshes based on visibility
+            static void SetupBounds(PSK psk, SkeletalMesh meshBin)
+            {
+                // bounds are important at least for the camera display preview in LEX, and possibly important for when to cull meshes based on visibility in game
                 // separate out the coordinates for each axis so we can operate on them
                 var xCoords = psk.Points.Select(x => x.X);
                 var yCoords = psk.Points.Select(x => -x.Y);
@@ -108,9 +196,10 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     BoxExtent = boxExtent * 2,
                     SphereRadius = sphereRad * 2
                 };
-                #endregion
+            }
 
-                #region materials
+            static void SetupMaterials(PackageEditorWindow pew, PSK psk, SkeletalMesh meshBin)
+            {
                 SetNumMaterialSlots(meshBin, psk.Materials.Count);
                 for (int i = 0; i < psk.Materials.Count; i++)
                 {
@@ -123,9 +212,10 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                         meshBin.Materials[i] = entry.UIndex;
                     }
                 }
-                #endregion
+            }
 
-                #region calcualte normals
+            static void CalculateNormalsIfNeeded(PSK psk)
+            {
                 // If the normals are not present already, calculate them here by averaging the normals of the faces containing each vertex, weighted by the angle containing that vertex, so as not to introduce artifacts due to triangulation
                 if (psk.VertexNormals == null || psk.VertexNormals.Count == 0)
                 {
@@ -169,16 +259,13 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     }
                     psk.VertexNormals = [.. summedNormals.Select(x => Vector3.Normalize(x))];
                 }
+            }
 
-                #endregion
-
-                #region combining vertex data, duplicating if needed, reordering if allowed
-                // if there are more wedges than points, we need to duplicate points to make this format happy; this will mess up vert order/count, so make sure it is not in this situation if you wish to maintain vert order and count
-                //var verts = GetVertices(psk);
-
+            static void GetAllVertices(PSK psk, out List<TempVertex> vertsInWedgeOrder, out TempVertex[] finalVerts)
+            {
                 // I need this psk to be set up such that each point corresponds to a wedge, and all are paired like this.
                 // So no loose points not assiciated with any triangles, and no points shared across UV/material seams. those points need to be duplicated for each wedge that shares them
-                // check if this condition is already met and if so, do nothing
+                // check if this condition is already met and if so, maintain the point order
 
                 bool preserveOrder;
                 // group wedges by point index
@@ -207,8 +294,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 // if we are handling morphs, those reference points and will need to be updated
 
                 var weightsByPoint = psk.Weights.GroupBy(x => x.Point).ToDictionary(g => g.Key, g => g.ToList());
-
-                var vertsInWedgeOrder = new List<TempVertex>();
+                vertsInWedgeOrder = [];
                 for (int i = 0; i < psk.Wedges.Count; i++)
                 {
                     var wedge = psk.Wedges[i];
@@ -216,16 +302,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     weightsByPoint.TryGetValue(wedge.PointIndex, out var weights);
                     weights ??= [];
 
-                    Vector3 normal;
-                    if (psk.VertexNormals != null && psk.VertexNormals.Count == psk.Points.Count)
-                    {
-                        normal = psk.VertexNormals[wedge.PointIndex];
-                    }
-                    else
-                    {
-                        // set it to 0, calculate it later?
-                        normal = new Vector3(0, 0, 0);
-                    }
+                    var normal = psk.VertexNormals[wedge.PointIndex];
 
                     vertsInWedgeOrder.Add(new TempVertex()
                     {
@@ -237,8 +314,6 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                         Position = point,
                         Weights = weights,
                         Normal = normal,
-                        // TODO calculate this properly
-                        Tangent = new Vector3(0, 0, 0)
                     });
                 }
 
@@ -251,18 +326,15 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     orderedVerts = orderedVerts.GroupBy(x => x.MaterialIndex).OrderBy(x => x.Key).SelectMany(x => x);
                 }
 
-                var finalVerts = orderedVerts.ToArray();
-
+                finalVerts = [.. orderedVerts];
                 for (var i = 0; i < finalVerts.Length; i++)
                 {
                     finalVerts[i].Index = (ushort)i;
                 }
+            }
 
-                #endregion
-
-                // TODO calcualte normals if they are not already there; do this pre dupe, actually, so that hard edges can be preserved if desired
-
-                #region calculate tangents
+            static void CalcualteTangents(PSK psk, List<TempVertex> vertsInWedgeOrder)
+            {
                 // generate tangents using the MikkTSpace algorithm which is used by most tools these days
 
                 // callback to get vertex positions
@@ -304,7 +376,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     // it is basically whether the UV mapping at this part of the mesh is mirrored, and everything will look bad if it's not set correctly.
                     vert.BiTangentSign = sign;
 
-                    // this is the 
+                    // this is the tangent vector for this vertex
                     vert.Tangent = new Vector3(x, y, z);
                 }
                 Mikktspace.NET.MikkGenerator.GenerateTangentSpace(
@@ -318,28 +390,21 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     VertUVHandler,
                     // callback to recieve the results: a tangent and BiNormal sign per vertex
                     BasicTangentHandler);
+            }
 
-                #endregion
-
-                #region sections and chunks
-
+            static void SetupSectionsAndChunks(PSK psk, SkeletalMesh meshBin, List<TempVertex> vertsInWedgeOrder, TempVertex[] finalVerts, out StaticLODModel LOD, out List<MeshChunk> chunks)
+            {
                 // next, write out the sections and chunks
                 // the triangles, grouped by material
                 var matGroups = psk.Faces.GroupBy(x => x.MatIndex).OrderBy(x => x.Key);
 
-                var LOD = new StaticLODModel
+                LOD = new StaticLODModel
                 {
                     // convert to the new point indices and make sure the order is correct to have the right normals (intentionally flipping 1 and 0)
                     IndexBuffer = [.. matGroups.SelectMany(x => x).SelectMany<PSK.PSKTriangle, ushort>(x => [vertsInWedgeOrder[x.WedgeIdx1].Index, vertsInWedgeOrder[x.WedgeIdx0].Index, vertsInWedgeOrder[x.WedgeIdx2].Index])],
                     // TODO filter this down to bones that actually have any weighting?
-                    RequiredBones = Enumerable.Range(0, psk.Bones.Count).Select(x => (byte)x).ToArray()
+                    RequiredBones = [.. Enumerable.Range(0, psk.Bones.Count).Select(x => (byte)x)]
                 };
-
-                // the indices of those triangles in order to put into the mesh binary
-                // yes, the order is intentionally flipped to make sure the normals come out right
-                //var indexBuffer = matGroups.SelectMany(x => x).SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]).ToArray();
-
-                // make some pseudo sections from those, tracking the min and max vertex index needed to contain each section of triangles
                 List<MeshSection> sections = [];
                 var startIndex = 0;
                 foreach (var matGroup in matGroups)
@@ -352,7 +417,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     };
 
                     // calculate the min and max vertex indices within this section
-                    var sectionIndices = matGroup.SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]);
+                    var sectionIndices = matGroup.SelectMany<PSK.PSKTriangle, ushort>(x => [vertsInWedgeOrder[x.WedgeIdx0].Index, vertsInWedgeOrder[x.WedgeIdx1].Index, vertsInWedgeOrder[x.WedgeIdx2].Index]);
                     section.MinVertIndex = sectionIndices.Min();
                     section.MaxVertIndex = sectionIndices.Max();
 
@@ -367,7 +432,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
                 // first, sort the sections by min vert index then max vert index, so we can enumerate them in that order
                 sections = [.. sections.OrderBy(x => x.MinVertIndex).ThenBy(x => x.MaxVertIndex)];
-                List<MeshChunk> chunks = [];
+                chunks = [];
                 chunks.Add(new MeshChunk
                 {
                     VertIndexStart = 0,
@@ -456,83 +521,6 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     NumSoftVertices = x.SoftVerts,
                     BoneMap = [.. x.InfluenceBones.Select(GetMeshBoneIndex).Order()]
                 })];
-
-                #endregion
-
-                #region the rest of the LOD data
-                LOD.ActiveBoneIndices = Enumerable.Range(0, psk.Bones.Count).Select(x => (ushort)x).ToArray();
-
-                // finally, write out the vertex data!
-                LOD.NumVertices = (uint)finalVerts.Length;
-
-                LOD.VertexBufferGPUSkin = new SkeletalMeshVertexBuffer
-                {
-                    VertexData = new GPUSkinVertex[finalVerts.Length],
-                    MeshExtension = new Vector3(1, 1, 1)
-                };
-
-                for (int chunkIndex = 0; chunkIndex < LOD.Chunks.Length; chunkIndex++)
-                {
-                    var LODChunk = LOD.Chunks[chunkIndex];
-                    var chunk = chunks[chunkIndex];
-                    for (var i = chunk.VertIndexStart; i <= chunk.VertIndexEnd; i++)
-                    {
-                        var tempVert = finalVerts[i];
-                        var newVert = new GPUSkinVertex
-                        {
-                            UV = new Vector2DHalf(tempVert.U, tempVert.V),
-                            Position = tempVert.Position with { Y = tempVert.Position.Y * -1 }
-                        };
-
-                        var vertNorm = tempVert.Normal with { Y = -tempVert.Normal.Y };
-                        var packedNorm = (PackedNormal)Vector3.Normalize(vertNorm);
-                        // the w component of the normal is stores the bitangent sign, indicating whether the UV mapping is mirorred here
-                        var normalW = tempVert.BiTangentSign > 0 ? (byte)255 : (byte)0;
-                        newVert.TangentZ = new PackedNormal(packedNorm.X, packedNorm.Y, packedNorm.Z, normalW);
-
-                        var vertTangent = tempVert.Tangent with { Y = -tempVert.Tangent.Y };
-                        var packedTangent = (PackedNormal)Vector3.Normalize(vertTangent);
-                        newVert.TangentX = packedTangent;
-
-                        // add in the bone influences
-                        var newBoneInfluenceIndices = new byte[4];
-                        var newBoneInfluenceWeights = new byte[4];
-                        var influences = weightsByPoint[i].OrderByDescending(x => x.Weight).ToArray();
-                        // sum up all the influences so we can normalize them on import
-                        var sum = influences.Select(x => x.Weight).Sum();
-                        for (int j = 0; j < 4 && j < influences.Length; j++)
-                        {
-                            var influence = influences[j];
-
-                            var boneName = psk.Bones[influence.Bone].Name;
-                            var meshBoneIndex = meshBin.RefSkeleton.FindIndex(x => x.Name == boneName);
-                            var mappedBoneIndex = LODChunk.BoneMap.IndexOf((ushort)meshBoneIndex);
-                            newBoneInfluenceIndices[j] = (byte)mappedBoneIndex;
-                            // normalize, convert to a byte with 0 being none and 255 being full
-                            newBoneInfluenceWeights[j] = (byte)Math.Round(influence.Weight * 255f / sum);
-                        }
-                        newVert.InfluenceBones = new Influences(newBoneInfluenceIndices[0], newBoneInfluenceIndices[1], newBoneInfluenceIndices[2], newBoneInfluenceIndices[3]);
-                        newVert.InfluenceWeights = new Influences(newBoneInfluenceWeights[0], newBoneInfluenceWeights[1], newBoneInfluenceWeights[2], newBoneInfluenceWeights[3]);
-
-                        LOD.VertexBufferGPUSkin.VertexData[i] = newVert;
-                    }
-                }
-
-                #endregion
-
-                /* things I have not implemented: 
-                 * net Index (probably not important unless you are doing ME3MP modding, and you can set it manually easily enough)
-                 * Clothing Assets (all null anyway in vanilla)
-                 * LOD size (no idea how to calculate it, and it doesn't actually seem to be important)
-                 * tangent and normal calculations. I actually should do that though. 
-                 * PerPolyBoneKDOPS (no idea what this is, it's mostly empty in vanilla)
-                 * importing to OT1 (the format is slightly different in ways I don't care to implement, though I should disallow this), you can probably use debug build to port into OT1 if you must
-                 * */
-
-                // just write one LOD. we could extend this to multiple in the future if needed, but no one I know of is actually generating multiple LODs
-                meshBin.LODModels = [LOD];
-
-                meshExport.WriteBinary(meshBin);
             }
         }
 

@@ -272,7 +272,6 @@ namespace LegendaryExplorerCore.Unreal
                         // first, we need to find the chunk containing this vertex:
                         var chunk = lod.Chunks.Last(x => x.BaseVertexIndex <= i);
 
-
                         psk.Weights.Add(new PSKWeight
                         {
                             Bone = chunk.BoneMap[vertex.InfluenceBones[j]],
