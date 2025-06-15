@@ -125,6 +125,53 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 }
                 #endregion
 
+                #region calcualte normals
+                // If the normals are not present already, calculate them here by averaging the normals of the faces containing each vertex, weighted by the angle containing that vertex, so as not to introduce artifacts due to triangulation
+                if (psk.VertexNormals == null || psk.VertexNormals.Count == 0)
+                {
+                    // things we need per triangle:
+                    // normal vector
+                    // point index/angle pairs
+                    float GetAngle(Vector3 p0, Vector3 p1, Vector3 p2)
+                    {
+                        var dot = Vector3.Dot(p1 - p0, p2 - p0);
+                        var m1 = Vector3.Distance(p0, p1);
+                        var m2 = Vector3.Distance(p0, p2);
+                        var temp = dot / (m1 * m2);
+                        return (float)Math.Acos(temp);
+                    }
+
+                    // need to calculate the normal per face
+                    // need to group faces by point index, but with dupes
+                    var summedNormals = new Vector3[psk.Points.Count];
+                    foreach (var face in psk.Faces)
+                    {
+                        // point index of each vertex of the triangle
+                        var i0 = psk.Wedges[face.WedgeIdx0].PointIndex;
+                        var i1 = psk.Wedges[face.WedgeIdx1].PointIndex;
+                        var i2 = psk.Wedges[face.WedgeIdx2].PointIndex;
+                        // position of each vertex of the triangle
+                        var p0 = psk.Points[i0];
+                        var p1 = psk.Points[i1];
+                        var p2 = psk.Points[i2];
+
+                        // angle (in rad) of each angle of the triangle by point it contains
+                        var a0 = GetAngle(p0, p1, p2);
+                        var a1 = GetAngle(p1, p0, p2);
+                        var a2 = GetAngle(p2, p1, p0);
+
+                        var faceNormal = Vector3.Normalize(Vector3.Cross(p2 - p0, p1 - p0));
+
+                        // accumulate the face normals for each point, weighted by the angle
+                        summedNormals[i0] += faceNormal * a0;
+                        summedNormals[i1] += faceNormal * a1;
+                        summedNormals[i2] += faceNormal * a2;
+                    }
+                    psk.VertexNormals = [.. summedNormals.Select(x => Vector3.Normalize(x))];
+                }
+
+                #endregion
+
                 #region combining vertex data, duplicating if needed, reordering if allowed
                 // if there are more wedges than points, we need to duplicate points to make this format happy; this will mess up vert order/count, so make sure it is not in this situation if you wish to maintain vert order and count
                 //var verts = GetVertices(psk);
@@ -494,7 +541,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
             public ushort Index { get; set; }
             public ushort OriginalPointIndex { get; set; }
             public ushort OriginalWedgeIndex { get; set; }
-            public Vector3 Position { get; set;  }
+            public Vector3 Position { get; set; }
             public Vector3 Normal { get; set; }
             public Vector3 Tangent { get; set; }
             public float U { get; set; }
@@ -962,7 +1009,8 @@ defaultproperties
 
         private static int ChooseMaterial(PackageEditorWindow pew, SkeletalMesh meshBinary, string prompt)
         {
-            var materialChoices = meshBinary.Materials.Select<int, IEntry>(x => x switch {
+            var materialChoices = meshBinary.Materials.Select<int, IEntry>(x => x switch
+            {
                 < 0 => pew.Pcc.GetImport(x),
                 0 => null,
                 > 0 => pew.Pcc.GetUExport(x)
@@ -1617,7 +1665,7 @@ defaultproperties
         {
             if (GetSelectedItem(pew, "BioMorphFace", out var bmfExport))
             {
-               if (GetPskFromFile(pew, out var psk, out _))
+                if (GetPskFromFile(pew, out var psk, out _))
                 {
                     var bmfBin = bmfExport.GetBinaryData<BioMorphFace>();
 
