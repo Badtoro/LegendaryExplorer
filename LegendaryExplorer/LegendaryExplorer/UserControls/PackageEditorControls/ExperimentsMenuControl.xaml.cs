@@ -1324,9 +1324,21 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
         // EXPERIMENTS: DropTheSquid
         #region DropTheSquid's Experiments
 
+        // AMM specific things:
+        private void MakeCustomMorphTargetSet_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.MakeCustomMorphTargetSet(GetPEWindow());
+        }
+        private void GetMeshMaterials_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.GetMeshMaterials(GetPEWindow());
+        }
+
+        // export mesh
+
         private void ExportSelectedToPsx_Click(object sender, RoutedEventArgs e)
         {
-            // TODO unified export selected item method
+            PackageEditorExperimentsSquid.ExportSelectedToPsx(GetPEWindow());
         }
 
         private void ExportRonToPsx_Click(object sender, RoutedEventArgs e)
@@ -1334,6 +1346,7 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             // TODO find the appropriate base head, export directly, or show an error if we can't find an appropriate base head
         }
 
+        // import a mesh like object
         private void ImportPskAsNewMesh_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.ImportPskAsNewlMesh(GetPEWindow());
@@ -1342,19 +1355,11 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
         // I need to simplify the interface for these at some point. 
         // like, export selected item as psk/psa (works for BioMorphFace, SkeletalMesh, StaticMesh, MorphTargetSet, maybe eventually others)
         // and then import psk/psa either as a new export or on top of the specific
-        private void MakeCustomMorphTargetSet_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.MakeCustomMorphTargetSet(GetPEWindow());
-        }
+        
 
         private void MakeHeterochromia_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.MakeHeterochromiaMesh(GetPEWindow());
-        }
-
-        private void GetMeshMaterials_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.GetMeshMaterials(GetPEWindow());
         }
 
         private void ExportMeshToPsk_Click(object sender, RoutedEventArgs e)
@@ -1385,16 +1390,6 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
         private void AddNewMorphTargetFromPskAndPsa_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.ImportPskAndPsaAsMorphTarget(GetPEWindow());
-        }
-
-        private void ExportMorphTargetSetToBlender_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.ExportMorphTargetSet(GetPEWindow());
-        }
-
-        private void ExportBmfToPskAndPsa_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.BioMorphFaceToPskAndPsa(GetPEWindow());
         }
 
         private void ImportPskAndPsaToBmf_Click(object sender, RoutedEventArgs e)

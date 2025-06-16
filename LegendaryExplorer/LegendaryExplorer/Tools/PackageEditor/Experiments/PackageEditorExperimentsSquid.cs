@@ -539,6 +539,188 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
             public float BiTangentSign { get; set; }
         }
 
+        public static void ExportSelectedToPsx(PackageEditorWindow pew)
+        {
+            var selectedEntryClass = pew.SelectedItem?.Entry?.ClassName;
+
+            switch (selectedEntryClass)
+            {
+                case "SkeletalMesh":
+                    // export the skeletal mesh as a psk
+                    var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
+                    if (d.ShowDialog() == true)
+                    {
+                        PSK.CreateFromSkeletalMesh(((ExportEntry)pew.SelectedItem.Entry).GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
+                    }
+                    return;
+                case "StaticMesh":
+                    ExportStaticMeshToPSKX(pew);
+                    return;
+                case "BioMorphFace":
+                    BioMorphFaceToPskAndPsa(pew);
+                    return;
+                case "MorphTargetSet":
+                    ExportMorphTargetSet(pew);
+                    return;
+                // TODO support BrushComponent, FracturedStaticMesh, Stages, etc. There are a few other mesh like objects it might be nice to be able to edit, but very low priority?
+                default:
+                    ShowError("You must open a pcc file and select a SkeletalMesh, StaticMesh, BioMorphFace, or MorphTargetSet for this experiment");
+                    return;
+            }
+        }
+
+        private static void ExportStaticMeshToPSKX(PackageEditorWindow pew)
+        {
+            // TODO implement this
+            throw new NotImplementedException("I haven't implemented exporting static meshes yet.");
+        }
+
+        private static void BioMorphFaceToPskAndPsa(PackageEditorWindow pew)
+        {
+            // get the selected bmf and ensure it has a base head mesh
+            if (!GetSelectedItem(pew, "BioMorphFace", out var bmf) || bmf.GetProperty<ObjectProperty>("m_oBaseHead") == null)
+            {
+                ShowError("You must select a BioMorphFace with a base head mesh for this command to work");
+                return;
+            }
+
+            var folderDialog = new OpenFolderDialog()
+            {
+                Multiselect = false,
+                Title = "Choose a folder for the output"
+            };
+
+            if (folderDialog.ShowDialog() == true)
+            {
+                var folder = folderDialog.FolderName;
+
+                var baseHeadMesh = pew.Pcc.GetEntry(bmf.GetProperty<ObjectProperty>("m_oBaseHead").Value) as ExportEntry;
+                var baseMeshBin = baseHeadMesh.GetBinaryData<SkeletalMesh>();
+
+                // make most of the psk from the base head mesh
+                var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh.GetBinaryData<SkeletalMesh>(), 0, true);
+
+                var bmfBin = bmf.GetBinaryData<BioMorphFace>();
+
+                for (var i = 0; i < psk.Points.Count && i < bmfBin.LODs[0].Length; i++)
+                {
+                    // modify each point in the psk with the points from the bmf
+                    var bmfPoint = bmfBin.LODs[0][i];
+                    psk.Points[i] = bmfPoint with { Y = -bmfPoint.Y };
+                }
+
+                psk.ToFile(Path.Combine(folder, bmf.ObjectName + ".pskx"));
+
+
+                // now, output the psa file and config file
+                var config = new StringBuilder();
+                config.AppendLine("[RemoveTracks]");
+                var psa = new PSA
+                {
+                    Bones = [],
+                    Infos = [],
+                    Keys = []
+                };
+
+                var bmfSkeleton = bmf.GetProperty<ArrayProperty<StructProperty>>("m_aFinalSkeleton");
+
+                // add the ref skeleton into the thing
+                foreach (var bone in baseMeshBin.RefSkeleton)
+                {
+                    psa.Bones.Add(new PSABone
+                    {
+                        Name = bone.Name,
+                        ParentIndex = bone.ParentIndex,
+                    });
+                }
+
+                psa.Infos.Add(new PSAAnimInfo
+                {
+                    Name = "BioMorphFaceFinalSkeleton",
+                    Group = "None",
+                    TotalBones = baseMeshBin.RefSkeleton.Length,
+                    KeyQuotum = baseMeshBin.RefSkeleton.Length, // this would be multiplied by the number of frames, but there is just one frame
+                    TrackTime = 1,
+                    AnimRate = 1,
+                    FirstRawFrame = 0,
+                    NumRawFrames = 1
+                });
+
+                for (int i = 0; i < baseMeshBin.RefSkeleton.Length; i++)
+                {
+                    var refBone = baseMeshBin.RefSkeleton[i];
+
+                    // is this bone offset by this BMF?
+                    var offset = bmfSkeleton.FirstOrDefault(x => x.GetProp<NameProperty>("nName").Value == refBone.Name);
+                    var rotQuat = new Quaternion(0, 0, 0, 1);
+                    var posVec = new Vector3(0, 0, 0);
+                    if (offset != null)
+                    {
+                        var pos = offset.GetProp<StructProperty>("vPos");
+                        posVec = new Vector3(pos.GetProp<FloatProperty>("X"), -pos.GetProp<FloatProperty>("Y"), pos.GetProp<FloatProperty>("Z"));
+                        // do not output rotation when you import this one
+                        config.AppendLine($"BioMorphFaceFinalSkeleton.{i}=rot");
+                    }
+                    else
+                    {
+                        // do not output anything when you import this one
+                        config.AppendLine($"BioMorphFaceFinalSkeleton.{i}=all");
+                    }
+
+                    psa.Keys.Add(new PSAAnimKeys
+                    {
+                        Position = posVec,
+                        Rotation = rotQuat,
+                        Time = 30
+                    });
+                }
+
+                psa.ToFile(Path.Combine(folder, bmf.ObjectName + ".psa"));
+
+                // also output a config file next to this to tell it to skip rotations for every sequence and every bone, and skip everythig for bones that aren't part of the pose
+                File.WriteAllText(Path.Combine(folder, bmf.ObjectName + ".config"), config.ToString());
+            }
+        }
+
+        public static void RonFileToPsk(PackageEditorWindow pew)
+        {
+            // first, get the ron file imported
+            if (GetHeadmorphFromFile(out var headmorph, out string filePath))
+            {
+                // get the proper base head based on the number of vertices
+                SkeletalMesh baseHeadMesh = null;
+                // TODO finish implementing this
+                // go to the backup (if available) for the base head; otherwise go to the basegame file, and grab the base head mesh
+                switch (headmorph.Lod0Vertices.Count)
+                {
+                    case 2232:
+                        // LE1/2 HMF
+                    case 2294:
+                        // LE1/2 HMM
+                    case 2390:
+                        // LE3 HMF
+                    case 2392:
+                        // LE3 HMM
+                        break;
+                    default:
+                        // TODO check if there is a head in the accessory meshes from AMM LE3?
+                        ShowError("unable to find base head; please convert to BioMorphFace and apply the base head then export that instead");
+                        return;
+                }
+
+                var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh, includeVertexNormals: true);
+
+                // update the vertex positions:
+                for (int i = 0; i < headmorph.Lod0Vertices.Count; i++)
+                {
+                    psk.Points[i] = headmorph.Lod0Vertices[i] with { Y = -headmorph.Lod0Vertices[i].Y };
+                }
+
+                psk.ToFile(Path.GetFileNameWithoutExtension(filePath) + ".pskx");
+
+                // TODO output the bone offsets as a psa file
+            }
+        }
 
         public static void MakeCustomMorphTargetSet(PackageEditorWindow pew)
         {
@@ -1105,113 +1287,6 @@ defaultproperties
             // TODO remove the morph features (useless), point the base head to the new mesh
         }
 
-        public static void BioMorphFaceToPskAndPsa(PackageEditorWindow pew)
-        {
-            // get the selected bmf and ensure it has a base head mesh
-            if (!GetSelectedItem(pew, "BioMorphFace", out var bmf) || bmf.GetProperty<ObjectProperty>("m_oBaseHead") == null)
-            {
-                ShowError("You must select a BioMorphFace with a base head mesh for this command to work");
-                return;
-            }
-
-            var folderDialog = new OpenFolderDialog()
-            {
-                Multiselect = false,
-                Title = "Choose a folder for the output"
-            };
-
-            if (folderDialog.ShowDialog() == true)
-            {
-                var folder = folderDialog.FolderName;
-
-                var baseHeadMesh = pew.Pcc.GetEntry(bmf.GetProperty<ObjectProperty>("m_oBaseHead").Value) as ExportEntry;
-                var baseMeshBin = baseHeadMesh.GetBinaryData<SkeletalMesh>();
-
-                // make most of the psk from the base head mesh
-                var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh.GetBinaryData<SkeletalMesh>(), 0, true);
-
-                var bmfBin = bmf.GetBinaryData<BioMorphFace>();
-
-                for (var i = 0; i < psk.Points.Count && i < bmfBin.LODs[0].Length; i++)
-                {
-                    // modify each point in the psk with the points from the bmf
-                    var bmfPoint = bmfBin.LODs[0][i];
-                    psk.Points[i] = bmfPoint with { Y = -bmfPoint.Y };
-                }
-
-                psk.ToFile(Path.Combine(folder, bmf.ObjectName + ".psk"));
-
-
-                // now, output the psa file and config file
-                var config = new StringBuilder();
-                config.AppendLine("[RemoveTracks]");
-                var psa = new PSA
-                {
-                    Bones = [],
-                    Infos = [],
-                    Keys = []
-                };
-
-                var bmfSkeleton = bmf.GetProperty<ArrayProperty<StructProperty>>("m_aFinalSkeleton");
-
-                // add the ref skeleton into the thing
-                foreach (var bone in baseMeshBin.RefSkeleton)
-                {
-                    psa.Bones.Add(new PSABone
-                    {
-                        Name = bone.Name,
-                        ParentIndex = bone.ParentIndex,
-                    });
-                }
-
-                psa.Infos.Add(new PSAAnimInfo
-                {
-                    Name = "BioMorphFaceFinalSkeleton",
-                    Group = "None",
-                    TotalBones = baseMeshBin.RefSkeleton.Length,
-                    KeyQuotum = baseMeshBin.RefSkeleton.Length, // this would be multiplied by the number of frames, but there is just one frame
-                    TrackTime = 1,
-                    AnimRate = 1,
-                    FirstRawFrame = 0,
-                    NumRawFrames = 1
-                });
-
-                for (int i = 0; i < baseMeshBin.RefSkeleton.Length; i++)
-                {
-                    var refBone = baseMeshBin.RefSkeleton[i];
-
-                    // is this bone offset by this BMF?
-                    var offset = bmfSkeleton.FirstOrDefault(x => x.GetProp<NameProperty>("nName").Value == refBone.Name);
-                    var rotQuat = new Quaternion(0, 0, 0, 1);
-                    var posVec = new Vector3(0, 0, 0);
-                    if (offset != null)
-                    {
-                        var pos = offset.GetProp<StructProperty>("vPos");
-                        posVec = new Vector3(pos.GetProp<FloatProperty>("X"), -pos.GetProp<FloatProperty>("Y"), pos.GetProp<FloatProperty>("Z"));
-                        // do not output rotation when you import this one
-                        config.AppendLine($"BioMorphFaceFinalSkeleton.{i}=rot");
-                    }
-                    else
-                    {
-                        // do not output anything when you import this one
-                        config.AppendLine($"BioMorphFaceFinalSkeleton.{i}=all");
-                    }
-
-                    psa.Keys.Add(new PSAAnimKeys
-                    {
-                        Position = posVec,
-                        Rotation = rotQuat,
-                        Time = 30
-                    });
-                }
-
-                psa.ToFile(Path.Combine(folder, bmf.ObjectName + ".psa"));
-
-                // also output a config file next to this to tell it to skip rotations for every sequence and every bone, and skip everythig for bones that aren't part of the pose
-                File.WriteAllText(Path.Combine(folder, bmf.ObjectName + ".config"), config.ToString());
-            }
-        }
-
         private static char NumToLetter(int input)
         {
             return (char)('a' + (char)input);
@@ -1381,7 +1456,7 @@ defaultproperties
             return false;
         }
 
-        private static bool GetHeadmorphFromFile(PackageEditorWindow pew, out HeadMorph headmorph, out string filePath)
+        private static bool GetHeadmorphFromFile(out HeadMorph headmorph, out string filePath)
         {
             var d = new OpenFileDialog
             {
@@ -1850,7 +1925,7 @@ defaultproperties
 
         public static void UpdateRonFromPskAndPsa(PackageEditorWindow pew)
         {
-            if (GetHeadmorphFromFile(pew, out var headMorph, out var ronFilePath))
+            if (GetHeadmorphFromFile(out var headMorph, out var ronFilePath))
             {
                 if (GetPskFromFile(pew, out var psk, out _))
                 {
@@ -2113,7 +2188,7 @@ defaultproperties
             return false;
         }
 
-        public static void ExportMorphTargetSet(PackageEditorWindow pew)
+        private static void ExportMorphTargetSet(PackageEditorWindow pew)
         {
             if (!GetSelectedItem(pew, "MorphTargetSet", out var morphTargetSet))
             {
@@ -2168,7 +2243,7 @@ defaultproperties
                     }
                 }
 
-                psk.ToFile(Path.Combine(folder, morphTargetSet.ObjectName + ".psk"));
+                psk.ToFile(Path.Combine(folder, morphTargetSet.ObjectName + ".pskx"));
 
                 // now, output the psa file and config file
                 var config = new StringBuilder();
