@@ -1,7 +1,9 @@
 ﻿using LegendaryExplorer.Dialogs;
 using LegendaryExplorer.Misc.ExperimentsTools;
+using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
 using LegendaryExplorerCore.Helpers;
+using LegendaryExplorerCore.Misc.ME3Tweaks;
 using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
 using LegendaryExplorerCore.Save;
@@ -687,6 +689,13 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
             // first, get the ron file imported
             if (GetHeadmorphFromFile(out var headmorph, out string filePath))
             {
+                // get an output for this file
+                var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
+                if (d.ShowDialog() != true)
+                {
+                    return;
+                }
+
                 // get the proper base head based on the number of vertices
                 SkeletalMesh baseHeadMesh = null;
                 // TODO finish implementing this
@@ -694,13 +703,45 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 switch (headmorph.Lod0Vertices.Count)
                 {
                     case 2232:
-                        // LE1/2 HMF
+                        // this is the LE1/2 HMF
+                        // first try to get the backup, then the base game path
+                        // TODO I could probably support individual OT games if I really wanted to, but I don't that much
+                        var basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE1) ?? MEDirectories.GetDefaultGamePath(MEGame.LE1);
+                        // append the rest of the stuff on there
+                        var proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMF_HED_PROMorph_R.pcc");
+                        // open the file
+                        var proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
+                        baseHeadMesh = proMorphFile.FindExport("Custom.HMF_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
+                        break;
                     case 2294:
-                        // LE1/2 HMM
+                        // this is the LE1/2 HMM
+                        // first try to get the backup, then the base game path
+                        basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE1) ?? MEDirectories.GetDefaultGamePath(MEGame.LE1);
+                        // append the rest of the stuff on there
+                        proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMM_HED_PROMorph.pcc");
+                        // open the file
+                        proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
+                        baseHeadMesh = proMorphFile.FindExport("Custom.HMM_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
+                        break;
                     case 2390:
-                        // LE3 HMF
+                        // this is the LE3 HMF
+                        // first try to get the backup, then the base game path
+                        basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3) ?? MEDirectories.GetDefaultGamePath(MEGame.LE3);
+                        // append the rest of the stuff on there
+                        proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMF_HED_PROMorph_R.pcc");
+                        // open the file
+                        proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
+                        baseHeadMesh = proMorphFile.FindExport("Custom.HMF_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
+                        break;
                     case 2392:
-                        // LE3 HMM
+                        // this is the LE3 HMM
+                        // first try to get the backup, then the base game path
+                        basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3) ?? MEDirectories.GetDefaultGamePath(MEGame.LE3);
+                        // append the rest of the stuff on there
+                        proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMM_HED_PROMorph.pcc");
+                        // open the file
+                        proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
+                        baseHeadMesh = proMorphFile.FindExport("Custom.HMM_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
                         break;
                     default:
                         // TODO check if there is a head in the accessory meshes from AMM LE3?
@@ -716,9 +757,71 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     psk.Points[i] = headmorph.Lod0Vertices[i] with { Y = -headmorph.Lod0Vertices[i].Y };
                 }
 
-                psk.ToFile(Path.GetFileNameWithoutExtension(filePath) + ".pskx");
+                psk.ToFile(d.FileName);
 
-                // TODO output the bone offsets as a psa file
+                // now, output the bone offsets as a psa file
+                var config = new StringBuilder();
+                config.AppendLine("[RemoveTracks]");
+                var psa = new PSA
+                {
+                    Bones = [],
+                    Infos = [],
+                    Keys = []
+                };
+
+                // add the ref skeleton into the thing
+                foreach (var bone in baseHeadMesh.RefSkeleton)
+                {
+                    psa.Bones.Add(new PSABone
+                    {
+                        Name = bone.Name,
+                        ParentIndex = bone.ParentIndex,
+                    });
+                }
+
+                psa.Infos.Add(new PSAAnimInfo
+                {
+                    Name = "BoneOffsets",
+                    Group = "None",
+                    TotalBones = baseHeadMesh.RefSkeleton.Length,
+                    KeyQuotum = baseHeadMesh.RefSkeleton.Length, // this would be multiplied by the number of frames, but there is just one frame
+                    TrackTime = 1,
+                    AnimRate = 1,
+                    FirstRawFrame = 0,
+                    NumRawFrames = 1
+                });
+
+                for (int i = 0; i < baseHeadMesh.RefSkeleton.Length; i++)
+                {
+                    var refBone = baseHeadMesh.RefSkeleton[i];
+
+                    // is this bone offset by this headmorph
+                    var rotQuat = new Quaternion(0, 0, 0, 1);
+                    var posVec = new Vector3(0, 0, 0);
+                    if (headmorph.OffsetBones.TryGetValue(refBone.Name, out var offset))
+                    {
+                        // do not output rotation when you import this one
+                        config.AppendLine($"BoneOffsets.{i}=rot");
+                        posVec = offset with { Y = -offset.Y };
+                    }
+                    else
+                    {
+                        // do not output anything when you import this one
+                        config.AppendLine($"BoneOffsets.{i}=all");
+                    }
+
+                    psa.Keys.Add(new PSAAnimKeys
+                    {
+                        Position = posVec,
+                        Rotation = rotQuat,
+                        Time = 30
+                    });
+                }
+
+                psa.ToFile(Path.Combine(Path.GetDirectoryName(d.FileName), Path.GetFileNameWithoutExtension(d.FileName) + ".psa"));
+
+                // also output a config file next to this to tell it to skip rotations for every sequence and every bone, and skip everythig for bones that aren't part of the pose
+                File.WriteAllText(Path.Combine(Path.GetDirectoryName(d.FileName), Path.GetFileNameWithoutExtension(d.FileName) + ".config"), config.ToString());
             }
         }
 

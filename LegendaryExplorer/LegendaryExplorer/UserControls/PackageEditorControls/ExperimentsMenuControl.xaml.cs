@@ -1343,7 +1343,7 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
 
         private void ExportRonToPsx_Click(object sender, RoutedEventArgs e)
         {
-            // TODO find the appropriate base head, export directly, or show an error if we can't find an appropriate base head
+            PackageEditorExperimentsSquid.RonFileToPsk(GetPEWindow());
         }
 
         // import a mesh like object
