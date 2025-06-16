@@ -238,6 +238,59 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         {
             Serialize(container);
         }
+
+
+        /// <summary>
+        /// Merges shader maps from this cache into the target one. Shader files are also merged (and replaced if existing).
+        /// </summary>
+        /// <param name="target">The target to merge into</param>
+        public void MergeInto(ShaderCache target, bool cleanup = false)
+        {
+            // Material shader maps
+            foreach (var shaderMap in MaterialShaderMaps)
+            {
+                // copy to target
+                target.MaterialShaderMaps[shaderMap.Key] = shaderMap.Value;
+            }
+
+            // Shader files
+            foreach (var shader in Shaders)
+            {
+                target.Shaders[shader.Key] = shader.Value;
+            }
+
+            if (cleanup)
+            {
+                target.Compact();
+            }
+        }
+
+        /// <summary>
+        /// Removes unreferenced Shader files 
+        /// </summary>
+        /// <returns>The amount of shaders removed</returns>
+        public int Compact()
+        {
+            int oldCount = Shaders.Count;
+            List<Guid> guidsToKeep = new List<Guid>();
+            foreach (var msm in MaterialShaderMaps)
+            {
+                foreach (var shaderRef in msm.Value.Shaders)
+                {
+                    guidsToKeep.Add(shaderRef.Value.Id);
+                }
+                foreach (var meshShaderMap in msm.Value.MeshShaderMaps)
+                {
+                    foreach (var meshShaderRef in meshShaderMap.Shaders)
+                    {
+                        guidsToKeep.Add(meshShaderRef.Value.Id);
+                    }
+                }
+            }
+            var newShaderList = Shaders.Where(x => guidsToKeep.Contains(x.Key));
+            Shaders = new(newShaderList);
+            return oldCount - Shaders.Count;
+        }
     }
 
     public class MaterialShaderMap
