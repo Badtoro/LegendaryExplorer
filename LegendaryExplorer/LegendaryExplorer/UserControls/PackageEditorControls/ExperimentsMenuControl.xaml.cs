@@ -1349,7 +1349,7 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
         // import a mesh like object
         private void ImportPskAsNewMesh_Click(object sender, RoutedEventArgs e)
         {
-            PackageEditorExperimentsSquid.ImportPskAsNewlMesh(GetPEWindow());
+            PackageEditorExperimentsSquid.ImportPskAsNewMesh(GetPEWindow());
         }
 
         // I need to simplify the interface for these at some point. 

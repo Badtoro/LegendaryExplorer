@@ -25,7 +25,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
     static internal class PackageEditorExperimentsSquid
     {
-        public static void ImportPskAsNewlMesh(PackageEditorWindow pew)
+        public static void ImportPskAsNewMesh(PackageEditorWindow pew)
         {
             if (GetPskFromFile(pew, out var psk, out var path))
             {
@@ -555,18 +555,18 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                         PSK.CreateFromSkeletalMesh(((ExportEntry)pew.SelectedItem.Entry).GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
                     }
                     return;
-                case "StaticMesh":
-                    ExportStaticMeshToPSKX(pew);
-                    return;
+                //case "StaticMesh":
+                //    ExportStaticMeshToPSKX(pew);
+                //    return;
                 case "BioMorphFace":
                     BioMorphFaceToPskAndPsa(pew);
                     return;
                 case "MorphTargetSet":
                     ExportMorphTargetSet(pew);
                     return;
-                // TODO support BrushComponent, FracturedStaticMesh, Stages, etc. There are a few other mesh like objects it might be nice to be able to edit, but very low priority?
+                // TODO support StaticMesh, BrushComponent, FracturedStaticMesh, Stages, etc. There are a few other mesh like objects it might be nice to be able to edit, but very low priority?
                 default:
-                    ShowError("You must open a pcc file and select a SkeletalMesh, StaticMesh, BioMorphFace, or MorphTargetSet for this experiment");
+                    ShowError("You must open a pcc file and select a SkeletalMesh, BioMorphFace, or MorphTargetSet for this experiment");
                     return;
             }
         }
