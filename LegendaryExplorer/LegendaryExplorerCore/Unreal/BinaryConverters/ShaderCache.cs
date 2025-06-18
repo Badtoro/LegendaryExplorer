@@ -38,7 +38,6 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             {
                 Game = game
             };
-            container.ActualGame = game;
             sc.Serialize(container);
             return sc;
         }
@@ -58,12 +57,24 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
             }
 
-            // I don't think we have a Serialize(uobject) method?
+            public override void Serialize(ref NameReference? name)
+            {
+                if (IsLoading)
+                {
+                    name = NameReference.FromInstancedString(ms.ReadUnrealString());
+                }
+                else if (name.HasValue)
+                {
+                    ms.Writer.WriteUnrealString(name.Value.Instanced, Game);
+                }
+                else
+                {
+                    // Can't serialize null name
+                    Debugger.Break();
+                }
+            }
 
-            /// <summary>
-            /// Game this container is for. Used for reserialization.
-            /// </summary>
-            public MEGame ActualGame { get; set; }
+            // I don't think we have a Serialize(uobject) method?
         }
 
         protected override void Serialize(SerializingContainer sc)
@@ -71,61 +82,43 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             if (!Packageless)
             {
                 if (sc.Pcc.Platform != MEPackage.GamePlatform.PC) return; //We do not support non-PC shader cache
-                if (sc.Game == MEGame.UDK)
-                {
-                    // Just default to 0, we aren't going to use this in ME
-                    int shaderCachePriority = 0;
-                    sc.Serialize(ref shaderCachePriority);
                 }
-
-                byte platform = sc.Game.IsLEGame() ? (byte)5 : (byte)0;
-                if (sc.Game == MEGame.UDK)
-                {
-                    // We do not support SM3 in UDK
-                    // Serialize as SM5
-                    platform = 4; // UDK SM5 is '4'
-                }
-                sc.Serialize(ref platform);
-            }
             else
             {
-                if (sc is PackagelessSerializingContainer gscsc)
-                {
                     // Global Shader Cache parsing.
                     // Requires special container as it does not have a package.
-                    if (gscsc.IsLoading)
+                if (sc.IsLoading)
                     {
-                        gscsc.ms.ReadStringASCII(4); // BMSG
+                    sc.ms.ReadStringASCII(4); // BMSG
                     }
                     else
                     {
-                        gscsc.ms.Writer.WriteStringASCII("BMSG");
+                    sc.ms.Writer.WriteStringASCII("BMSG");
                     }
 
-                    int version = UnrealPackageFile.UnrealVersion(gscsc.ActualGame);
-                    gscsc.Serialize(ref version);
-                    int licensee = UnrealPackageFile.LicenseeVersion(gscsc.ActualGame);
-                    gscsc.Serialize(ref licensee);
+                int version = UnrealPackageFile.UnrealVersion(sc.Game);
+                sc.Serialize(ref version);
+                int licensee = UnrealPackageFile.LicenseeVersion(sc.Game);
+                sc.Serialize(ref licensee);
                 }
+            if (sc.Game == MEGame.UDK)
+            {
+                // Just default to 0, we aren't going to use this in ME
+                int shaderCachePriority = 0;
+                sc.Serialize(ref shaderCachePriority);
+            }
 
-                // We only support editing this in LE
-                byte platform = 5;
+            byte platform = sc.Game.IsLEGame() ? (byte)5 : (byte)0;
                 if (sc.Game == MEGame.UDK)
                 {
-                    // Also technically UDK, not sure this would ever be useful
+                // We do not support SM3 in UDK
                     // Serialize as SM5
                     platform = 4; // UDK SM5 is '4'
                 }
                 sc.Serialize(ref platform);
-            }
+
 
             sc.Serialize(ref ShaderTypeCRCMap, sc.Serialize, sc.Serialize);
-            /*if (Packageless)
-            {
-                int zero = 0;
-                sc.Serialize(ref zero);
-            }
-            else*/
             if (sc.Game == MEGame.ME3 || sc.Game.IsLEGame())
             {
                 if (sc.IsLoading)
@@ -147,6 +140,9 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
                 else
                 {
+                    // should probably keep these... it is name to crc map
+                    // technically not important, but we've seen that burn 
+                    // us in the past
                     sc.ms.Writer.WriteInt32(0);
                 }
             }
@@ -156,6 +152,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
             }
 
+            // EMBEDDED SHADER FILES
             if (sc.IsLoading)
             {
                 int shaderCount = sc.ms.ReadInt32();
@@ -164,6 +161,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 {
                     Shader shader = null;
                     sc.Serialize(ref shader);
+                    Debug.WriteLine($"Shader stopped serializing at {sc.ms.Position:X8}");
                     Shaders.Add(shader.Guid, shader);
                 }
             }
@@ -177,18 +175,22 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
             }
 
-
+            // VertexFactoryType to CRC maps
             if (sc.Game != MEGame.ME1 && sc.Game != MEGame.UDK)
             {
                 sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
             }
 
+            // Shader maps (maps material guids to a map of diff shader types located in the embedded shaders block)
             sc.Serialize(ref MaterialShaderMaps, sc.Serialize, sc.Serialize);
+
 
             if (sc.Game is not (MEGame.ME2 or MEGame.LE2 or MEGame.LE1 or MEGame.UDK))
             {
-                int dummy = 0;
-                sc.Serialize(ref dummy);
+                // Technically this matters on console
+                // Technically we don't support them
+                int shaderCachePayloadsSize = 0;
+                sc.Serialize(ref shaderCachePayloadsSize);
             }
         }
         public static ShaderCache Create()

@@ -440,6 +440,23 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             }
         }
 
+        public virtual void Serialize(ref NameReference? name)
+        {
+            if (IsLoading)
+            {
+                name = ms.ReadNameReference(Pcc);
+            }
+            else if (name.HasValue)
+            {
+                ms.Writer.WriteNameReference(name.Value, Pcc);
+            }
+            else
+            {
+                // You can't write a null name.
+                Debugger.Break();
+            }
+        }
+
         public void Serialize(ref SharpDX.Color color)
         {
             if (IsLoading)
