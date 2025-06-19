@@ -995,9 +995,24 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             }
         }
 
-        //Ignores Endianness! Only use for Shader serialization
         public void SerializeUnmanaged<T>(ref T val) where T : unmanaged
         {
+            if (IsLoading)
+            {
+                ms.Read(val.AsBytes());
+            }
+            else
+            {
+                ms.Writer.Write(val.AsBytes());
+            }
+        }
+
+        //Ignores Endianness! Only use for Shader serialization
+        public void SerializeUnmanaged<T>(ref T val, string logging) where T : unmanaged
+        {
+#if DEBUG
+            Debug.WriteLine($"Serializing {logging} at {ms.Position:X8}");
+#endif
             if (IsLoading)
             {
                 ms.Read(val.AsBytes());
