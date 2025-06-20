@@ -173,6 +173,8 @@
         <MenuItem Header="Replace all wems" Click="ReplaceAllWems_Click"/>
     </MenuItem>
     <MenuItem Header="Squid's new and exciting ways to break stuff">
+        <MenuItem Header="Export AnimSet" Click="ExportAnimSet_Click" ToolTip="bulk export an entire animSet as a PSA"/>
+        <MenuItem Header="IMport AnimSet" Click="ImportAnimSet_Click" ToolTip="bulk import an entire animSet from a PSA"/>
         <MenuItem Header="Export Selected Item as PSKX/PSA" Click="ExportSelectedToPsx_Click" ToolTip="Exports the selected item as a pskx and sometimes a psa and config file. Works for SkeletalMesh, StaticMesh, BioMorphFace, and MorphTargetSet"/>
         <MenuItem Header="Ron File tools">
             <MenuItem Header="Export RON file as PSKX/PSA" Click="ExportRonToPsx_Click" ToolTip="Converts"/>

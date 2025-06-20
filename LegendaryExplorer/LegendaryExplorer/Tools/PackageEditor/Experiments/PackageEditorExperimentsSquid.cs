@@ -1,4 +1,7 @@
-﻿using LegendaryExplorer.Dialogs;
+﻿using CommunityToolkit.HighPerformance;
+using DocumentFormat.OpenXml.Office2021.Excel.NamedSheetViews;
+using LegendaryExplorer.Dialogs;
+using LegendaryExplorer.Misc;
 using LegendaryExplorer.Misc.ExperimentsTools;
 using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
@@ -25,6 +28,75 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
     static internal class PackageEditorExperimentsSquid
     {
+
+        public static void ExportAnimSet(PackageEditorWindow pew)
+        {
+            if (GetSelectedItem(pew, "AnimSet", out var animSetExport))
+            {
+                var d = new SaveFileDialog { Filter = "PSA|*.psa" };
+                if (d.ShowDialog() == true)
+                {
+                    //var data = animSetExport.GetProperty<ObjectProperty>("m_pBioAnimSetData").ResolveToEntry(pew.Pcc) as ExportEntry;
+                    // TODO any validation at all
+                    var sequences = animSetExport.GetProperty<ArrayProperty<ObjectProperty>>("Sequences").Select(x => (x.ResolveToEntry(pew.Pcc) as ExportEntry).GetBinaryData<AnimSequence>());
+
+                    var psa = PSA.CreateFrom([.. sequences]);
+
+                    psa.ToFile(d.FileName);
+                }
+            }
+            else
+            {
+                ShowError("please select an AnimSet to use this experiment");
+            }
+        }
+
+        public static void ImportAnimSet(PackageEditorWindow pew)
+        {
+            if(GetPsaFromFile(pew, out var psa, out var filePath))
+            {
+                var name = Path.GetFileNameWithoutExtension(filePath).Replace(" ", "_");
+                // first, create a new package export
+                var pkg = ExportCreator.CreatePackageExport(pew.Pcc, pew.Pcc.GetNextIndexedName(name + "_ex_a"));
+
+                // create an animSet, animSetData, and a list of sequences, one per animation in the psa
+                var animSet = ExportCreator.CreateExport(pew.Pcc, name, "AnimSet", pkg, indexed: false);
+                var animSetData = ExportCreator.CreateExport(pew.Pcc, name + "_BioAnimSetData", "BioAnimSetData", pkg, indexed: false);
+
+                animSet.WriteProperty(new ObjectProperty(animSetData, "m_pBioAnimSetData"));
+
+                animSetData.WriteProperty(new ArrayProperty<NameProperty>(psa.Bones.Select(x => new NameProperty(x.Name)), "TrackBoneNames"));
+
+                // not sure how important this is
+                animSetData.WriteProperty(new ArrayProperty<NameProperty>([new NameProperty("Root"), new NameProperty("Prop01"), new NameProperty("Prop02")], "UseTranslationBoneNames"));
+
+                var animSequences = psa.GetAnimSequences();
+
+                if (animSequences.IsEmpty())
+                {
+                    ShowError("this PSA contains no sequences.");
+                    return;
+                }
+
+                // TODO at least some compression formats are bugged; using None fixes it for now, but I want to test more
+                AnimationCompressionFormat rotationCompressionFormat = AnimationCompressionFormat.ACF_None;
+
+                List<ObjectProperty> sequenceExports = [];
+                foreach (AnimSequence seq in animSequences)
+                {
+                    var seqExp = ExportCreator.CreateExport(pew.Pcc, NameReference.FromInstancedString(seq.Name), "AnimSequence", pkg, indexed: false);
+                    var props = seqExp.GetProperties();
+                    seq.UpdateProps(props, pew.Pcc.Game, rotationCompressionFormat, forceUpdate: true);
+                    props.AddOrReplaceProp(new ObjectProperty(animSetData, "m_pBioAnimSetData"));
+                    seqExp.WriteProperties(props);
+                    seqExp.WriteBinary(seq);
+                    sequenceExports.Add(seqExp);
+                }
+
+                animSet.WriteProperty(new ArrayProperty<ObjectProperty>(sequenceExports, "Sequences"));
+            }
+        }
+
         public static void ImportPskAsNewMesh(PackageEditorWindow pew)
         {
             if (GetPskFromFile(pew, out var psk, out var path))

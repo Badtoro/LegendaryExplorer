@@ -1323,6 +1323,15 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
 
         // EXPERIMENTS: DropTheSquid
         #region DropTheSquid's Experiments
+        private void ExportAnimSet_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ExportAnimSet(GetPEWindow());
+        }
+
+        private void ImportAnimSet_Click(object sender, RoutedEventArgs e)
+        {
+            PackageEditorExperimentsSquid.ImportAnimSet(GetPEWindow());
+        }
 
         // AMM specific things:
         private void MakeCustomMorphTargetSet_Click(object sender, RoutedEventArgs e)
