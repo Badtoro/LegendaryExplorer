@@ -159,7 +159,7 @@ namespace LegendaryExplorerCore.Unreal
                         AnimTrack animTrack = animSeq.RawAnimationData[boneIdx];
                         Vector3 posVec = animTrack.Positions.Count > frameIdx ? animTrack.Positions[frameIdx] : animTrack.Positions[^1];
                         Quaternion rotQuat = animTrack.Rotations.Count > frameIdx ? animTrack.Rotations[frameIdx] : animTrack.Rotations[^1];
-                        rotQuat = new Quaternion(rotQuat.X * -1, rotQuat.Y, rotQuat.Z * -1, rotQuat.W);
+                        rotQuat = Quaternion.Normalize(new Quaternion(rotQuat.X * -1, rotQuat.Y, rotQuat.Z * -1, rotQuat.W));
                         posVec = posVec with { Y = posVec.Y * -1 };
                         psa.Keys.Add(new PSAAnimKeys
                         {
@@ -205,9 +205,11 @@ namespace LegendaryExplorerCore.Unreal
                     {
                         int srcIdx = ((info.FirstRawFrame + frameIdx) * boneCount) + boneIdx;
                         Vector3 posVec = Keys[srcIdx].Position;
-                        Quaternion rotQuat = Keys[srcIdx].Rotation;
+                        // you must normalize both before and after flipping the bits, or you can get nasty bugs
+                        // the normalization before is probably overkill, as most systems exporting PSA files should normalize
+                        Quaternion rotQuat = Quaternion.Normalize(Keys[srcIdx].Rotation);
                         track.Positions.Add(posVec with { Y = posVec.Y * -1 });
-                        track.Rotations.Add(new Quaternion(rotQuat.X * -1, rotQuat.Y, rotQuat.Z * -1, rotQuat.W));
+                        track.Rotations.Add(Quaternion.Normalize(new Quaternion(rotQuat.X * -1, rotQuat.Y, rotQuat.Z * -1, rotQuat.W)));
                     }
 
                     //if all keys are identical, replace with a single key

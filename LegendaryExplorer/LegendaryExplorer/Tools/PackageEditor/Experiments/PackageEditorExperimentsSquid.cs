@@ -1,7 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
-using DocumentFormat.OpenXml.Office2021.Excel.NamedSheetViews;
 using LegendaryExplorer.Dialogs;
-using LegendaryExplorer.Misc;
 using LegendaryExplorer.Misc.ExperimentsTools;
 using LegendaryExplorerCore.GameFilesystem;
 using LegendaryExplorerCore.Gammtek.Extensions.Collections.Generic;
@@ -78,15 +76,13 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     return;
                 }
 
-                // TODO at least some compression formats are bugged; using None fixes it for now, but I want to test more
-                AnimationCompressionFormat rotationCompressionFormat = AnimationCompressionFormat.ACF_None;
-
                 List<ObjectProperty> sequenceExports = [];
                 foreach (AnimSequence seq in animSequences)
                 {
                     var seqExp = ExportCreator.CreateExport(pew.Pcc, NameReference.FromInstancedString(seq.Name), "AnimSequence", pkg, indexed: false);
                     var props = seqExp.GetProperties();
-                    seq.UpdateProps(props, pew.Pcc.Game, rotationCompressionFormat, forceUpdate: true);
+                    // the compression format does not matter much, so we will use the one most comonly used by vanilla meshes which is the smallest one
+                    seq.UpdateProps(props, pew.Pcc.Game, AnimationCompressionFormat.ACF_BioFixed48, forceUpdate: true);
                     props.AddOrReplaceProp(new ObjectProperty(animSetData, "m_pBioAnimSetData"));
                     seqExp.WriteProperties(props);
                     seqExp.WriteBinary(seq);
