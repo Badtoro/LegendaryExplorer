@@ -85,6 +85,16 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 ms.Writer.WriteInt32(val);
         }
 
+        /// <summary>
+        /// This method can be overriden to change how object references are serialized.
+        /// By default, it just serializes as integer.
+        /// </summary>
+        /// <param name="val"></param>
+        public virtual void SerializeObjectRef(ref int val)
+        {
+            Serialize(ref val);
+        }
+
         public void SerializeConstInt(int val)
         {
             Serialize(ref val);
