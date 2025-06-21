@@ -1,8 +1,10 @@
 ﻿// ReSharper disable InconsistentNaming
 
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters.Shaders;
+[DebuggerDisplay("FShaderParameter BaseIndex: {BaseIndex} NumBytes: {NumBytes} BufferIndex: {BufferIndex}")]
 public struct FShaderParameter
 {
     public ushort BaseIndex;
@@ -16,6 +18,7 @@ public struct FShaderParameter
     } 
 }
 
+[DebuggerDisplay("FShaderResourceParameter BaseIndex: {BaseIndex} NumResources: {NumResources} SamplerIndex: {SamplerIndex}")]
 public struct FShaderResourceParameter
 {
     public ushort BaseIndex;
@@ -188,6 +191,8 @@ public struct FMaterialPixelShaderParameters
     //should these be calculated instead of stored?
     private int UniformPixelScalarShaderParameters_IsValid;
     private int UniformPixelVectorShaderParameters_IsValid;
+
+    // Appears to be BioWare specific as it is behind licensee check
     public FShaderParameter WrapLightingParameters;
     public void Serialize(SerializingContainer sc)
     {
