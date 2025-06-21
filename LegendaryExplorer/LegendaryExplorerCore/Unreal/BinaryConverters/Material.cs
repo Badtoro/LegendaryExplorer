@@ -1263,7 +1263,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             Serialize(ref mres.NumUserTexCoords);
             if (Game >= MEGame.ME3)
             {
-                Serialize(ref mres.UniformExpressionTextures, Serialize);
+                Serialize(ref mres.UniformExpressionTextures, SerializeObjectRef);
             }
             else
             {

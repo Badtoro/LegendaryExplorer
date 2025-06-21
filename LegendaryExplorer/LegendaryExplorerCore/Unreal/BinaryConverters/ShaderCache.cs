@@ -42,6 +42,14 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             return sc;
         }
 
+        /// <summary>
+        /// Serializer used by the GlobalShaderCache, to serialize name references as strings. This cannot serialize objects.
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <param name="pcc"></param>
+        /// <param name="isLoading"></param>
+        /// <param name="offset"></param>
+        /// <param name="packageCache"></param>
         public class PackagelessSerializingContainer(Stream stream, IMEPackage pcc, bool isLoading = false, int offset = 0, PackageCache packageCache = null) : SerializingContainer(stream, pcc, isLoading, offset, packageCache)
         {
             // Name references are directly written.
@@ -74,7 +82,45 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
             }
 
-            // I don't think we have a Serialize(uobject) method?
+            public override void SerializeObjectRef(ref int val)
+            {
+                throw new Exception(nameof(PackagelessSerializingContainer) + " cannot serialize object references.");
+            }
+        }
+
+        /// <summary>
+        /// SPECIAL SERIALIZER - Serializes names as strings, serializes objects in special format. This does NOT support serializing, only deserializing!
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <param name="pcc"></param>
+        /// <param name="isLoading"></param>
+        /// <param name="offset"></param>
+        /// <param name="packageCache"></param>
+        public class PackagelessWithObjectsSerializingContainer(Stream stream, IMEPackage pcc, bool isLoading = false, int offset = 0, PackageCache packageCache = null) : PackagelessSerializingContainer(stream, pcc, isLoading, offset, packageCache)
+        {
+            // Special deserialization method.
+            // Does NOT support writing serialization!
+
+            public override void SerializeObjectRef(ref int val)
+            {
+                if (!IsLoading)
+                {
+                    throw new Exception(nameof(PackagelessSerializingContainer) + " cannot be used to serialize object references when saving.");
+                }
+
+                var objectIfp = stream.ReadUnrealString();
+                var foundEntry = pcc.FindEntry(objectIfp);
+                if (foundEntry == null)
+                {
+                    Debug.WriteLine($"Could not found {objectIfp} in package, value will be set to null");
+                    val = 0;
+                }
+                else
+                {
+                    val = foundEntry.UIndex;
+                }
+
+            }
         }
 
         protected override void Serialize(SerializingContainer sc)
