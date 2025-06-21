@@ -66,6 +66,17 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             return offset;
         }
 
+        public void Serialize(ref int val, string logging)
+        {
+#if DEBUG
+            Debug.WriteLine($"Serializing {logging} at {ms.Position:X8}");
+#endif
+            if (IsLoading)
+                val = ms.ReadInt32();
+            else
+                ms.Writer.WriteInt32(val);
+        }
+
         public void Serialize(ref int val)
         {
             if (IsLoading)
