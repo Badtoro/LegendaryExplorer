@@ -26,34 +26,12 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 {
     static internal class PackageEditorExperimentsSquid
     {
-
-        public static void ExportAnimSet(PackageEditorWindow pew)
-        {
-            if (GetSelectedItem(pew, "AnimSet", out var animSetExport))
-            {
-                var d = new SaveFileDialog { Filter = "PSA|*.psa" };
-                if (d.ShowDialog() == true)
-                {
-                    //var data = animSetExport.GetProperty<ObjectProperty>("m_pBioAnimSetData").ResolveToEntry(pew.Pcc) as ExportEntry;
-                    // TODO any validation at all
-                    var sequences = animSetExport.GetProperty<ArrayProperty<ObjectProperty>>("Sequences").Select(x => (x.ResolveToEntry(pew.Pcc) as ExportEntry).GetBinaryData<AnimSequence>());
-
-                    var psa = PSA.CreateFrom([.. sequences]);
-
-                    psa.ToFile(d.FileName);
-                }
-            }
-            else
-            {
-                ShowError("please select an AnimSet to use this experiment");
-            }
-        }
-
         public static void ImportAnimSet(PackageEditorWindow pew)
         {
             if(GetPsaFromFile(pew, out var psa, out var filePath))
             {
                 var name = Path.GetFileNameWithoutExtension(filePath).Replace(" ", "_");
+
                 // first, create a new package export
                 var pkg = ExportCreator.CreatePackageExport(pew.Pcc, pew.Pcc.GetNextIndexedName(name + "_ex_a"));
 
@@ -623,29 +601,69 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                         PSK.CreateFromSkeletalMesh(((ExportEntry)pew.SelectedItem.Entry).GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
                     }
                     return;
+                case "animSet":
+                case "BioDynamicAnimSet":
+                    ExportAnimSet(pew);
+                    return;
+                case "animSequence":
+                    ExportAnimSequence(pew);
+                    return;
                 //case "StaticMesh":
                 //    ExportStaticMeshToPSKX(pew);
                 //    return;
                 case "BioMorphFace":
-                    BioMorphFaceToPskAndPsa(pew);
+                    BioMorphFaceToPskxAndPsa(pew);
                     return;
                 case "MorphTargetSet":
                     ExportMorphTargetSet(pew);
                     return;
-                // TODO support StaticMesh, BrushComponent, FracturedStaticMesh, Stages, etc. There are a few other mesh like objects it might be nice to be able to edit, but very low priority?
+                // TODO support StaticMesh, BrushComponent, FracturedStaticMesh, etc. There are a few other mesh like objects it might be nice to be able to edit, but very low priority?
                 default:
-                    ShowError("You must open a pcc file and select a SkeletalMesh, BioMorphFace, or MorphTargetSet for this experiment");
+                    ShowError("You must open a pcc file and select a SkeletalMesh, BioMorphFace, MorphTargetSet, AnimSet, or AnimSequence for this experiment");
                     return;
             }
         }
 
-        private static void ExportStaticMeshToPSKX(PackageEditorWindow pew)
+        private static void ExportAnimSequence(PackageEditorWindow pew)
         {
-            // TODO implement this
-            throw new NotImplementedException("I haven't implemented exporting static meshes yet.");
+            if (GetSelectedItem(pew, "AnimSequence", out var animSeqExport))
+            {
+                var d = new SaveFileDialog { Filter = "PSA|*.psa" };
+                if (d.ShowDialog() == true)
+                {
+                    // TODO any validation at all
+                    var psa = PSA.CreateFrom(animSeqExport.GetBinaryData<AnimSequence>());
+
+                    psa.ToFile(d.FileName);
+                }
+            }
         }
 
-        private static void BioMorphFaceToPskAndPsa(PackageEditorWindow pew)
+        private static void ExportAnimSet(PackageEditorWindow pew)
+        {
+            if (GetSelectedItem(pew, ["AnimSet", "BioDynamicAnimSet"], out var animSetExport))
+            {
+                var d = new SaveFileDialog { Filter = "PSA|*.psa" };
+                if (d.ShowDialog() == true)
+                {
+                    //var data = animSetExport.GetProperty<ObjectProperty>("m_pBioAnimSetData").ResolveToEntry(pew.Pcc) as ExportEntry;
+                    // TODO any validation at all
+                    var sequences = animSetExport.GetProperty<ArrayProperty<ObjectProperty>>("Sequences").Select(x => (x.ResolveToEntry(pew.Pcc) as ExportEntry).GetBinaryData<AnimSequence>());
+
+                    var psa = PSA.CreateFrom([.. sequences]);
+
+                    psa.ToFile(d.FileName);
+                }
+            }
+        }
+
+        //private static void ExportStaticMeshToPSKX(PackageEditorWindow pew)
+        //{
+        //    // TODO implement this
+        //    throw new NotImplementedException("I haven't implemented exporting static meshes yet.");
+        //}
+
+        private static void BioMorphFaceToPskxAndPsa(PackageEditorWindow pew)
         {
             // get the selected bmf and ensure it has a base head mesh
             if (!GetSelectedItem(pew, "BioMorphFace", out var bmf) || bmf.GetProperty<ObjectProperty>("m_oBaseHead") == null)
@@ -654,15 +672,9 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 return;
             }
 
-            var folderDialog = new OpenFolderDialog()
+            var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
+            if (d.ShowDialog() == true)
             {
-                Multiselect = false,
-                Title = "Choose a folder for the output"
-            };
-
-            if (folderDialog.ShowDialog() == true)
-            {
-                var folder = folderDialog.FolderName;
 
                 var baseHeadMesh = pew.Pcc.GetEntry(bmf.GetProperty<ObjectProperty>("m_oBaseHead").Value) as ExportEntry;
                 var baseMeshBin = baseHeadMesh.GetBinaryData<SkeletalMesh>();
@@ -679,7 +691,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     psk.Points[i] = bmfPoint with { Y = -bmfPoint.Y };
                 }
 
-                psk.ToFile(Path.Combine(folder, bmf.ObjectName + ".pskx"));
+                psk.ToFile(d.FileName);
 
 
                 // now, output the psa file and config file
@@ -745,14 +757,14 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     });
                 }
 
-                psa.ToFile(Path.Combine(folder, bmf.ObjectName + ".psa"));
+                psa.ToFile(Path.ChangeExtension(d.FileName, "psa"));
 
                 // also output a config file next to this to tell it to skip rotations for every sequence and every bone, and skip everythig for bones that aren't part of the pose
-                File.WriteAllText(Path.Combine(folder, bmf.ObjectName + ".config"), config.ToString());
+                File.WriteAllText(Path.ChangeExtension(d.FileName, "config"), config.ToString());
             }
         }
 
-        public static void RonFileToPsk(PackageEditorWindow pew)
+        public static void RonFileToPskx(PackageEditorWindow pew)
         {
             // first, get the ron file imported
             if (GetHeadmorphFromFile(out var headmorph, out string filePath))
@@ -886,10 +898,10 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     });
                 }
 
-                psa.ToFile(Path.Combine(Path.GetDirectoryName(d.FileName), Path.GetFileNameWithoutExtension(d.FileName) + ".psa"));
+                psa.ToFile(Path.ChangeExtension(d.FileName, "psa"));
 
                 // also output a config file next to this to tell it to skip rotations for every sequence and every bone, and skip everythig for bones that aren't part of the pose
-                File.WriteAllText(Path.Combine(Path.GetDirectoryName(d.FileName), Path.GetFileNameWithoutExtension(d.FileName) + ".config"), config.ToString());
+                File.WriteAllText(Path.ChangeExtension(d.FileName, "config"), config.ToString());
             }
         }
 
@@ -1397,7 +1409,7 @@ defaultproperties
             MessageBox.Show(errMsg, "Warning", MessageBoxButton.OK);
         }
 
-        public static void BioMorphFaceToMesh(PackageEditorWindow pew)
+        public static void BioMorphFaceToUniqueSkeletalMesh(PackageEditorWindow pew)
         {
             // make sure something is selected, a package is open ,and the right thing is selected
             if (!GetSelectedItem(pew, "BioMorphFace", out var bmf) || bmf.GetProperty<ObjectProperty>("m_oBaseHead") == null)
@@ -1941,20 +1953,6 @@ defaultproperties
             }
         }
 
-        public static void MeshToPsk(PackageEditorWindow pew)
-        {
-            if (!GetSelectedItem(pew, "SkeletalMesh", out var skelMeshExport))
-            {
-                ShowError("You must select a SkeletalMesh to use this experiment");
-                return;
-            }
-            var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
-            if (d.ShowDialog() == true)
-            {
-                PSK.CreateFromSkeletalMesh(skelMeshExport.GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
-            }
-        }
-
         public static void ImportRonToBmf(PackageEditorWindow pew)
         {
             var d = new OpenFileDialog
@@ -2378,16 +2376,9 @@ defaultproperties
             var baseMeshBin = baseMesh.GetBinaryData<SkeletalMesh>();
             var targets = morphTargetSet.GetProperty<ArrayProperty<ObjectProperty>>("Targets");
 
-            var folderDialog = new OpenFolderDialog()
+            var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
+            if (d.ShowDialog() == true)
             {
-                Multiselect = false,
-                Title = "Choose a folder for the output"
-            };
-
-            if (folderDialog.ShowDialog() == true)
-            {
-                var folder = folderDialog.FolderName;
-
                 // output the special psk into a file with the name of the base head
                 // make most of the psk from the base skeletal mesh
                 var psk = PSK.CreateFromSkeletalMesh(baseMeshBin, 0, true);
@@ -2414,7 +2405,7 @@ defaultproperties
                     }
                 }
 
-                psk.ToFile(Path.Combine(folder, morphTargetSet.ObjectName + ".pskx"));
+                psk.ToFile(d.FileName);
 
                 // now, output the psa file and config file
                 var config = new StringBuilder();
@@ -2489,21 +2480,24 @@ defaultproperties
                     }
                 }
 
-                psa.ToFile(Path.Combine(folder, morphTargetSet.ObjectName + ".psa"));
+                psa.ToFile(Path.ChangeExtension(d.FileName, "psa"));
 
                 // also output a config file next to this to tell it to skip rotations for every sequence and every bone
-                File.WriteAllText(Path.Combine(folder, morphTargetSet.ObjectName + ".config"), config.ToString());
+                File.WriteAllText(Path.ChangeExtension(d.FileName, "config"), config.ToString());
             }
-
-            //MessageBox.Show("Done.");
         }
 
         private static bool GetSelectedItem(PackageEditorWindow pew, string expectedType, out ExportEntry entry)
         {
+            return GetSelectedItem(pew, [expectedType], out entry);
+        }
+
+        private static bool GetSelectedItem(PackageEditorWindow pew, string[] expectedTypes, out ExportEntry entry)
+        {
             entry = null;
             if (pew.SelectedItem == null || pew.SelectedItem.Entry == null || pew.Pcc == null) { return false; }
 
-            if (pew.SelectedItem.Entry.ClassName != expectedType)
+            if (!expectedTypes.Contains(pew.SelectedItem.Entry.ClassName))
             {
                 return false;
             }

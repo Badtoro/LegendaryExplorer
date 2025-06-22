@@ -1323,11 +1323,6 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
 
         // EXPERIMENTS: DropTheSquid
         #region DropTheSquid's Experiments
-        private void ExportAnimSet_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.ExportAnimSet(GetPEWindow());
-        }
-
         private void ImportAnimSet_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.ImportAnimSet(GetPEWindow());
@@ -1352,7 +1347,7 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
 
         private void ExportRonToPsx_Click(object sender, RoutedEventArgs e)
         {
-            PackageEditorExperimentsSquid.RonFileToPsk(GetPEWindow());
+            PackageEditorExperimentsSquid.RonFileToPskx(GetPEWindow());
         }
 
         // import a mesh like object
@@ -1371,11 +1366,6 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.MakeHeterochromiaMesh(GetPEWindow());
         }
 
-        private void ExportMeshToPsk_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.MeshToPsk(GetPEWindow());
-        }
-
         private void ImportRonToBmf_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.ImportRonToBmf(GetPEWindow());
@@ -1388,7 +1378,7 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
 
         private void MorphFaceToMesh_Click(object sender, RoutedEventArgs e)
         {
-            PackageEditorExperimentsSquid.BioMorphFaceToMesh(GetPEWindow());
+            PackageEditorExperimentsSquid.BioMorphFaceToUniqueSkeletalMesh(GetPEWindow());
         }
 
         private void ReplaceMeshFromPSK_Click(object sender, RoutedEventArgs e)

@@ -173,28 +173,23 @@
         <MenuItem Header="Replace all wems" Click="ReplaceAllWems_Click"/>
     </MenuItem>
     <MenuItem Header="Squid's new and exciting ways to break stuff">
-        <MenuItem Header="Export AnimSet" Click="ExportAnimSet_Click" ToolTip="bulk export an entire animSet as a PSA"/>
-        <MenuItem Header="IMport AnimSet" Click="ImportAnimSet_Click" ToolTip="bulk import an entire animSet from a PSA"/>
-        <MenuItem Header="Export Selected Item as PSKX/PSA" Click="ExportSelectedToPsx_Click" ToolTip="Exports the selected item as a pskx and sometimes a psa and config file. Works for SkeletalMesh, StaticMesh, BioMorphFace, and MorphTargetSet"/>
+        <MenuItem Header="Export Selected Item as PSKX/PSA" Click="ExportSelectedToPsx_Click" ToolTip="Exports the selected item as a pskx and/or psa and config file. Works for SkeletalMesh, BioMorphFace, MorphTargetSet, AnimSet, BioDynamicAnimSet, and AnimSequence"/>
         <MenuItem Header="Ron File tools">
             <MenuItem Header="Export RON file as PSKX/PSA" Click="ExportRonToPsx_Click" ToolTip="Converts"/>
             <MenuItem Header="import ron to BioMorphFace" Click="ImportRonToBmf_Click" ToolTip="Imports a Ron file as a BioMorphFace; assets will be linked if they are in the file. "/>
             <MenuItem Header="export BioMorphFace to ron" Click="ExportBmfToRon_Click" ToolTip="Export a BioMorphFace to a ron file"/>
             <MenuItem Header="replace ron vertex + bone data from psk + psa" Click="UpdateRonFromPskAndPsa_Click" ToolTip="Updates the vertex positions in a ron file with those from a psk"/>
-            <!-- TODO export BMF as ron file -->
         </MenuItem>
-        <MenuItem Header="Import Mesh">
+        <MenuItem Header="Import Mesh/Animation">
             <MenuItem Header="Import PSK/PSKX as new mesh" Click="ImportPskAsNewMesh_Click" ToolTip="Directly imports a psk/pskx file as a new skeletal/static mesh depending on whether it has a skeleton or not"/>
+            <MenuItem Header="Replace mesh data from psk/pskx" Click="ReplaceMeshFromPSK_Click" ToolTip="Replaces some of the mesh data from a psk to avoid needing to go through UModel, which  messes up vertex count and order. only use if you need it."/>
             <MenuItem Header="Add/Update a new MorphTarget from a psk + psa" Click="AddNewMorphTargetFromPskAndPsa_Click" ToolTip="Converts a psk to a morph target as a delta to the base mesh. select a morphTargetSet to use this. "/>
             <MenuItem Header="import psk + psa to BioMorphFace" Click="ImportPskAndPsaToBmf_Click" ToolTip="Applies the vetex positions from a psk file onto a BioMorphFace. "/>
+            <MenuItem Header="Import AnimSet" Click="ImportAnimSet_Click" ToolTip="bulk import an entire animSet from a PSA"/>
         </MenuItem>
         <MenuItem Header="Convert stuff">
             <MenuItem Header="Convert BioMorphFace to a unique mesh" Click="MorphFaceToMesh_Click" ToolTip="Converts a BioMoprhFace to a new mesh with the vertices and materials applied, which can then be edited in external programs"/>
             <MenuItem Header="Convert Head Mesh to Have Separate Eye Materials" Click="MakeHeterochromia_Click" ToolTip="Converts a head mesh to have separate eye materials while maintaining vertex count and order. This will affect all LODs. Make sure the materials are properly mapped and show up correctly in preview."/>
-        </MenuItem>
-        <MenuItem Header="To Be Removed">
-            <MenuItem Header="Replace mesh data from psk" Click="ReplaceMeshFromPSK_Click" ToolTip="Replaces some of the mesh data from a psk to avoid needing to go through UModel, which  messes up vertex count and order. only use if you need it."/>
-            <!-- <MenuItem Header="Smooth Mesh Seams" Click="SmoothMeshSeams_Click" ToolTip="Attempts to smooth seams between two meshes by copying the vertex normals from one mesh to the other where vertices are in the same positions. "/> -->
         </MenuItem>
         <MenuItem Header="AMM stuff">
             <MenuItem Header="Get Mesh Material paths" Click="GetMeshMaterials_Click" ToolTip="Copies all the material memory paths to clipboard; useful for making AMM LE1 configs."/>
