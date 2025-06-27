@@ -20,6 +20,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Windows;
+using static LegendaryExplorerCore.Packages.CloningImportingAndRelinking.EntryImporter;
 using static LegendaryExplorerCore.Unreal.PSA;
 
 namespace LegendaryExplorer.Tools.PackageEditor.Experiments
@@ -73,6 +74,14 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
 
         public static void ImportPskAsNewMesh(PackageEditorWindow pew)
         {
+            if (pew.Pcc.Game == MEGame.ME1)
+            {
+                ShowError("This experiment does not yet support OT1; if you must do this, import it into another game and port it to OT1");
+            }
+            if (pew.Pcc.Game == MEGame.UDK)
+            {
+                ShowError("This experiment does not support UDK files;");
+            }
             if (GetPskFromFile(pew, out var psk, out var path))
             {
                 if (!psk.Bones.Any())
@@ -204,7 +213,6 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     {
                         Name = currentBone.Name,
                         NumChildren = currentBone.NumChildren,
-                        // TODO do I need this?
                         BoneColor = new LegendaryExplorerCore.SharpDX.Color(new Vector4(1, 1, 1, 1)),
                         Flags = currentBone.Flags,
                         ParentIndex = currentBone.ParentIndex,
@@ -601,7 +609,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                         PSK.CreateFromSkeletalMesh(((ExportEntry)pew.SelectedItem.Entry).GetBinaryData<SkeletalMesh>(), 0, true).ToFile(d.FileName);
                     }
                     return;
-                case "animSet":
+                case "AnimSet":
                 case "BioDynamicAnimSet":
                     ExportAnimSet(pew);
                     return;
@@ -648,7 +656,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 {
                     //var data = animSetExport.GetProperty<ObjectProperty>("m_pBioAnimSetData").ResolveToEntry(pew.Pcc) as ExportEntry;
                     // TODO any validation at all
-                    var sequences = animSetExport.GetProperty<ArrayProperty<ObjectProperty>>("Sequences").Select(x => (x.ResolveToEntry(pew.Pcc) as ExportEntry).GetBinaryData<AnimSequence>());
+                    var sequences = animSetExport.GetProperty<ArrayProperty<ObjectProperty>>("Sequences").Select(x => (x.ResolveToExport(pew.Pcc, new PackageCache())).GetBinaryData<AnimSequence>());
 
                     var psa = PSA.CreateFrom([.. sequences]);
 
@@ -764,69 +772,140 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
             }
         }
 
-        public static void RonFileToPskx(PackageEditorWindow pew)
+        private static bool GetHeadmorphBaseHead(HeadMorph headmorph, MEGame game, out SkeletalMesh baseHeadMesh, out bool isFemaleMorph, out bool gameMismatch)
+        {
+            baseHeadMesh = null;
+            isFemaleMorph = false;
+            gameMismatch = false;
+            // not supported, makes no sense
+            if (game == MEGame.UDK || game == MEGame.LELauncher)
+            {
+                gameMismatch = true;
+                return false;
+            }
+
+            // determine which game (1/2 [identical] or 3) and gender it is
+            bool isGame3Morph;
+            switch (headmorph.Lod0Vertices.Count)
+            {
+                case 2232:
+                    // this is the ME1/2 HMF
+                    isGame3Morph = false;
+                    isFemaleMorph = true;
+                    break;
+                case 2294:
+                    // this is the ME1/2 HMH
+                    isGame3Morph = false;
+                    isFemaleMorph = false;
+                    break;
+                case 2390:
+                    // this is the ME3 HMF
+                    isGame3Morph = true;
+                    isFemaleMorph = true;
+                    break;
+                case 2392:
+                    // this is the ME3 HMM
+                    isGame3Morph = true;
+                    isFemaleMorph = false;
+                    break;
+                default:
+                    // unknown game and gender based on vert count
+                    return false;
+            }
+
+            // if we don't have a specific game we are going for, find a suitable one
+            if (game == MEGame.Unknown)
+            {
+                if (isGame3Morph)
+                {
+                    if (ME3TweaksBackups.GetGameBackupPath(MEGame.LE3) != null || LE3Directory.DefaultGamePath != null)
+                    {
+                        game = MEGame.LE3;
+                    }
+                    else if (ME3TweaksBackups.GetGameBackupPath(MEGame.ME3) != null || ME3Directory.DefaultGamePath != null)
+                    {
+                        game = MEGame.ME3;
+                    }
+                    else
+                    {
+                        // this is an ME3 morph, but neither OT3 or LE3 are intalled or have a backup
+                        return false;
+                    }
+                }
+                else
+                {
+                    // this is a ME1/2 morph; look for a source for the mesh going LE1, LE2, ME2, ME1 in that order
+                    if (ME3TweaksBackups.GetGameBackupPath(MEGame.LE1) != null || LE1Directory.DefaultGamePath != null)
+                    {
+                        game = MEGame.LE1;
+                    }
+                    else if (ME3TweaksBackups.GetGameBackupPath(MEGame.LE2) != null || LE2Directory.DefaultGamePath != null)
+                    {
+                        game = MEGame.LE2;
+                    }
+                    else if (ME3TweaksBackups.GetGameBackupPath(MEGame.ME2) != null || ME2Directory.DefaultGamePath != null)
+                    {
+                        game = MEGame.ME2;
+                    }
+                    else if (ME3TweaksBackups.GetGameBackupPath(MEGame.ME1) != null || ME1Directory.DefaultGamePath != null)
+                    {
+                        game = MEGame.ME1;
+                    }
+                    else
+                    {
+                        // this is an ME1/2 morph, but neither OT1/2 or LE1/2 are intalled or have a backup
+                        return false;
+                    }
+                }
+            }
+
+            // this will identify an ME3 morph going into ME1/2 or vice versa
+            // this is almost certainly a mistake, and if it not, you can do the extra step of putting it in the right game then porting it over
+            if (isGame3Morph ^ game.IsGame3())
+            {
+                gameMismatch = true;
+                return false;
+            }
+
+            // the path to the file containing the mesh
+            string packageFilePath = null;
+            // the path to the mesh within the file (consistent in all games)
+            string exportPath = isFemaleMorph ? "BIOG_HMF_HED_PROMorph_R.Custom.HMF_HED_PROCustom_MDL" : "BIOG_HMM_HED_PROMorph.Custom.HMM_HED_PROCustom_MDL";
+            var basePath = ME3TweaksBackups.GetGameBackupPath(game) ?? MEDirectories.GetDefaultGamePath(game);
+            switch (game)
+            {
+                case MEGame.ME1:
+                    packageFilePath = Path.Combine(basePath, $"BioGame\\CookedPC\\Maps\\EntryMenu.SFM");
+                    break;
+                case MEGame.ME2:
+                case MEGame.LE1:
+                case MEGame.LE2:
+                    // identical for LE1/2
+                    packageFilePath = Path.Combine(basePath, $"BioGame\\{MEDirectories.CookedName(game)}\\BIOG_MORPH_FACE.pcc");
+                    break;
+                case MEGame.ME3:
+                case MEGame.LE3:
+                    // identical for ME3 and LE3
+                    packageFilePath = Path.Combine(basePath, $"BioGame\\CookedPCConsole\\BioP_Char.pcc");
+                    break;
+            }
+
+            // TODO unsafe partial load for performance?
+            var proMorphFile = MEPackageHandler.OpenMEPackage(packageFilePath);
+            baseHeadMesh = proMorphFile.FindExport(exportPath).GetBinaryData<SkeletalMesh>();
+            return true;
+        }
+
+        public static void RonFileToPskx(PackageEditorWindow _)
         {
             // first, get the ron file imported
-            if (GetHeadmorphFromFile(out var headmorph, out string filePath))
+            if (GetHeadmorphFromFile(out var headmorph, out var _))
             {
-                // get an output for this file
-                var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
-                if (d.ShowDialog() != true)
+                if (!GetHeadmorphBaseHead(headmorph, MEGame.Unknown, out var baseHeadMesh, out var _, out var _))
                 {
+                    // TODO check if there is a head in the accessory meshes from AMM LE3?
+                    ShowError("unable to find base head; please convert to BioMorphFace and apply the base head then export that instead");
                     return;
-                }
-
-                // get the proper base head based on the number of vertices
-                SkeletalMesh baseHeadMesh = null;
-                // TODO finish implementing this
-                // go to the backup (if available) for the base head; otherwise go to the basegame file, and grab the base head mesh
-                switch (headmorph.Lod0Vertices.Count)
-                {
-                    case 2232:
-                        // this is the LE1/2 HMF
-                        // first try to get the backup, then the base game path
-                        // TODO I could probably support individual OT games if I really wanted to, but I don't that much
-                        var basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE1) ?? MEDirectories.GetDefaultGamePath(MEGame.LE1);
-                        // append the rest of the stuff on there
-                        var proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMF_HED_PROMorph_R.pcc");
-                        // open the file
-                        var proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
-                        baseHeadMesh = proMorphFile.FindExport("Custom.HMF_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
-                        break;
-                    case 2294:
-                        // this is the LE1/2 HMM
-                        // first try to get the backup, then the base game path
-                        basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE1) ?? MEDirectories.GetDefaultGamePath(MEGame.LE1);
-                        // append the rest of the stuff on there
-                        proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMM_HED_PROMorph.pcc");
-                        // open the file
-                        proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
-                        baseHeadMesh = proMorphFile.FindExport("Custom.HMM_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
-                        break;
-                    case 2390:
-                        // this is the LE3 HMF
-                        // first try to get the backup, then the base game path
-                        basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3) ?? MEDirectories.GetDefaultGamePath(MEGame.LE3);
-                        // append the rest of the stuff on there
-                        proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMF_HED_PROMorph_R.pcc");
-                        // open the file
-                        proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
-                        baseHeadMesh = proMorphFile.FindExport("Custom.HMF_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
-                        break;
-                    case 2392:
-                        // this is the LE3 HMM
-                        // first try to get the backup, then the base game path
-                        basePath = ME3TweaksBackups.GetGameBackupPath(MEGame.LE3) ?? MEDirectories.GetDefaultGamePath(MEGame.LE3);
-                        // append the rest of the stuff on there
-                        proMorphPath = Path.Combine(basePath, "BioGame\\CookedPCConsole\\BIOG_HMM_HED_PROMorph.pcc");
-                        // open the file
-                        proMorphFile = MEPackageHandler.OpenMEPackage(proMorphPath);
-                        baseHeadMesh = proMorphFile.FindExport("Custom.HMM_HED_PROCustom_MDL").GetBinaryData<SkeletalMesh>();
-                        break;
-                    default:
-                        // TODO check if there is a head in the accessory meshes from AMM LE3?
-                        ShowError("unable to find base head; please convert to BioMorphFace and apply the base head then export that instead");
-                        return;
                 }
 
                 var psk = PSK.CreateFromSkeletalMesh(baseHeadMesh, includeVertexNormals: true);
@@ -835,6 +914,13 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 for (int i = 0; i < headmorph.Lod0Vertices.Count; i++)
                 {
                     psk.Points[i] = headmorph.Lod0Vertices[i] with { Y = -headmorph.Lod0Vertices[i].Y };
+                }
+
+                // get an output for this file
+                var d = new SaveFileDialog { Filter = "PSKX|*.pskx" };
+                if (d.ShowDialog() != true)
+                {
+                    return;
                 }
 
                 psk.ToFile(d.FileName);
@@ -1442,20 +1528,34 @@ defaultproperties
             }
 
             // next, copy the vertices from the bioMorphFace binary to the mesh binary
-            var bmfBinary = bmf.GetBinaryData<LegendaryExplorerCore.Unreal.BinaryConverters.BioMorphFace>();
+            var bmfBinary = bmf.GetBinaryData<BioMorphFace>();
 
             for (int lodIndex = 0; lodIndex < bmfBinary.LODs.Length && lodIndex < newHeadBinary.LODModels.Length; lodIndex++)
             {
                 var lod = bmfBinary.LODs[lodIndex];
                 var meshData = newHeadBinary.LODModels[lodIndex];
 
-                for (int i = 0; i < lod.Length && i < meshData.VertexBufferGPUSkin.VertexData.Length; i++)
+                if (pew.Pcc.Game == MEGame.ME1)
                 {
-                    var bmfVert = lod[i];
+                    for (int i = 0; i < lod.Length && i < meshData.ME1VertexBufferGPUSkin.Length; i++)
+                    {
+                        var bmfVert = lod[i];
 
-                    meshData.VertexBufferGPUSkin.VertexData[i].Position.X = bmfVert.X;
-                    meshData.VertexBufferGPUSkin.VertexData[i].Position.Y = bmfVert.Y;
-                    meshData.VertexBufferGPUSkin.VertexData[i].Position.Z = bmfVert.Z;
+                        meshData.ME1VertexBufferGPUSkin[i].Position.X = bmfVert.X;
+                        meshData.ME1VertexBufferGPUSkin[i].Position.Y = bmfVert.Y;
+                        meshData.ME1VertexBufferGPUSkin[i].Position.Z = bmfVert.Z;
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < lod.Length && i < meshData.VertexBufferGPUSkin.VertexData.Length; i++)
+                    {
+                        var bmfVert = lod[i];
+
+                        meshData.VertexBufferGPUSkin.VertexData[i].Position.X = bmfVert.X;
+                        meshData.VertexBufferGPUSkin.VertexData[i].Position.Y = bmfVert.Y;
+                        meshData.VertexBufferGPUSkin.VertexData[i].Position.Z = bmfVert.Z;
+                    }
                 }
             }
 
@@ -1467,7 +1567,8 @@ defaultproperties
             var newBmfBinary = newBmf.GetBinaryData<BioMorphFace>();
             newBmfBinary.LODs = [];
             newBmf.WriteBinary(newBmfBinary);
-            // TODO remove the morph features (useless), point the base head to the new mesh
+            newBmf.RemoveProperty("m_aMorphFeatures");
+            newBmf.WriteProperty(new ObjectProperty(newHeadEntry, "m_oBaseHead"));
         }
 
         private static char NumToLetter(int input)
@@ -1658,235 +1759,6 @@ defaultproperties
             return false;
         }
 
-        public static void ReplaceMeshDataFromPsk(PackageEditorWindow pew)
-        {
-            if (GetSelectedMeshBinary(pew, out var meshExport, out var meshBin)
-                && GetPskFromFile(pew, out var psk, out _))
-            {
-                if (psk.Points.Count != meshBin.LODModels[0].NumVertices)
-                {
-                    ShowError("the number of vertices in the mesh (LOD 0) and the psk must match.");
-                    return;
-                }
-
-                if (psk.Points.Count != psk.Wedges.Count)
-                {
-                    ShowError("Can't import this psk; number of points and wedges differ. You probably created new material or UV seams, which will break morph targets");
-                    return;
-                }
-
-
-                // make sure the skeletons match; we may need to update that from the psk so positions, rotations, etc match
-                foreach (var bone in meshBin.RefSkeleton)
-                {
-                    var pskBone = psk.Bones.FirstOrDefault(x => x.Name == bone.Name);
-                    bone.Position = pskBone.Position with { Y = -pskBone.Position.Y };
-                    bone.Orientation = pskBone.Rotation with { Y = -pskBone.Rotation.Y };
-                    // TODO I could probably have it update the structure but it seems super unlikely anyone would actually want to do that
-                }
-
-
-                SetNumMaterialSlots(meshBin, psk.Materials.Count);
-
-                var LOD = meshBin.LODModels[0];
-
-                var weightsByPoint = psk.Weights.GroupBy(x => x.Point).ToDictionary(g => g.Key, g => g.ToList());
-
-                SetupSectionsAndChunks(psk, LOD, weightsByPoint, meshBin.RefSkeleton);
-
-                // update the UVs of each vertex
-                foreach (var wedge in psk.Wedges)
-                {
-                    LOD.VertexBufferGPUSkin.VertexData[wedge.PointIndex].UV = new Vector2DHalf(wedge.U, wedge.V);
-                }
-
-                if (psk.VertexNormals != null)
-                {
-                    // import the vector normals and replace them
-                    for (int i = 0; i < psk.VertexNormals.Count; i++)
-                    {
-                        var vertNorm = psk.VertexNormals[i] with { Y = -psk.VertexNormals[i].Y };
-                        var packedNorm = (PackedNormal)Vector3.Normalize(vertNorm);
-                        // there is a possible bug in the PackedNormal explicit operator used above where it assigns 128 to W instead of 255, but I didn't want to risk messing things up, so I have not changed it
-                        LOD.VertexBufferGPUSkin.VertexData[i].TangentZ = new PackedNormal(packedNorm.X, packedNorm.Y, packedNorm.Z, 255);
-                    }
-                }
-
-                // update the position and weights of each point
-                for (int i = 0; i < psk.Points.Count; i++)
-                {
-                    // replace the position data with that of the psk
-                    // gotta invert that Y, just like we inverted in on import
-                    LOD.VertexBufferGPUSkin.VertexData[i].Position = psk.Points[i] with { Y = psk.Points[i].Y * -1 };
-
-                    // find the chunk containing this point
-                    // TODO optimization: don't look this up every loop; the chunks are ordered non overlapping sequences of verts
-                    var containingChunk = LOD.Chunks.LastOrDefault(x => x.BaseVertexIndex <= i);
-
-                    var newBoneInfluenceIndices = new byte[4];
-                    var newBoneInfluenceWeights = new byte[4];
-                    var influences = weightsByPoint[i].OrderByDescending(x => x.Weight).ToArray();
-                    // sum up all the influences so we can normalize them on import
-                    var sum = influences.Select(x => x.Weight).Aggregate((float runningTotal, float currentValue) => runningTotal + currentValue);
-                    for (int j = 0; j < 4 && j < influences.Length; j++)
-                    {
-                        var influence = influences[j];
-
-                        var boneName = psk.Bones[influence.Bone].Name;
-                        var meshBoneIndex = meshBin.RefSkeleton.FindIndex(x => x.Name == boneName);
-                        var mappedBoneIndex = containingChunk.BoneMap.IndexOf((ushort)meshBoneIndex);
-                        newBoneInfluenceIndices[j] = (byte)mappedBoneIndex;
-                        // normalize, convert to a byte with 0 being none and 255 being full
-                        newBoneInfluenceWeights[j] = (byte)Math.Round(influence.Weight * 255f / sum);
-                    }
-                    LOD.VertexBufferGPUSkin.VertexData[i].InfluenceBones = new Influences(newBoneInfluenceIndices[0], newBoneInfluenceIndices[1], newBoneInfluenceIndices[2], newBoneInfluenceIndices[3]);
-                    LOD.VertexBufferGPUSkin.VertexData[i].InfluenceWeights = new Influences(newBoneInfluenceWeights[0], newBoneInfluenceWeights[1], newBoneInfluenceWeights[2], newBoneInfluenceWeights[3]);
-                }
-
-                // remove the extra LODs; we are not handling them correctly anyway
-                meshBin.LODModels = [meshBin.LODModels[0]];
-
-                meshExport.WriteBinary(meshBin);
-            }
-        }
-
-        private static void SetupSectionsAndChunks(PSK psk, StaticLODModel lod, Dictionary<int, List<PSK.PSKWeight>> weightsByPoint, MeshBone[] refSkeleton)
-        {
-            // the triangles, grouped by material
-            var matGroups = psk.Faces.GroupBy(x => x.MatIndex).OrderBy(x => x.Key).Select(x => x.ToArray()).ToArray();
-
-            // the indices of those triangles in order to put into the mesh binary
-            // yes, the order is intentionally flipped to make sure the normals come out right
-            var indexBuffer = matGroups.SelectMany(x => x).SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]).ToArray();
-
-            // make some pseudo sections from those, tracking the min and max vertex index needed to contain each section of triangles
-            List<MeshSection> sections = [];
-            var startIndex = 0;
-            foreach (var matGroup in matGroups)
-            {
-                var section = new MeshSection
-                {
-                    Triangles = matGroup,
-                    BaseTriIndex = startIndex,
-                    MatIndex = matGroup[0].MatIndex,
-                };
-
-                // calculate the min and max vertex indices within this section
-                var sectionIndices = matGroup.SelectMany<PSK.PSKTriangle, ushort>(x => [psk.Wedges[x.WedgeIdx0].PointIndex, psk.Wedges[x.WedgeIdx1].PointIndex, psk.Wedges[x.WedgeIdx2].PointIndex]);
-                section.MinVertIndex = sectionIndices.Min();
-                section.MaxVertIndex = sectionIndices.Max();
-
-                sections.Add(section);
-                startIndex += matGroup.Length;
-            }
-
-            // given this, I then need to make the fewest number of chunks with non overlapping vertex ranges
-            // in the best case this means the same number of chunks as sections
-            // in the worst case we fold them into a single chunk
-            // hypothetically we could split the sections to avoid merging chunks but I haven't tested that and it won't work in all cases
-
-            // first, sort the sections by min vert index then max vert index, so we can enumerate them in that order
-            sections = [.. sections.OrderBy(x => x.MinVertIndex).ThenBy(x => x.MaxVertIndex)];
-            List<MeshChunk> chunks = [];
-            chunks.Add(new MeshChunk
-            {
-                VertIndexStart = 0,
-                VertIndexEnd = sections[0].MaxVertIndex,
-                InfluenceBones = []
-            });
-            foreach (var section in sections)
-            {
-                if (section.MinVertIndex > chunks[^1].VertIndexEnd)
-                {
-                    // sections have non overlapping vertices; make a new chunk
-                    chunks.Add(new MeshChunk
-                    {
-                        VertIndexStart = section.MinVertIndex,
-                        VertIndexEnd = section.MaxVertIndex,
-                        InfluenceBones = []
-                    });
-                }
-                else
-                {
-                    // sections have overlapping vertices and we need to combine the chunks
-                    chunks[^1].VertIndexEnd = Math.Max(section.MaxVertIndex, chunks[^1].VertIndexEnd);
-                }
-            }
-
-            // now, assign a chunk index to each section
-            for (var i = 0; i < sections.Count; i++)
-            {
-                sections[i].ChunkIndex = chunks.FindIndex(x => x.VertIndexStart <= sections[i].MinVertIndex && x.VertIndexEnd >= sections[i].MaxVertIndex);
-            }
-
-            // next, we need to see which bones influence each chunk
-            // as well as count the rigid and soft vertices (not positive if that matters in game or not, but I am trying to emulate vanilla as closely as possible)
-            foreach (var chunk in chunks)
-            {
-                for (var i = chunk.VertIndexStart; i <= chunk.VertIndexEnd; i++)
-                {
-                    if (weightsByPoint.TryGetValue(i, out var weights))
-                    {
-                        switch (weights.Count)
-                        {
-                            case <= 1:
-                                chunk.RigidVerts++;
-                                break;
-                            case > 4:
-                                throw new Exception("there are too many bones influencing this vertex, and I don't know how to handle that.");
-                            default:
-                                chunk.SoftVerts++;
-                                break;
-                        }
-                        if (weights.Count > chunk.maxBoneInfluences)
-                        {
-                            chunk.maxBoneInfluences = weights.Count;
-                        }
-                        foreach (var weight in weights)
-                        {
-                            chunk.InfluenceBones.Add((ushort)weight.Bone);
-                        }
-                    }
-                    else
-                    {
-                        // for some reason this vert has no weights, which really seems like a bug, but I will treat it as a rigid vertex
-                        chunk.RigidVerts++;
-                    }
-                }
-                // the indices into the bone mapping array are bytes, so we can't have too many here without splitting the chunk up, which I have not implemented because it is extraorinarily unlikely to come up in real world usage
-                if (chunk.InfluenceBones.Count > 255)
-                {
-                    throw new Exception("there are too many influence bones in this chunk; Send the psk to Squid and tell him to implement chunk splitting logic.");
-                }
-            }
-
-            ushort GetMeshBoneIndex(ushort pskIndex)
-            {
-                var pskBone = psk.Bones[pskIndex];
-                return (ushort)refSkeleton.FindIndex(x => x.Name == pskBone.Name);
-            }
-
-            // now that this is all done, we can finally add this stuff to the mesh binary
-            lod.IndexBuffer = indexBuffer;
-
-            lod.Sections = [..sections.Select(x => new SkelMeshSection
-            {
-                BaseIndex = (uint)(x.BaseTriIndex * 3),
-                ChunkIndex = (ushort)x.ChunkIndex,
-                MaterialIndex = (ushort)x.MatIndex,
-                NumTriangles = x.Triangles.Length
-            })];
-
-            lod.Chunks = [..chunks.Select(x => new SkelMeshChunk
-            {
-                BaseVertexIndex = (uint)x.VertIndexStart,
-                MaxBoneInfluences = x.maxBoneInfluences,
-                NumRigidVertices = x.RigidVerts,
-                NumSoftVertices = x.SoftVerts,
-                BoneMap = [.. x.InfluenceBones.Select(GetMeshBoneIndex).Order()]
-            })];
-        }
-
         private class MeshSection
         {
             public PSK.PSKTriangle[] Triangles;
@@ -1955,25 +1827,39 @@ defaultproperties
 
         public static void ImportRonToBmf(PackageEditorWindow pew)
         {
-            var d = new OpenFileDialog
+            // make sure a file is open to put the new BMF into
+            if (pew.Pcc == null)
             {
-                Filter = "RON|*.ron",
-                Title = "Select a ron headmorph file"
-            };
-            if (d.ShowDialog() == true)
+                return;
+            }
+            if (GetHeadmorphFromFile(out var headMorph, out var filePath))
             {
-                // create a new BioMorphFace
-                var bmf = ExportCreator.CreateExport(pew.Pcc, Path.GetFileNameWithoutExtension(d.FileName), "BioMorphFace");
-
-                if (GetSelectedItem(pew, "SkeletalMesh", out var baseHead))
+                IEntry baseHeadEntry = null;
+                // find the base head mesh that goes with this
+                if (GetHeadmorphBaseHead(headMorph, pew.Pcc.Game, out var baseHead, out var isFemaleMorph, out var gameMismatch))
                 {
-                    // if they have selected the base head when they run this, set that as the base head
-                    bmf.WriteProperty(new ObjectProperty(baseHead, "m_oBaseHead"));
+                    // esnure the base head is in this file
+                    if (baseHead.Export.FileRef == pew.Pcc)
+                    {
+                        baseHeadEntry = baseHead.Export;
+                    }
+                    else
+                    {
+                        // create the package structure
+                        var rootPackage = ExportCreator.CreatePackageExport(pew.Pcc, isFemaleMorph ? "BIOG_HMF_HED_PROMorph_R" : "BIOG_HMM_HED_PROMorph");
+                        var containingPackage = ExportCreator.CreatePackageExport(pew.Pcc, "Custom", rootPackage);
 
-                    // TODO selector dialog instead?
+                        ImportAndRelinkEntries(PortingOption.CloneAllDependencies, baseHead.Export, pew.Pcc, containingPackage, true, new RelinkerOptionsPackage(), out baseHeadEntry);
+                    }
+                }
+                else if (gameMismatch)
+                {
+                    ShowError("you are attemtping to import a headmorph from ME1/2 into ME3 or vice versa; this is almost cetainly not what you want; if it is, import it into the correct game and then port it to the target game");
+                    return;
                 }
 
-                var headMorph = HeadMorph.FromRonFile(d.FileName);
+                // create a new BioMorphFace
+                var bmf = ExportCreator.CreateExport(pew.Pcc, Path.GetFileNameWithoutExtension(filePath), "BioMorphFace");
 
                 // add a reference to the hair mesh, if it is in this file
                 if (headMorph.HairMesh != null && headMorph.HairMesh != "None")
@@ -2051,6 +1937,15 @@ defaultproperties
                 bmfBin.LODs = [.. LODs];
 
                 bmf.WriteBinary(bmfBin);
+
+                if (baseHead != null)
+                {
+                    bmf.WriteProperty(new ObjectProperty(baseHeadEntry, "m_oBaseHead"));
+                }
+                else
+                {
+                    ShowError("BioMorphFace was created, but the experiment was unable to link a base head");
+                }
             }
         }
 
@@ -2315,7 +2210,7 @@ defaultproperties
                             });
                         }
 
-                        // TODO anything with vertex normal deltas once we can export those?
+                        // TODO anything with vertex normal deltas once we can export those, and they aren't actually used in game? probably not
                     }
 
                     morphTargetBin.MorphLODModels[0].Vertices = [.. vertDeltas];

@@ -182,7 +182,6 @@
         </MenuItem>
         <MenuItem Header="Import Mesh/Animation">
             <MenuItem Header="Import PSK/PSKX as new mesh" Click="ImportPskAsNewMesh_Click" ToolTip="Directly imports a psk/pskx file as a new skeletal/static mesh depending on whether it has a skeleton or not"/>
-            <MenuItem Header="Replace mesh data from psk/pskx" Click="ReplaceMeshFromPSK_Click" ToolTip="Replaces some of the mesh data from a psk to avoid needing to go through UModel, which  messes up vertex count and order. only use if you need it."/>
             <MenuItem Header="Add/Update a new MorphTarget from a psk + psa" Click="AddNewMorphTargetFromPskAndPsa_Click" ToolTip="Converts a psk to a morph target as a delta to the base mesh. select a morphTargetSet to use this. "/>
             <MenuItem Header="import psk + psa to BioMorphFace" Click="ImportPskAndPsaToBmf_Click" ToolTip="Applies the vetex positions from a psk file onto a BioMorphFace. "/>
             <MenuItem Header="Import AnimSet" Click="ImportAnimSet_Click" ToolTip="bulk import an entire animSet from a PSA"/>

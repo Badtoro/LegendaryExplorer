@@ -1356,10 +1356,6 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
             PackageEditorExperimentsSquid.ImportPskAsNewMesh(GetPEWindow());
         }
 
-        // I need to simplify the interface for these at some point. 
-        // like, export selected item as psk/psa (works for BioMorphFace, SkeletalMesh, StaticMesh, MorphTargetSet, maybe eventually others)
-        // and then import psk/psa either as a new export or on top of the specific
-        
 
         private void MakeHeterochromia_Click(object sender, RoutedEventArgs e)
         {
@@ -1379,11 +1375,6 @@ namespace LegendaryExplorer.UserControls.PackageEditorControls
         private void MorphFaceToMesh_Click(object sender, RoutedEventArgs e)
         {
             PackageEditorExperimentsSquid.BioMorphFaceToUniqueSkeletalMesh(GetPEWindow());
-        }
-
-        private void ReplaceMeshFromPSK_Click(object sender, RoutedEventArgs e)
-        {
-            PackageEditorExperimentsSquid.ReplaceMeshDataFromPsk(GetPEWindow());
         }
 
         private void AddNewMorphTargetFromPskAndPsa_Click(object sender, RoutedEventArgs e)
