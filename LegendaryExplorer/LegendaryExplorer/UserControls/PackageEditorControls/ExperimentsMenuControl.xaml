@@ -175,7 +175,7 @@
     <MenuItem Header="Squid's new and exciting ways to break stuff">
         <MenuItem Header="Export Selected Item as PSKX/PSA" Click="ExportSelectedToPsx_Click" ToolTip="Exports the selected item as a pskx and/or psa and config file. Works for SkeletalMesh, BioMorphFace, MorphTargetSet, AnimSet, BioDynamicAnimSet, and AnimSequence"/>
         <MenuItem Header="Ron File tools">
-            <MenuItem Header="Export RON file as PSKX/PSA" Click="ExportRonToPsx_Click" ToolTip="Converts"/>
+            <MenuItem Header="Export RON file as PSKX/PSA" Click="ExportRonToPsx_Click" ToolTip="Converts a ron file into a pskx and psa file that can be imported into blender to edit your Shepard's head."/>
             <MenuItem Header="import ron to BioMorphFace" Click="ImportRonToBmf_Click" ToolTip="Imports a Ron file as a BioMorphFace; assets will be linked if they are in the file. "/>
             <MenuItem Header="export BioMorphFace to ron" Click="ExportBmfToRon_Click" ToolTip="Export a BioMorphFace to a ron file"/>
             <MenuItem Header="replace ron vertex + bone data from psk + psa" Click="UpdateRonFromPskAndPsa_Click" ToolTip="Updates the vertex positions in a ron file with those from a psk"/>
