@@ -12,34 +12,47 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
 {
     public class ShaderCache : ObjectBinary
     {
-        public bool IsGlobalShaderCache;
+        /// <summary>
+        /// If true, names are serialized as strings and objects cannot be serialized. Used by GlobalShaderCache.
+        /// </summary>
+        public bool Packageless;
         public UMultiMap<NameReference, uint> ShaderTypeCRCMap; //TODO: Make this a UMap
         public UMultiMap<Guid, Shader> Shaders; //TODO: Make this a UMap
         public UMultiMap<NameReference, uint> VertexFactoryTypeCRCMap; //TODO: Make this a UMap
         public UMultiMap<NameReference, Guid> VertexFactoryTypeGuidMap; // GlobalShaderCache
         public UMultiMap<StaticParameterSet, MaterialShaderMap> MaterialShaderMaps; //TODO: Make this a UMap
 
+        /// <summary>
+        /// GlobalShaderCache is not in a package, it serializes names as strings
+        /// </summary>
+        /// <param name="fs"></param>
+        /// <param name="game"></param>
+        /// <returns></returns>
         public static ShaderCache ReadGlobalShaderCache(Stream fs, MEGame game)
         {
             ShaderCache sc = new ShaderCache
             {
-                IsGlobalShaderCache = true,
+                Packageless = true,
             };
-            var container = new GlobalShaderCacheSerializingContainer(fs, null, true);
-            container.ActualGame = game;
+            var container = new PackagelessSerializingContainer(fs, null, true)
+            {
+                Game = game
+            };
             sc.Serialize(container);
-
-            // Sanity check
-            //if (fs.Position != fs.Length)
-            //    // We add an extra 0 on the end to make size different. This way it always is different size.
-            //    if (fs.Position != fs.Length - 1 || fs.ReadByte() == 0)
-            //        Debugger.Break(); // Did not fully read!
             return sc;
         }
 
-        public class GlobalShaderCacheSerializingContainer(Stream stream, IMEPackage pcc, bool isLoading = false, int offset = 0, PackageCache packageCache = null) : SerializingContainer(stream, pcc, isLoading, offset, packageCache)
+        /// <summary>
+        /// Serializer used by the GlobalShaderCache, to serialize name references as strings. This cannot serialize objects.
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <param name="pcc"></param>
+        /// <param name="isLoading"></param>
+        /// <param name="offset"></param>
+        /// <param name="packageCache"></param>
+        public class PackagelessSerializingContainer(Stream stream, IMEPackage pcc, bool isLoading = false, int offset = 0, PackageCache packageCache = null) : SerializingContainer(stream, pcc, isLoading, offset, packageCache)
         {
-            // Global shader cache is not in a package. Thus name references are directly written.
+            // Name references are directly written.
             public override void Serialize(ref NameReference name)
             {
                 if (IsLoading)
@@ -48,92 +61,144 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
                 else
                 {
-                    ms.Writer.WriteUnrealString(name.Instanced, MEGame.ME3); // Unicode.
+                    ms.Writer.WriteUnrealString(name.Instanced, Game);
                 }
             }
 
-            /// <summary>
-            /// Game this container is for. Used for reserialization.
-            /// </summary>
-            public MEGame ActualGame { get; set; }
+            public override void Serialize(ref NameReference? name)
+            {
+                if (IsLoading)
+                {
+                    name = NameReference.FromInstancedString(ms.ReadUnrealString());
+                }
+                else if (name.HasValue)
+                {
+                    ms.Writer.WriteUnrealString(name.Value.Instanced, Game);
+                }
+                else
+                {
+                    // Can't serialize null name
+                    Debugger.Break();
+                }
+            }
+
+            public override void SerializeObjectRef(ref int val)
+            {
+                throw new Exception(nameof(PackagelessSerializingContainer) + " cannot serialize object references.");
+            }
+        }
+
+        /// <summary>
+        /// SPECIAL SERIALIZER - Serializes names as strings, serializes objects in special format. This does NOT support serializing, only deserializing!
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <param name="pcc"></param>
+        /// <param name="isLoading"></param>
+        /// <param name="offset"></param>
+        /// <param name="packageCache"></param>
+        public class PackagelessWithObjectsSerializingContainer(Stream stream, IMEPackage pcc, bool isLoading = false, int offset = 0, PackageCache packageCache = null) : PackagelessSerializingContainer(stream, pcc, isLoading, offset, packageCache)
+        {
+            // Special deserialization method.
+            // Does NOT support writing serialization!
+
+            public override void SerializeObjectRef(ref int val)
+            {
+                if (!IsLoading)
+                {
+                    throw new Exception(nameof(PackagelessSerializingContainer) + " cannot be used to serialize object references when saving.");
+                }
+
+                var objectIfp = stream.ReadUnrealString();
+                var foundEntry = pcc.FindEntry(objectIfp);
+                if (foundEntry == null)
+                {
+                    Debug.WriteLine($"Could not found {objectIfp} in package, value will be set to null");
+                    val = 0;
+                }
+                else
+                {
+                    val = foundEntry.UIndex;
+                }
+
+            }
         }
 
         protected override void Serialize(SerializingContainer sc)
         {
-            if (!IsGlobalShaderCache)
+            if (!Packageless)
             {
                 if (sc.Pcc.Platform != MEPackage.GamePlatform.PC) return; //We do not support non-PC shader cache
-                if (sc.Game == MEGame.UDK)
-                {
-                    // Just default to 0, we aren't going to use this in ME
-                    int shaderCachePriority = 0;
-                    sc.Serialize(ref shaderCachePriority);
                 }
-                
-                byte platform = sc.Game.IsLEGame() ? (byte)5 : (byte)0;
-                if (sc.Game == MEGame.UDK)
-                {
-                    // We do not support SM3 in UDK
-                    // Serialize as SM5
-                    platform = 4; // UDK SM5 is '4'
-                }
-                sc.Serialize(ref platform);
-            }
             else
             {
-                if (sc is GlobalShaderCacheSerializingContainer gscsc)
-                {
+                    // Global Shader Cache parsing.
                     // Requires special container as it does not have a package.
-                    if (gscsc.IsLoading)
+                if (sc.IsLoading)
                     {
-                        gscsc.ms.ReadStringASCII(4); // BMSG
+                    sc.ms.ReadStringASCII(4); // BMSG
                     }
                     else
                     {
-                        gscsc.ms.Writer.WriteStringASCII("BMSG");
+                    sc.ms.Writer.WriteStringASCII("BMSG");
                     }
 
-                    int version = UnrealPackageFile.UnrealVersion(gscsc.ActualGame);
-                    gscsc.Serialize(ref version);
-                    int licensee = UnrealPackageFile.LicenseeVersion(gscsc.ActualGame);
-                    gscsc.Serialize(ref licensee);
+                int version = UnrealPackageFile.UnrealVersion(sc.Game);
+                sc.Serialize(ref version);
+                int licensee = UnrealPackageFile.LicenseeVersion(sc.Game);
+                sc.Serialize(ref licensee);
                 }
+            if (sc.Game == MEGame.UDK)
+            {
+                // Just default to 0, we aren't going to use this in ME
+                int shaderCachePriority = 0;
+                sc.Serialize(ref shaderCachePriority);
+            }
 
-                // We only support editing this in LE
-                byte platform = 5;
+            byte platform = sc.Game.IsLEGame() ? (byte)5 : (byte)0;
                 if (sc.Game == MEGame.UDK)
                 {
-                    // Also technically UDK, not sure this would ever be useful
+                // We do not support SM3 in UDK
                     // Serialize as SM5
                     platform = 4; // UDK SM5 is '4'
                 }
                 sc.Serialize(ref platform);
-            }
+
 
             sc.Serialize(ref ShaderTypeCRCMap, sc.Serialize, sc.Serialize);
-            if (IsGlobalShaderCache)
-            {
-                int zero = 0;
-                sc.Serialize(ref zero);
-            }
-            else if (sc.Game == MEGame.ME3 || sc.Game.IsLEGame())
+            if (sc.Game == MEGame.ME3 || sc.Game.IsLEGame())
             {
                 if (sc.IsLoading)
                 {
                     int nameMapCount = sc.ms.ReadInt32();
-                    sc.ms.Skip(nameMapCount * 12);
+                    if (Packageless)
+                    {
+                        for (int i = 0; i < nameMapCount; i++)
+                        {
+                            string str = null;
+                            sc.Serialize(ref str);
+                        }
+                    }
+                    else
+                    {
+                        // Size is fixed
+                        sc.ms.Skip(nameMapCount * 12);
+                    }
                 }
                 else
                 {
+                    // should probably keep these... it is name to crc map
+                    // technically not important, but we've seen that burn 
+                    // us in the past
                     sc.ms.Writer.WriteInt32(0);
                 }
             }
 
-            if (!IsGlobalShaderCache && sc.Game == MEGame.ME1)
+            if (sc.Game == MEGame.ME1)
             {
                 sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
             }
 
+            // EMBEDDED SHADER FILES
             if (sc.IsLoading)
             {
                 int shaderCount = sc.ms.ReadInt32();
@@ -142,6 +207,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 {
                     Shader shader = null;
                     sc.Serialize(ref shader);
+                    Debug.WriteLine($"Shader stopped serializing at {sc.ms.Position:X8}");
                     Shaders.Add(shader.Guid, shader);
                 }
             }
@@ -155,57 +221,22 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
             }
 
-
-            if (IsGlobalShaderCache)
+            // VertexFactoryType to CRC maps
+            if (sc.Game != MEGame.ME1 && sc.Game != MEGame.UDK)
             {
-                if (sc.IsLoading)
-                {
-                    VertexFactoryTypeGuidMap = [];
-                }
-
-                int count = VertexFactoryTypeGuidMap.Count;
-                sc.Serialize(ref count);
-
-                if (sc.IsLoading)
-                {
-                    int i = 0;
-                    while (i < count)
-                    {
-                        NameReference name = default;
-                        sc.Serialize(ref name);
-                        Guid value = default;
-                        sc.Serialize(ref value);
-                        sc.Serialize(ref name); // duplicate
-                        VertexFactoryTypeGuidMap.Add(name, value);
-                        i++;
-                    }
-                }
-                else
-                {
-                    foreach (var keyMap in VertexFactoryTypeGuidMap)
-                    {
-                        var key = keyMap.Key;
-                        sc.Serialize(ref key);
-                        var value = keyMap.Value;
-                        sc.Serialize(ref value);
-                        sc.Serialize(ref key); // duplicate
-                    }
-                }
+                sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
             }
-            else
+
+            // Shader maps (maps material guids to a map of diff shader types located in the embedded shaders block)
+            sc.Serialize(ref MaterialShaderMaps, sc.Serialize, sc.Serialize);
+
+
+            if (sc.Game is not (MEGame.ME2 or MEGame.LE2 or MEGame.LE1 or MEGame.UDK))
             {
-                if (sc.Game != MEGame.ME1 && sc.Game != MEGame.UDK)
-                {
-                    sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
-                }
-
-                sc.Serialize(ref MaterialShaderMaps, sc.Serialize, sc.Serialize);
-
-                if (sc.Game is not (MEGame.ME2 or MEGame.LE2 or MEGame.LE1 or MEGame.UDK))
-                {
-                    int dummy = 0;
-                    sc.Serialize(ref dummy);
-                }
+                // Technically this matters on console
+                // Technically we don't support them
+                int shaderCachePayloadsSize = 0;
+                sc.Serialize(ref shaderCachePayloadsSize);
             }
         }
         public static ShaderCache Create()
@@ -254,6 +285,59 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public void WriteTo(SerializingContainer container)
         {
             Serialize(container);
+        }
+
+
+        /// <summary>
+        /// Merges shader maps from this cache into the target one. Shader files are also merged (and replaced if existing).
+        /// </summary>
+        /// <param name="target">The target to merge into</param>
+        public void MergeInto(ShaderCache target, bool cleanup = false)
+        {
+            // Material shader maps
+            foreach (var shaderMap in MaterialShaderMaps)
+            {
+                // copy to target
+                target.MaterialShaderMaps[shaderMap.Key] = shaderMap.Value;
+            }
+
+            // Shader files
+            foreach (var shader in Shaders)
+            {
+                target.Shaders[shader.Key] = shader.Value;
+            }
+
+            if (cleanup)
+            {
+                target.Compact();
+            }
+        }
+
+        /// <summary>
+        /// Removes unreferenced Shader files 
+        /// </summary>
+        /// <returns>The amount of shaders removed</returns>
+        public int Compact()
+        {
+            int oldCount = Shaders.Count;
+            List<Guid> guidsToKeep = new List<Guid>();
+            foreach (var msm in MaterialShaderMaps)
+            {
+                foreach (var shaderRef in msm.Value.Shaders)
+                {
+                    guidsToKeep.Add(shaderRef.Value.Id);
+                }
+                foreach (var meshShaderMap in msm.Value.MeshShaderMaps)
+                {
+                    foreach (var meshShaderRef in meshShaderMap.Shaders)
+                    {
+                        guidsToKeep.Add(meshShaderRef.Value.Id);
+                    }
+                }
+            }
+            var newShaderList = Shaders.Where(x => guidsToKeep.Contains(x.Key));
+            Shaders = new(newShaderList);
+            return oldCount - Shaders.Count;
         }
     }
 
@@ -459,7 +543,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 }
             }
 
-            
+
             if (IsSaving)
             {
                 long endOffset = ms.Position;

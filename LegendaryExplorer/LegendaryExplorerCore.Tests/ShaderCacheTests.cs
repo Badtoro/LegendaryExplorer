@@ -25,7 +25,7 @@ namespace LegendaryExplorerCore.Tests
                 using var input = new MemoryStream(File.ReadAllBytes(p));
                 var inCache = ShaderCache.ReadGlobalShaderCache(input, MEGame.LE3);
                 var outS = new MemoryStream();
-                ShaderCache.GlobalShaderCacheSerializingContainer container = new(outS, null)
+                ShaderCache.PackagelessSerializingContainer container = new(outS, null)
                 {
                     ActualGame = MEGame.LE3
                 };

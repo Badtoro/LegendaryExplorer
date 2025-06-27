@@ -190,7 +190,7 @@ public class UnparsedShader : Shader
                     case "TBasePassVertexShaderFCustomVectorVertexLightMapPolicyFNoDensityPolicy":
                     case "TBasePassVertexShaderFCustomVectorVertexLightMapPolicyFSphereDensityPolicy":
                         unkBytesPreName = sc.ms.ReadBytes(6);
-                        VertexFactoryType = sc.ms.ReadNameReference(sc.Pcc);
+                        sc.Serialize(ref VertexFactoryType);
                         break;
                     case "TLightVertexShaderFDirectionalLightPolicyFShadowTexturePolicy":
                     case "TLightVertexShaderFDirectionalLightPolicyFSignedDistanceFieldShadowTexturePolicy":

@@ -15,13 +15,13 @@ using LegendaryExplorerCore.Unreal.Collections;
 namespace LegendaryExplorerCore.Shaders
 {
     /*
-     * This class is for reading each game's global shader cache. Because the ShaderCache in those files is so large,
+     * This class is for reading each game's reference shader cache. Because the ShaderCache in those files is so large,
      * parsing it with the ShaderCache ObjectBinary class is very slow and uses an enormous amount of memory.
      * This class parses only what it needs to, and then caches file offsets to make subsequent reads even faster
      */
     public static class RefShaderCacheReader
     {
-        public static string GlobalShaderFileName(MEGame game) => game.IsLEGame() ? "RefShaderCache-PC-D3D-SM5.upk" : "RefShaderCache-PC-D3D-SM3.upk";
+        public static string ShaderCacheName(MEGame game) => game.IsLEGame() ? "RefShaderCache-PC-D3D-SM5.upk" : "RefShaderCache-PC-D3D-SM3.upk";
 
         public static string ShaderFilePath(MEGame game, string gamePathOverride = null)
         {
@@ -31,7 +31,7 @@ namespace LegendaryExplorerCore.Shaders
                 LECLog.Error(@"Cannot determine game path - cannot lookup shader file path");
                 return null; // We cannot find the game!
             }
-            return Path.Combine(cookedPath, GlobalShaderFileName(game));
+            return Path.Combine(cookedPath, ShaderCacheName(game));
         }
 
         private static Dictionary<Guid, int> ME3ShaderOffsets;

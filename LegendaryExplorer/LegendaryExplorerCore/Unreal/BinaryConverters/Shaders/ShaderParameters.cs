@@ -1,8 +1,10 @@
 ﻿// ReSharper disable InconsistentNaming
 
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters.Shaders;
+[DebuggerDisplay("FShaderParameter BaseIndex: {BaseIndex} NumBytes: {NumBytes} BufferIndex: {BufferIndex}")]
 public struct FShaderParameter
 {
     public ushort BaseIndex;
@@ -16,6 +18,7 @@ public struct FShaderParameter
     } 
 }
 
+[DebuggerDisplay("FShaderResourceParameter BaseIndex: {BaseIndex} NumResources: {NumResources} SamplerIndex: {SamplerIndex}")]
 public struct FShaderResourceParameter
 {
     public ushort BaseIndex;
@@ -188,9 +191,12 @@ public struct FMaterialPixelShaderParameters
     //should these be calculated instead of stored?
     private int UniformPixelScalarShaderParameters_IsValid;
     private int UniformPixelVectorShaderParameters_IsValid;
+
+    // Appears to be BioWare specific as it is behind licensee check
     public FShaderParameter WrapLightingParameters;
     public void Serialize(SerializingContainer sc)
     {
+        // MaterialShaderParameters
         sc.SerializeUnmanaged(ref CameraWorldPosition);
         sc.SerializeUnmanaged(ref ObjectWorldPositionAndRadius);
         sc.SerializeUnmanaged(ref ObjectOrientation);
@@ -201,25 +207,27 @@ public struct FMaterialPixelShaderParameters
         sc.Serialize(ref UniformPixelVectorShaderParameters, sc.SerializeUnmanaged);
         sc.Serialize(ref UniformPixel2DShaderResourceParameters, sc.SerializeUnmanaged);
         sc.Serialize(ref UniformPixelCubeShaderResourceParameters, sc.SerializeUnmanaged);
-        sc.SerializeUnmanaged(ref LocalToWorld);
-        sc.SerializeUnmanaged(ref WorldToLocal);
-        sc.SerializeUnmanaged(ref WorldToView);
-        sc.SerializeUnmanaged(ref InvViewProjection);
-        sc.SerializeUnmanaged(ref ViewProjection);
-        sc.SerializeUnmanaged(ref SceneTextureParameters);
-        sc.SerializeUnmanaged(ref TwoSidedSign);
-        sc.SerializeUnmanaged(ref InvGamma);
-        sc.SerializeUnmanaged(ref DecalFarPlaneDistance);
-        sc.SerializeUnmanaged(ref ObjectPostProjectionPosition);
-        sc.SerializeUnmanaged(ref ObjectMacroUVScales);
-        sc.SerializeUnmanaged(ref ObjectNDCPosition);
-        sc.SerializeUnmanaged(ref OcclusionPercentage);
-        sc.SerializeUnmanaged(ref EnableScreenDoorFade);
-        sc.SerializeUnmanaged(ref ScreenDoorFadeSettings);
-        sc.SerializeUnmanaged(ref ScreenDoorFadeSettings2);
-        sc.SerializeUnmanaged(ref ScreenDoorNoiseTexture);
+        
+        // PixelShaderParameters
+        sc.SerializeUnmanaged(ref LocalToWorld, "LocalToWorld");
+        sc.SerializeUnmanaged(ref WorldToLocal, "WorldToLocal");
+        sc.SerializeUnmanaged(ref WorldToView, "WorldToView");
+        sc.SerializeUnmanaged(ref InvViewProjection, "InvViewProjection");
+        sc.SerializeUnmanaged(ref ViewProjection, "ViewProjection");
+        sc.SerializeUnmanaged(ref SceneTextureParameters, "SceneTextureParameters");
+        sc.SerializeUnmanaged(ref TwoSidedSign, "TwoSidedSign");
+        sc.SerializeUnmanaged(ref InvGamma, "InvGamma");
+        sc.SerializeUnmanaged(ref DecalFarPlaneDistance, "DecalFarPlaneDistance");
+        sc.SerializeUnmanaged(ref ObjectPostProjectionPosition, "ObjectPostProjectionPosition");
+        sc.SerializeUnmanaged(ref ObjectMacroUVScales, "ObjectMacroUVScales");
+        sc.SerializeUnmanaged(ref ObjectNDCPosition, "ObjectNDCPosition");
+        sc.SerializeUnmanaged(ref OcclusionPercentage, "OcclusionPercentage");
+        sc.SerializeUnmanaged(ref EnableScreenDoorFade, "EnableScreenDoorFade");
+        sc.SerializeUnmanaged(ref ScreenDoorFadeSettings, "ScreenDoorFadeSettings");
+        sc.SerializeUnmanaged(ref ScreenDoorFadeSettings2, "ScreenDoorFadeSettings2");
+        sc.SerializeUnmanaged(ref ScreenDoorNoiseTexture, "ScreenDoorNoiseTexture");
         sc.Serialize(ref UniformPixelScalarShaderParameters_IsValid);
         sc.Serialize(ref UniformPixelVectorShaderParameters_IsValid);
-        sc.SerializeUnmanaged(ref WrapLightingParameters);
+        sc.SerializeUnmanaged(ref WrapLightingParameters, "WrapLightingParameters");
     }
 }
