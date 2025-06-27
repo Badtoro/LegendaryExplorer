@@ -55,7 +55,7 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     return;
                 }
 
-                List<ObjectProperty> sequenceExports = [];
+                List<ExportEntry> sequenceExports = [];
                 foreach (AnimSequence seq in animSequences)
                 {
                     var seqExp = ExportCreator.CreateExport(pew.Pcc, NameReference.FromInstancedString(seq.Name), "AnimSequence", pkg, indexed: false);
@@ -68,7 +68,37 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                     sequenceExports.Add(seqExp);
                 }
 
-                animSet.WriteProperty(new ArrayProperty<ObjectProperty>(sequenceExports, "Sequences"));
+                animSet.WriteProperty(new ArrayProperty<ObjectProperty>(sequenceExports.Select(x => (ObjectProperty)x), "Sequences"));
+
+                // copy the footstep/sound/event notifies from the selected set onto this one
+                if (GetSelectedItem(pew, "AnimSet", out var selectedAnimSet))
+                {
+                    var originalSequences = selectedAnimSet.GetProperty<ArrayProperty<ObjectProperty>>("Sequences").Select(x => x.ResolveToExport(pew.Pcc, new PackageCache()));
+                    foreach (var seq in sequenceExports)
+                    {
+                        var seqName = seq.GetProperty<NameProperty>("SequenceName").Value;
+                        var correspondingSequence = originalSequences.FirstOrDefault(x => x.GetProperty<NameProperty>("SequenceName").Value == seqName);
+                        if (correspondingSequence == null)
+                        {
+                            continue;
+                        }
+                        var originalNotifies = correspondingSequence.GetProperty<ArrayProperty<StructProperty>>("Notifies");
+                        if (originalNotifies == null)
+                        {
+                            continue;
+                        }
+                        var notifies = new ArrayProperty<StructProperty>("Notifies");
+                        foreach (var notify in originalNotifies)
+                        {
+                            var newEntry = EntryCloner.CloneTree(notify.GetProp<ObjectProperty>("Notify").ResolveToEntry(pew.Pcc), false);
+                            newEntry.Parent = seq;
+                            var newNotify = notify.DeepClone();
+                            newNotify.Properties.AddOrReplaceProp(new ObjectProperty(newEntry, "Notify"));
+                            notifies.Add(newNotify);
+                        }
+                        seq.WriteProperty(notifies);
+                    }
+                }
             }
         }
 
@@ -170,13 +200,27 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                  * Clothing Assets (all null anyway in vanilla)
                  * LOD size (doesn't seem to be important; UDK imports have it set to 0, and I don't know how it is calculated)
                  * PerPolyBoneKDOPS (no idea what this is, it's mostly empty in vanilla)
-                 * importing to OT1 (the format is slightly different in ways I don't care to implement, though I should disallow this), you can probably use debug build to port into OT1 if you must
+                 * importing to OT1 (the format is slightly different in ways I don't care to implement), you can probably use debug build to port into OT1 if you must
                  * */
 
                 // just write one LOD. we could extend this to multiple in the future if needed, but no one I know of is actually generating multiple LODs
                 meshBin.LODModels = [LOD];
 
                 meshExport.WriteBinary(meshBin);
+
+                // copy the sockets from the selected mesh onto the new one
+                if (GetSelectedItem(pew, "SkeletalMesh", out var selectedMesh))
+                {
+                    var oldSocketsProp = selectedMesh.GetProperty<ArrayProperty<ObjectProperty>>("Sockets");
+                    var newSocketsProp = new ArrayProperty<ObjectProperty>("Sockets");
+                    foreach (var socket in oldSocketsProp)
+                    {
+                        var newEntry = EntryCloner.CloneEntry(socket.ResolveToEntry(pew.Pcc), incrementIndex: false);
+                        newEntry.Parent = meshExport;
+                        newSocketsProp.Add(new ObjectProperty(newEntry));
+                    }
+                    meshExport.WriteProperty(newSocketsProp);
+                }
             }
 
             static void SetupSkeleton(PSK psk, SkeletalMesh meshBin)
@@ -639,7 +683,6 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 var d = new SaveFileDialog { Filter = "PSA|*.psa" };
                 if (d.ShowDialog() == true)
                 {
-                    // TODO any validation at all
                     var psa = PSA.CreateFrom(animSeqExport.GetBinaryData<AnimSequence>());
 
                     psa.ToFile(d.FileName);
@@ -654,8 +697,6 @@ namespace LegendaryExplorer.Tools.PackageEditor.Experiments
                 var d = new SaveFileDialog { Filter = "PSA|*.psa" };
                 if (d.ShowDialog() == true)
                 {
-                    //var data = animSetExport.GetProperty<ObjectProperty>("m_pBioAnimSetData").ResolveToEntry(pew.Pcc) as ExportEntry;
-                    // TODO any validation at all
                     var sequences = animSetExport.GetProperty<ArrayProperty<ObjectProperty>>("Sequences").Select(x => (x.ResolveToExport(pew.Pcc, new PackageCache())).GetBinaryData<AnimSequence>());
 
                     var psa = PSA.CreateFrom([.. sequences]);

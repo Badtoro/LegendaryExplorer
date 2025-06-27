@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using LegendaryExplorerCore.Packages;
 using LegendaryExplorerCore.Unreal.BinaryConverters;
 
 namespace LegendaryExplorerCore.Unreal
@@ -118,6 +119,13 @@ namespace LegendaryExplorerCore.Unreal
                 Infos = [],
                 Keys = []
             };
+
+            var data = animSeqs.Select(x => x.Export.GetProperty<ObjectProperty>("m_pBioAnimSetData").Value);
+            var first = data.First();
+            if (!data.All(x => x == first))
+            {
+                throw new ArgumentException("AnimSequences do not all have matching animSet data!", nameof(animSeqs));
+            }
 
             int numBones = animSeqs[0].Bones.Count;
             for (int i = 0; i < numBones; i++)
