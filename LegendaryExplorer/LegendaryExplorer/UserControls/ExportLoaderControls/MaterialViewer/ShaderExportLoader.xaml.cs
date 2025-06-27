@@ -384,12 +384,10 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                         BusyText = "Calculating Shader offsets\n(May take ~15s)";
                     }
 
-                    MaterialShaderMap msmFromGlobalCache =
-                        RefShaderCacheReader.GetMaterialShaderMap(Pcc.Game, sps, out int fileOffset);
+                    MaterialShaderMap msmFromGlobalCache = RefShaderCacheReader.GetMaterialShaderMap(Pcc.Game, sps, out int fileOffset);
                     if (msmFromGlobalCache != null && CurrentLoadedExport is not null)
                     {
-                        var topInfoText =
-                            $"Shaders in {RefShaderCacheReader.GlobalShaderFileName(Pcc.Game)} at 0x{fileOffset:X8}";
+                        var topInfoText = $"Shaders in {RefShaderCacheReader.ShaderCacheName(Pcc.Game)} at 0x{fileOffset:X8}";
                         return (GetMeshShaderMaps(msmFromGlobalCache), topInfoText);
                     }
                 }

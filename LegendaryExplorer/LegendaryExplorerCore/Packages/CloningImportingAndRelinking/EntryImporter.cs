@@ -1841,20 +1841,23 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             //This saves us retrieving and comparing the ClassName string for each import.
             //Export can use IsClass because that's just a simple int comparison
             int classNameIdx = pcc.findName("Class");
-            foreach (ImportEntry import in pcc.Imports)
+            if (classNameIdx > -1) // if package doesn't contain 'Class' it doesn't contain any classes, so skip this
             {
-                if (import.idxClassName == classNameIdx && import.ObjectName == className)
+                foreach (ImportEntry import in pcc.Imports)
                 {
-                    return import;
+                    if (import.idxClassName == classNameIdx && import.ObjectName == className)
+                    {
+                        return import;
+                    }
                 }
-            }
-            foreach (ExportEntry export in pcc.Exports)
-            {
-                // 05/12/2025 - Change comparison to .Instanced because some vanilla material names
-                // are 'Material' and it is causing relink issues when class has not been resolved yet.
-                if (export.IsClass && export.ObjectName.Instanced == className)
+                foreach (ExportEntry export in pcc.Exports)
                 {
-                    return export;
+                    // 05/12/2025 - Change comparison to .Instanced because some vanilla material names
+                    // are 'Material' and it is causing relink issues when class has not been resolved yet.
+                    if (export.IsClass && export.ObjectName.Instanced == className)
+                    {
+                        return export;
+                    }
                 }
             }
 

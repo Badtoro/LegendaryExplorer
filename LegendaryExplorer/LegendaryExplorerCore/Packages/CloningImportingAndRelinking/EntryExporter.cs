@@ -70,7 +70,7 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
             customROP?.CrossPackageMap.Clear();
 
             // Import the original item now
-            var lParent = PortParents(sourceExport, targetPackage, cache: cache);
+            var lParent = PortParents(sourceExport, targetPackage, cache: cache, customROP: customROP);
 
             // Test the entry was not ported in already, such as from a Parent reference
             newEntry = targetPackage.FindEntry(sourceExport.InstancedFullPath, sourceExport.ClassName);
@@ -235,7 +235,10 @@ namespace LegendaryExplorerCore.Packages.CloningImportingAndRelinking
                     {
                         // Port in with relink... this could get really ugly performance wise
                         // Unsure how this will work if it tries to bring over things as we port INTO linker package
-                        EntryImporter.ImportAndRelinkEntries(EntryImporter.PortingOption.AddSingularAsChild, pEntry, target, parent, true, new RelinkerOptionsPackage() { ImportExportDependencies = true, PortImportsMemorySafe = true, Cache = cache }, out parent);
+
+                        // 06/23/2025 - Use passed in ROP object, otherwise make a new one.
+                        // Unsure if we should set PortImportsMemorySafe on it to make sure things pull in properly.
+                        EntryImporter.ImportAndRelinkEntries(EntryImporter.PortingOption.AddSingularAsChild, pEntry, target, parent, true, customROP ?? new RelinkerOptionsPackage() { ImportExportDependencies = true, PortImportsMemorySafe = true, Cache = cache }, out parent);
                     }
                     //var entriesAC = target.ExportCount;
                     //if (entriesAC - entriesBC > parentCount)
