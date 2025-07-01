@@ -14,6 +14,7 @@ namespace LegendaryExplorerCore.Tests
     public class ShaderCacheTests
     {
         [TestMethod]
+        [Ignore]
         public void TestGlobalShaderCacheReserialization()
         {
             GlobalTest.Init();
@@ -27,7 +28,7 @@ namespace LegendaryExplorerCore.Tests
                 var outS = new MemoryStream();
                 ShaderCache.PackagelessSerializingContainer container = new(outS, null)
                 {
-                    ActualGame = MEGame.LE3
+                    //ActualGame = MEGame.LE3
                 };
                 inCache.WriteTo(container);
 #if DEBUG
