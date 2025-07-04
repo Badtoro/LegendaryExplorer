@@ -23,7 +23,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             Serialize(ref shaderType);
             Serialize(ref id);
             
-            if (Game is not MEGame.LE3)
+            if (Game is not (MEGame.LE3 or MEGame.LE1))
             {
                 shader = new UnparsedShader
                 {
@@ -955,7 +955,99 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 case "FLightFunctionPixelShader":
                     shader = new FLightFunctionPixelShader();
                     break;
-                
+
+                //LE1 only shaders
+                case "FSFXUberPostProcessBlendPixelShader111111":
+                case "FSFXUberPostProcessBlendPixelShader111110":
+                case "FSFXUberPostProcessBlendPixelShader111101":
+                case "FSFXUberPostProcessBlendPixelShader111100":
+                case "FSFXUberPostProcessBlendPixelShader111011":
+                case "FSFXUberPostProcessBlendPixelShader111010":
+                case "FSFXUberPostProcessBlendPixelShader111001":
+                case "FSFXUberPostProcessBlendPixelShader111000":
+                case "FSFXUberPostProcessBlendPixelShader110111":
+                case "FSFXUberPostProcessBlendPixelShader110110":
+                case "FSFXUberPostProcessBlendPixelShader110101":
+                case "FSFXUberPostProcessBlendPixelShader110100":
+                case "FSFXUberPostProcessBlendPixelShader110011":
+                case "FSFXUberPostProcessBlendPixelShader110010":
+                case "FSFXUberPostProcessBlendPixelShader110001":
+                case "FSFXUberPostProcessBlendPixelShader110000":
+                case "FSFXUberPostProcessBlendPixelShader101111":
+                case "FSFXUberPostProcessBlendPixelShader101110":
+                case "FSFXUberPostProcessBlendPixelShader101101":
+                case "FSFXUberPostProcessBlendPixelShader101100":
+                case "FSFXUberPostProcessBlendPixelShader101011":
+                case "FSFXUberPostProcessBlendPixelShader101010":
+                case "FSFXUberPostProcessBlendPixelShader101001":
+                case "FSFXUberPostProcessBlendPixelShader101000":
+                case "FSFXUberPostProcessBlendPixelShader100111":
+                case "FSFXUberPostProcessBlendPixelShader100110":
+                case "FSFXUberPostProcessBlendPixelShader100101":
+                case "FSFXUberPostProcessBlendPixelShader100100":
+                case "FSFXUberPostProcessBlendPixelShader100011":
+                case "FSFXUberPostProcessBlendPixelShader100010":
+                case "FSFXUberPostProcessBlendPixelShader100001":
+                case "FSFXUberPostProcessBlendPixelShader100000":
+                case "FSFXUberPostProcessBlendPixelShader011111":
+                case "FSFXUberPostProcessBlendPixelShader011110":
+                case "FSFXUberPostProcessBlendPixelShader011101":
+                case "FSFXUberPostProcessBlendPixelShader011100":
+                case "FSFXUberPostProcessBlendPixelShader011011":
+                case "FSFXUberPostProcessBlendPixelShader011010":
+                case "FSFXUberPostProcessBlendPixelShader011001":
+                case "FSFXUberPostProcessBlendPixelShader011000":
+                case "FSFXUberPostProcessBlendPixelShader010111":
+                case "FSFXUberPostProcessBlendPixelShader010110":
+                case "FSFXUberPostProcessBlendPixelShader010101":
+                case "FSFXUberPostProcessBlendPixelShader010100":
+                case "FSFXUberPostProcessBlendPixelShader010011":
+                case "FSFXUberPostProcessBlendPixelShader010010":
+                case "FSFXUberPostProcessBlendPixelShader010001":
+                case "FSFXUberPostProcessBlendPixelShader010000":
+                case "FSFXUberPostProcessBlendPixelShader001111":
+                case "FSFXUberPostProcessBlendPixelShader001110":
+                case "FSFXUberPostProcessBlendPixelShader001101":
+                case "FSFXUberPostProcessBlendPixelShader001100":
+                case "FSFXUberPostProcessBlendPixelShader001011":
+                case "FSFXUberPostProcessBlendPixelShader001010":
+                case "FSFXUberPostProcessBlendPixelShader001001":
+                case "FSFXUberPostProcessBlendPixelShader001000":
+                case "FSFXUberPostProcessBlendPixelShader000111":
+                case "FSFXUberPostProcessBlendPixelShader000110":
+                case "FSFXUberPostProcessBlendPixelShader000101":
+                case "FSFXUberPostProcessBlendPixelShader000100":
+                case "FSFXUberPostProcessBlendPixelShader000011":
+                case "FSFXUberPostProcessBlendPixelShader000010":
+                case "FSFXUberPostProcessBlendPixelShader000001":
+                case "FSFXUberPostProcessBlendPixelShader000000":
+                    shader = new FSFXUberPostProcessBlendPixelShader();
+                    break;
+                case "FUberPostProcessBlendPixelShader1111":
+                case "FUberPostProcessBlendPixelShader1110":
+                case "FUberPostProcessBlendPixelShader1101":
+                case "FUberPostProcessBlendPixelShader1100":
+                case "FUberPostProcessBlendPixelShader1011":
+                case "FUberPostProcessBlendPixelShader1010":
+                case "FUberPostProcessBlendPixelShader1001":
+                case "FUberPostProcessBlendPixelShader1000":
+                case "FUberPostProcessBlendPixelShader0111":
+                case "FUberPostProcessBlendPixelShader0110":
+                case "FUberPostProcessBlendPixelShader0101":
+                case "FUberPostProcessBlendPixelShader0100":
+                case "FUberPostProcessBlendPixelShader0011":
+                case "FUberPostProcessBlendPixelShader0010":
+                case "FUberPostProcessBlendPixelShader0001":
+                case "FUberPostProcessBlendPixelShader0000":
+                    shader = new FUberPostProcessBlendPixelShader();
+                    break;
+                case "TBloomGatherPixelShader<MAX_FILTER_SAMPLES>":
+                    shader = new TDOFAndBloomGatherPixelShader();
+                    break;
+                case "TDOFGatherPixelShader<MAX_FILTER_SAMPLES>":
+                    shader = new TDOFGatherPixelShader();
+                    break;
+
                 // These are in GlobalShaderCache but are not in the game's executable.
                 // They are likely editor-only shaders and cannot be used by the game,
                 // but we have to be able to deserialize the GlobalShaderCache so we have to handle it here.
@@ -1010,9 +1102,9 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         //Ignores Endianness! Only use for Shader serialization
         public void SerializeUnmanaged<T>(ref T val, string logging) where T : unmanaged
         {
-#if DEBUG
-            Debug.WriteLine($"Serializing {logging} at {ms.Position:X8}");
-#endif
+//#if DEBUG
+//            Debug.WriteLine($"Serializing {logging} at {ms.Position:X8}");
+//#endif
             if (IsLoading)
             {
                 ms.Read(val.AsBytes());

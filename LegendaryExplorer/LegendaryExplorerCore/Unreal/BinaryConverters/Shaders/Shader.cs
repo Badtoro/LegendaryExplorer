@@ -794,8 +794,11 @@ public class FSFXUberPostProcessBlendPixelShader : FUberPostProcessBlendPixelSha
         sc.SerializeUnmanaged(ref NoiseTextureOffset);
         sc.SerializeUnmanaged(ref FilmGrain_Scale);
         sc.SerializeUnmanaged(ref smpFilmicLUT);
-        sc.SerializeUnmanaged(ref ScreenUVScaleBias);
-        sc.SerializeUnmanaged(ref HighPrecisionGamma);
+        if (sc.Game is MEGame.LE3)
+        {
+            sc.SerializeUnmanaged(ref ScreenUVScaleBias);
+            sc.SerializeUnmanaged(ref HighPrecisionGamma);
+        }
         return defferedOffsetWriter;
     }
 }
@@ -835,7 +838,7 @@ public class FUberPostProcessBlendPixelShader : FDOFAndBloomBlendPixelShader
     public FColorRemapShaderParameters MaterialParameters;
     public FGammaShaderParameters GammaParameters;
     public FShaderResourceParameter LowResSceneBuffer;
-    public FShaderParameter HalfResMaskRec;
+    public FShaderParameter HalfResMaskRect;
     public FMotionBlurShaderParameters MotionBlurParameters;
 
     internal override DefferedFileOffsetWriter Serialize(SerializingContainer sc)
@@ -843,8 +846,11 @@ public class FUberPostProcessBlendPixelShader : FDOFAndBloomBlendPixelShader
         var defferedOffsetWriter = base.Serialize(sc);
         sc.SerializeUnmanaged(ref MaterialParameters);
         sc.SerializeUnmanaged(ref GammaParameters);
-        sc.SerializeUnmanaged(ref LowResSceneBuffer);
-        sc.SerializeUnmanaged(ref HalfResMaskRec);
+        if (sc.Game is MEGame.LE3)
+        {
+            sc.SerializeUnmanaged(ref LowResSceneBuffer);
+            sc.SerializeUnmanaged(ref HalfResMaskRect);
+        }
         sc.SerializeUnmanaged(ref MotionBlurParameters);
         return defferedOffsetWriter;
     }

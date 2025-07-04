@@ -1193,10 +1193,9 @@ import java.util.*;"
         }
         public static void ScanStuff(PackageEditorWindow pewpf)
         {
-            // 05/16/2024 - This has not been compilable for some time, is being commented out - Mgamerz
+#if !DEBUG
             throw new Exception("Experiment has been disabled");
-
-
+#endif
             ////test pcc deserialization time
             //string pccPath = MELoadedFiles.GetFilesLoadedInGame(MEGame.LE3)["SFXGame.pcc"];
             //for (int i = 0; i < 200; i++)
@@ -1225,7 +1224,7 @@ import java.util.*;"
             pewpf.BusyText = "Scanning";
             Task.Run(() =>
             {
-                foreach (MEGame game in new[] { MEGame.LE3, MEGame.LE2, MEGame.LE1, /*MEGame.ME3, MEGame.ME2, MEGame.ME1*/ })
+                foreach (MEGame game in new[] { MEGame.LE3, /*MEGame.LE2,*/ MEGame.LE1, /*MEGame.ME3, MEGame.ME2, MEGame.ME1*/ })
                 {
                     //preload base files for faster scanning
                     using (DisposableCollection<IMEPackage> baseFiles = MEPackageHandler.OpenMEPackages(EntryImporter.FilesSafeToImportFrom(game)
@@ -1237,9 +1236,9 @@ import java.util.*;"
                         {
                             baseFiles.Add(MEPackageHandler.OpenMEPackage(Path.Combine(ME3Directory.CookedPCPath, "BIOP_MP_COMMON.pcc")));
                         }
-
                         foreach (string filePath in EnumerateOfficialFiles(game))
                         {
+                            ReserializeShaderCaches(filePath);
                             //ScanShaderCache(filePath);
                             //ScanMaterials(filePath);
                             //ScanStaticMeshComponents(filePath);
@@ -1251,10 +1250,14 @@ import java.util.*;"
                             //RecompileAllFunctions(filePath);
                             //RecompileAllStates(filePath);
                             //RecompileAllDefaults(filePath, packageCache);
-                            RecompileAllPropsOfNonScriptExports(filePath, packageCache);
+                            //RecompileAllPropsOfNonScriptExports(filePath, packageCache);
                             //RecompileAllStructs(filePath, packageCache);
                             //RecompileAllEnums(filePath, packageCache);
                             //RecompileAllClasses(filePath, packageCache);
+                            if (interestingExports.Any())
+                            {
+                                return;
+                            }
                         }
                     }
                     //the base files will have been in memory for so long at this point that they take a looong time to clear out automatically, so force it.
@@ -1296,6 +1299,39 @@ import java.util.*;"
             });
 
             #region extra scanning functions
+
+            bool ReserializeShaderCaches(string filePath)
+            {
+                using IMEPackage pcc = MEPackageHandler.OpenMEPackage(filePath);
+                ExportEntry shaderCache = pcc.Exports.FirstOrDefault(exp => exp.ClassName == "ShaderCache");
+                if (shaderCache == null) return true;
+
+                try
+                {
+                    byte[] originalData = shaderCache.Data;
+                    var shaderBin = shaderCache.GetBinaryData<ShaderCache>();
+                    shaderCache.WriteBinary(shaderBin);
+                    if (!originalData.AsSpan().SequenceEqual(shaderCache.DataReadOnly))
+                    {
+                        interestingExports.Add(shaderCache);
+                        byte[] newData = shaderCache.Data;
+                        comparisonDict.Add($"{shaderCache.UIndex} {shaderCache.FileRef.FilePath}", (originalData, newData));
+                        File.WriteAllBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "original.bin"), originalData);
+                        File.WriteAllBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "new.bin"), newData);
+                        return false;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Debug.WriteLine(exception);
+                    interestingExports.Add(new EntryStringPair(shaderCache, $"{shaderCache.UIndex}: {filePath}\n{exception}"));
+                    return false;
+                }
+
+
+
+                return true;
+            }
 
             bool findClass(string filePath, string className, bool withBinary = false)
             {
