@@ -6,11 +6,13 @@ using System.IO;
 
 namespace LegendaryExplorerCore.Unreal.BinaryConverters;
 
+// This class must still take pcc so subclasses that can use pcc will pass it up
+// Callers using straight packageless should pass null for pcc
+
 /// <summary>
-/// Serializer used by the GlobalShaderCache, to serialize name references as strings. This cannot serialize objects.
+/// Serializer used by the GlobalShaderCache and, to serialize name references as strings. This cannot serialize objects.
 /// </summary>
 /// <param name="stream"></param>
-/// <param name="pcc"></param>
 /// <param name="isLoading"></param>
 /// <param name="offset"></param>
 /// <param name="packageCache"></param>
