@@ -757,7 +757,22 @@ public class TFilterPixelShader : Shader
         var defferedOffsetWriter = base.Serialize(sc);
         sc.SerializeUnmanaged(ref FilterTexture);
         sc.SerializeUnmanaged(ref SampleWeights);
-        sc.SerializeUnmanaged(ref SampleMaskRect);
+        if (sc.Game is MEGame.LE3)
+        {
+            sc.SerializeUnmanaged(ref SampleMaskRect);
+        }
+        return defferedOffsetWriter;
+    }
+}
+
+public class TFilterPixelShaderDepthInAlpha : TFilterPixelShader
+{
+    public FSceneTextureShaderParameters SceneTextureParameters;
+
+    internal override DefferedFileOffsetWriter Serialize(SerializingContainer sc)
+    {
+        var defferedOffsetWriter = base.Serialize(sc);
+        sc.SerializeUnmanaged(ref SceneTextureParameters);
         return defferedOffsetWriter;
     }
 }
@@ -813,8 +828,11 @@ public class FUberPostProcessVertexShader : Shader
     {
         var defferedOffsetWriter = base.Serialize(sc);
         sc.SerializeUnmanaged(ref SceneCoordinate1ScaleBias);
-        sc.SerializeUnmanaged(ref SceneCoordinate2ScaleBias);
-        sc.SerializeUnmanaged(ref SceneCoordinate3ScaleBias);
+        if (sc.Game is MEGame.LE3)
+        {
+            sc.SerializeUnmanaged(ref SceneCoordinate2ScaleBias);
+            sc.SerializeUnmanaged(ref SceneCoordinate3ScaleBias);
+        }
         return defferedOffsetWriter;
     }
 }
@@ -1617,6 +1635,11 @@ public class FFXAA3VertexShader : Shader
 
 public class FSimpleElementDistanceFieldGammaPixelShader : Shader
 {
+    public FShaderResourceParameter Texture;
+    public FShaderParameter TextureComponentReplicate;
+    public FShaderParameter TextureComponentReplicateAlpha;
+    public FShaderParameter Gamma;
+    public FShaderParameter ClipRef;
     public FShaderParameter SmoothWidth;
     public FShaderParameter EnableShadow;
     public FShaderParameter ShadowDirection;
@@ -1630,6 +1653,11 @@ public class FSimpleElementDistanceFieldGammaPixelShader : Shader
     internal override DefferedFileOffsetWriter Serialize(SerializingContainer sc)
     {
         var defferedOffsetWriter = base.Serialize(sc);
+        sc.SerializeUnmanaged(ref Texture);
+        sc.SerializeUnmanaged(ref TextureComponentReplicate);
+        sc.SerializeUnmanaged(ref TextureComponentReplicateAlpha);
+        sc.SerializeUnmanaged(ref Gamma);
+        sc.SerializeUnmanaged(ref ClipRef);
         sc.SerializeUnmanaged(ref SmoothWidth);
         sc.SerializeUnmanaged(ref EnableShadow);
         sc.SerializeUnmanaged(ref ShadowDirection);
@@ -2212,22 +2240,58 @@ public class TAOMeshVertexShader : Shader
 
 public class FLightFunctionPixelShader : Shader
 {
-    public FShaderResourceParameter SceneColorTexture;
-    public FShaderResourceParameter SceneDepthTexture;
-    public FShaderParameter MinZ_MaxZRatio;
-    public FShaderParameter ScreenPositionScaleBias;
+    public FSceneTextureShaderParameters SceneTextureParameters;
     public FShaderParameter ScreenToLight;
     public FMaterialPixelShaderParameters MaterialParameters;
 
     internal override DefferedFileOffsetWriter Serialize(SerializingContainer sc)
     {
         var defferedOffsetWriter = base.Serialize(sc);
-        sc.SerializeUnmanaged(ref SceneColorTexture);
-        sc.SerializeUnmanaged(ref SceneDepthTexture);
-        sc.SerializeUnmanaged(ref MinZ_MaxZRatio);
-        sc.SerializeUnmanaged(ref ScreenPositionScaleBias);
+        sc.SerializeUnmanaged(ref SceneTextureParameters);
         sc.SerializeUnmanaged(ref ScreenToLight);
         MaterialParameters.Serialize(sc);
+        return defferedOffsetWriter;
+    }
+}
+
+public class VisualizeTexturePixelShader : Shader
+{
+    public FShaderResourceParameter VisualizeTexture;
+    public FShaderParameter VisualizeParam;
+
+    internal override DefferedFileOffsetWriter Serialize(SerializingContainer sc)
+    {
+        var defferedOffsetWriter = base.Serialize(sc);
+        sc.SerializeUnmanaged(ref VisualizeTexture);
+        sc.SerializeUnmanaged(ref VisualizeParam);
+        return defferedOffsetWriter;
+    }
+}
+
+public class FMLAAComputeLineLengthPixelShader : Shader
+{
+    public FShaderResourceParameter EdgeMaskTexture;
+    public FShaderParameter gRTSize;
+
+    internal override DefferedFileOffsetWriter Serialize(SerializingContainer sc)
+    {
+        var defferedOffsetWriter = base.Serialize(sc);
+        sc.SerializeUnmanaged(ref EdgeMaskTexture);
+        sc.SerializeUnmanaged(ref gRTSize);
+        return defferedOffsetWriter;
+    }
+}
+
+public class FFilterVSMPixelShader : Shader
+{
+    public FShaderResourceParameter VarianceTexture;
+    public FShaderParameter SampleWeights;
+
+    internal override DefferedFileOffsetWriter Serialize(SerializingContainer sc)
+    {
+        var defferedOffsetWriter = base.Serialize(sc);
+        sc.SerializeUnmanaged(ref VarianceTexture);
+        sc.SerializeUnmanaged(ref SampleWeights);
         return defferedOffsetWriter;
     }
 }

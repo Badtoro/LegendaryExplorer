@@ -293,6 +293,24 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 case "TFilterPixelShader<1>":
                     shader = new TFilterPixelShader();
                     break;
+                case "TFilterPixelShaderDepthInAlpha<16>":
+                case "TFilterPixelShaderDepthInAlpha<15>":
+                case "TFilterPixelShaderDepthInAlpha<14>":
+                case "TFilterPixelShaderDepthInAlpha<13>":
+                case "TFilterPixelShaderDepthInAlpha<12>":
+                case "TFilterPixelShaderDepthInAlpha<11>":
+                case "TFilterPixelShaderDepthInAlpha<10>":
+                case "TFilterPixelShaderDepthInAlpha<9>":
+                case "TFilterPixelShaderDepthInAlpha<8>":
+                case "TFilterPixelShaderDepthInAlpha<7>":
+                case "TFilterPixelShaderDepthInAlpha<6>":
+                case "TFilterPixelShaderDepthInAlpha<5>":
+                case "TFilterPixelShaderDepthInAlpha<4>":
+                case "TFilterPixelShaderDepthInAlpha<3>":
+                case "TFilterPixelShaderDepthInAlpha<2>":
+                case "TFilterPixelShaderDepthInAlpha<1>":
+                    shader = new TFilterPixelShaderDepthInAlpha();
+                    break;
                 case "FShadowVolumeVertexShader":
                     shader = new FShadowVolumeVertexShader();
                     break;
@@ -686,7 +704,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 case "TEdgePreservingFilterPixelShader<6>":
                 case "TEdgePreservingFilterPixelShader<4>":
                 case "TEdgePreservingFilterPixelShader<2>":
-                    shader = new FStaticHistoryUpdatePixelShader();
+                    shader = new TEdgePreservingFilterPixelShader();
                     break;
                 case "TAmbientOcclusionPixelShaderFDefaultQualityAOTRUEFALSE":
                 case "TAmbientOcclusionPixelShaderFDefaultQualityAOFALSETRUE":
@@ -955,6 +973,15 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 case "FLightFunctionPixelShader":
                     shader = new FLightFunctionPixelShader();
                     break;
+                case "VisualizeTexturePixelShader":
+                    shader = new VisualizeTexturePixelShader();
+                    break;
+                case "FMLAAComputeLineLengthPixelShader":
+                    shader = new FMLAAComputeLineLengthPixelShader();
+                    break;
+                case "FFilterVSMPixelShader":
+                    shader = new FFilterVSMPixelShader();
+                    break;
 
                 //LE1 only shaders
                 case "FSFXUberPostProcessBlendPixelShader111111":
@@ -1062,13 +1089,8 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 default:
                     throw new InvalidDataException($"Unexpected shader type: '{shaderType.Name}'");
             }
-            shader.Serialize(this);
+            var endOffset = shader.Serialize(this).SerializedOffset;
             //for debugging
-            //var offsetWriter = shader.Serialize(this);
-            //var pos = ms.Position;
-            //ms.JumpTo(offsetWriter.WritePos);
-            //var endOffset = ms.ReadInt32();
-            //ms.JumpTo(pos);
             //if (endOffset != FileOffset)
             //{
             //    Debugger.Break();
