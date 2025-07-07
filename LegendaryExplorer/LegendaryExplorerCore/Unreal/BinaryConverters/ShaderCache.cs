@@ -18,8 +18,8 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public bool Packageless;
         public UMultiMap<NameReference, uint> ShaderTypeCRCMap; //TODO: Make this a UMap
         public UMultiMap<Guid, Shader> Shaders; //TODO: Make this a UMap
-        public UMultiMap<NameReference, uint> VertexFactoryTypeCRCMap; //TODO: Make this a UMap
-        public UMultiMap<NameReference, Guid> VertexFactoryTypeGuidMap; // GlobalShaderCache
+        public UMultiMap<NameReference, uint> VertexFactoryTypeCRCMap; // Not ME1 TODO: Make this a UMap
+        public UMultiMap<NameReference, Guid> VertexFactoryTypeGuidMap; // ME1
         public UMultiMap<StaticParameterSet, MaterialShaderMap> MaterialShaderMaps; //TODO: Make this a UMap
 
         /// <summary>
@@ -114,14 +114,7 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
 
             if (sc.Game == MEGame.ME1)
             {
-                if (Packageless)
-                {
-                    sc.Serialize(ref VertexFactoryTypeGuidMap, sc.Serialize, sc.Serialize);
-                }
-                else
-                {
-                    sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
-                }
+                sc.Serialize(ref VertexFactoryTypeGuidMap, sc.Serialize, sc.Serialize);
             }
 
             // EMBEDDED SHADER FILES
@@ -149,38 +142,18 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
             // VertexFactoryType to CRC maps
             if (sc.Game != MEGame.ME1 && sc.Game != MEGame.UDK)
             {
-                if (Packageless)
-                {
-                    NameReference prevNameRef = default;
-                    sc.Serialize(ref VertexFactoryTypeGuidMap, (ref NameReference nameRef) =>
-                    {
-                        sc.Serialize(ref nameRef);
-                        prevNameRef = nameRef;
-
-                    }, (ref Guid guid) =>
-                    {
-                        sc.Serialize(ref guid);
-                        sc.Serialize(ref prevNameRef);
-                    });
-                }
-                else
-                {
-                    sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
-                }
+                sc.Serialize(ref VertexFactoryTypeCRCMap, sc.Serialize, sc.Serialize);
             }
 
-            if (!Packageless)
-            {
-                // Shader maps (maps material guids to a map of diff shader types located in the embedded shaders block)
-                sc.Serialize(ref MaterialShaderMaps, sc.Serialize, sc.Serialize);
+            // Shader maps (maps material guids to a map of diff shader types located in the embedded shaders block)
+            sc.Serialize(ref MaterialShaderMaps, sc.Serialize, sc.Serialize);
 
-                if (sc.Game is not (MEGame.ME2 or MEGame.LE2 or MEGame.LE1 or MEGame.UDK))
-                {
-                    // Technically this matters on console
-                    // Technically we don't support them
-                    int shaderCachePayloadsSize = 0;
-                    sc.Serialize(ref shaderCachePayloadsSize);
-                }
+            if (sc.Game is not (MEGame.ME2 or MEGame.LE2 or MEGame.LE1 or MEGame.UDK))
+            {
+                // Technically this matters on console
+                // Technically we don't support them
+                int shaderCachePayloadsSize = 0;
+                sc.Serialize(ref shaderCachePayloadsSize);
             }
         }
         public static ShaderCache Create()
