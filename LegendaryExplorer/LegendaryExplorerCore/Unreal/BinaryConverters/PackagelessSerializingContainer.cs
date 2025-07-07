@@ -78,7 +78,7 @@ public class PackagelessWithObjectsSerializingContainer(Stream stream, IMEPackag
         var foundEntry = pcc.FindEntry(objectIfp);
         if (foundEntry == null)
         {
-            Debug.WriteLine($"Could not found {objectIfp} in package, value will be set to null");
+            Debug.WriteLine($"Could not find {objectIfp} in package, value will be set to null");
             val = 0;
         }
         else
