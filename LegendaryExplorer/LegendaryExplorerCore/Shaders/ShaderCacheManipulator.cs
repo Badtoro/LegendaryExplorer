@@ -373,7 +373,7 @@ namespace LegendaryExplorerCore.Shaders
             }
 
             var newCache = ShaderCache.Create();
-            RefShaderCacheReader.PopulateCRCMaps(newCache);
+            RefShaderCacheReader.PopulateCRCMaps(package.Game, newCache);
             seekFreeShaderCacheExport = new ExportEntry(package, 0, "SeekFreeShaderCache", BitConverter.GetBytes(-1), binary: newCache)
             {
                 Class = package.GetEntryOrAddImport("Engine.ShaderCache", "Class"),
@@ -381,7 +381,7 @@ namespace LegendaryExplorerCore.Shaders
                   UnrealFlags.EObjectFlags.LoadForServer | UnrealFlags.EObjectFlags.Standalone
             };
             package.AddExport(seekFreeShaderCacheExport);
-            return seekFreeShaderCacheExport
+            return seekFreeShaderCacheExport;
         }
 
         /// <summary>
