@@ -126,7 +126,6 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
                 {
                     Shader shader = null;
                     sc.Serialize(ref shader);
-                    //Debug.WriteLine($"Shader stopped serializing at {sc.ms.Position:X8}");
                     Shaders.Add(shader.Guid, shader);
                 }
             }
