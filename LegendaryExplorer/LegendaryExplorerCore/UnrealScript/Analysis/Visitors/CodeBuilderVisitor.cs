@@ -1874,7 +1874,7 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Visitors
                 specs.Add("out");
             }
 
-            if (flags.Has(EPropertyFlags.EditInline & EPropertyFlags.ExportObject))
+            if (flags.Has(EPropertyFlags.EditInline | EPropertyFlags.ExportObject))
             {
                 specs.Add("instanced");
             }
