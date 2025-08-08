@@ -1808,11 +1808,6 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Visitors
                 specs.Add("config");
             }
 
-            if (flags.Has(EPropertyFlags.EditInline))
-            {
-                specs.Add(nameof(EPropertyFlags.EditInline).ToLowerInvariant());
-            }
-
             if (flags.Has(EPropertyFlags.Localized))
             {
                 specs.Add("localized");
@@ -1879,9 +1874,20 @@ namespace LegendaryExplorerCore.UnrealScript.Analysis.Visitors
                 specs.Add("out");
             }
 
-            if (flags.Has(EPropertyFlags.ExportObject))
+            if (flags.Has(EPropertyFlags.EditInline & EPropertyFlags.ExportObject))
             {
-                specs.Add("export");
+                specs.Add("instanced");
+            }
+            else
+            {
+                if (flags.Has(EPropertyFlags.EditInline))
+                {
+                    specs.Add("editinline");
+                }
+                if (flags.Has(EPropertyFlags.ExportObject))
+                {
+                    specs.Add("export");
+                }
             }
 
             if (flags.Has(EPropertyFlags.EditInlineUse))

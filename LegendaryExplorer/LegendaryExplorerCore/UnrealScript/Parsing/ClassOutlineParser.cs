@@ -1130,6 +1130,10 @@ namespace LegendaryExplorerCore.UnrealScript.Parsing
                 {
                     flags |= EPropertyFlags.GlobalConfig | EPropertyFlags.Config;
                 }
+                else if (Matches("instanced", EF.Specifier))
+                {
+                    flags |= EPropertyFlags.EditInline | EPropertyFlags.ExportObject;
+                }
                 else if (Matches(nameof(EPropertyFlags.EditInline), EF.Specifier))
                 {
                     flags |= EPropertyFlags.EditInline;
