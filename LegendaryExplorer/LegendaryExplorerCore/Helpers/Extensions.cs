@@ -893,6 +893,17 @@ namespace LegendaryExplorerCore.Helpers
             }
         }
 
+        public static Vector3 GetAxis(this Matrix4x4 m, int axis) => new Vector3(m[axis, 0], m[axis, 1], m[axis, 2]);
+
+        public static Vector3 Normal(this Vector3 vec) => Vector3.Normalize(vec);
+
+        public static float RotDeterminant(this Matrix4x4 m)
+        {
+            return m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1]) -
+                   m[1, 0] * (m[0, 1] * m[2, 2] - m[0, 2] * m[2, 1]) +
+                   m[2, 0] * (m[0, 1] * m[1, 2] - m[0, 2] * m[1, 1]);
+        }
+
         public static (Vector3 translation, Vector3 scale, Rotator rotation) UnrealDecompose(this Matrix4x4 m)
         {
             Vector3 translation = m.Translation;

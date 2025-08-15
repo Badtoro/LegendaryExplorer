@@ -171,6 +171,19 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         public Vector3 Max;
         public byte IsValid;
 
+        public Box()
+        {
+            Min = Vector3.Zero;
+            Max = Vector3.Zero;
+            IsValid = 0;
+        }
+        public Box(Vector3 min, Vector3 max)
+        {
+            Min = min;
+            Max = max;
+            IsValid = 1;
+        }
+
         public void Add(Vector3 vec)
         {
             if (IsValid > 0)
@@ -191,11 +204,25 @@ namespace LegendaryExplorerCore.Unreal.BinaryConverters
         }
     }
 
-    public class BoxSphereBounds
+    public struct BoxSphereBounds
     {
         public Vector3 Origin;
         public Vector3 BoxExtent;
         public float SphereRadius;
+
+        public BoxSphereBounds()
+        {
+            Origin = Vector3.Zero;
+            BoxExtent = Vector3.Zero;
+            SphereRadius = 0f;
+        }
+
+        public BoxSphereBounds(Box box)
+        {
+            BoxExtent = (box.Max - box.Min) * 0.5f;
+            Origin = box.Min + BoxExtent;
+            SphereRadius = BoxExtent.Length();
+        }
     }
 
     public class Sphere

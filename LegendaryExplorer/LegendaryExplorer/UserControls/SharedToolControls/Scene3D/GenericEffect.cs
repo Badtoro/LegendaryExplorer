@@ -19,7 +19,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
     /// <typeparam name="ConstantBufferData">The structure that will hold the data in the only constant buffer.</typeparam>
     /// <typeparam name="Vertex"></typeparam>
     // I may have gone slightly overboard with the generics here, but hey, it's very flexible!
-    public class GenericEffect<ConstantBufferData, Vertex> : IDisposable where ConstantBufferData : struct where Vertex : IVertexBase
+    public class GenericEffect<ConstantBufferData> : IDisposable where ConstantBufferData : struct
     {
         private const string VERTEX_SHADER_ENTRYPOINT = "VSMain";
         private const string PIXEL_SHADER_ENTRYPOINT = "PSMain";
@@ -46,7 +46,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
 
             // Create input layout. This tells the input-assembler stage how to map items from our vertex structures into vertices for the vertex shader.
             // It is validated against the vertex shader bytecode because it needs to match properly.
-            InputLayout = new InputLayout(device, vsb, Vertex.InputElements);
+            InputLayout = new InputLayout(device, vsb, LEVertex.InputElements);
             vsb.Dispose();
         }
 
@@ -65,13 +65,13 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             context.PixelShader.SetConstantBuffer(0, ConstantBuffer);
         }
 
-        public void RenderObject(DeviceContext context, ConstantBufferData constantData, Mesh<Vertex> mesh, int indexstart, int indexcount, params ShaderResourceView[] textures)
+        public void RenderObject(DeviceContext context, ConstantBufferData constantData, Mesh mesh, int indexstart, int indexcount, params ShaderResourceView[] textures)
         {
             // Push new data into the shaders' constant buffer
             context.UpdateSubresource(ref constantData, ConstantBuffer);
 
             // Setup buffers for rendering
-            context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(mesh.VertexBuffer, Vertex.Stride, 0));
+            context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(mesh.VertexBuffer, LEVertex.Stride, 0));
             context.InputAssembler.SetIndexBuffer(mesh.IndexBuffer, Format.R32_UInt, 0);
 
             // Set the textures
@@ -84,7 +84,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             context.DrawIndexed(indexcount, indexstart, 0);
         }
 
-        public void RenderObject(DeviceContext context, ConstantBufferData constantData, Mesh<Vertex> mesh, params ShaderResourceView[] textures)
+        public void RenderObject(DeviceContext context, ConstantBufferData constantData, Mesh mesh, params ShaderResourceView[] textures)
         {
             RenderObject(context, constantData, mesh, 0, mesh.Triangles.Count * 3, textures);
         }

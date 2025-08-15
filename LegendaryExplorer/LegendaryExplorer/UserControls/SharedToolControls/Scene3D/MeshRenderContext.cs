@@ -67,7 +67,7 @@ public class MeshRenderContext : RenderContext
     private D2D.SolidColorBrush defaultForegroundBrush;
 #endif
     #endregion
-    public GenericEffect<WorldConstants, WorldVertex> DefaultEffect { get; private set; }
+    public GenericEffect<WorldConstants> DefaultEffect { get; private set; }
     public LEEffect LEEffect { get; private set; }
     private Texture2D DefaultTexture;
     private Texture2D WhiteTextureCube;
@@ -214,11 +214,11 @@ public class MeshRenderContext : RenderContext
         }
 
         // Load the default texture
-        DefaultTexture = this.LoadFile(Path.Combine(AppDirectories.ExecFolder, "Default.png"));
+        DefaultTexture = this.LoadTextureFromFile(Path.Combine(AppDirectories.ExecFolder, "Default.png"));
         DefaultTextureView = new ShaderResourceView(Device, DefaultTexture);
 
         // Load the default position-texture shader
-        DefaultEffect = new GenericEffect<WorldConstants, WorldVertex>(Device, EmbeddedResources.StandardShader);
+        DefaultEffect = new GenericEffect<WorldConstants>(Device, EmbeddedResources.StandardShader);
 
         //create fallback textures
         var whiteCubeData = new Fixed6<byte[]>();
