@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LegendaryExplorerCore.Helpers;
+using System;
 using System.Numerics;
 
 namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
@@ -13,7 +14,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         public float aspect = 1.0f;
         public float FOV = MathF.PI / 3; // 60 degrees.
         public float ZNear = 0.1f;
-        public float ZFar = 40000;
+        public float ZFar = 400_000f;
         public bool FirstPerson = false;
         public Vector3 CameraUp => Vector3.Transform(Vector3.UnitY, Matrix4x4.CreateRotationX(Pitch) * Matrix4x4.CreateRotationY(Yaw)) * new Vector3(1, 1, -1);
 
@@ -28,6 +29,13 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         public SceneCamera(Vector3 Position)
         {
             this.Position = Position;
+        }
+
+        public void OrientTowards(Vector3 point)
+        {
+            Vector3 direction = (point - Position).Normal();
+            Pitch = MathF.Asin(-direction.Y);
+            Yaw = MathF.Atan2(direction.X, direction.Z);
         }
 
         public Matrix4x4 ViewMatrix

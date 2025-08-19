@@ -6,7 +6,6 @@ using System.Windows.Media;
 using System.Windows.Controls;
 using System.Windows.Input;
 using FontAwesome5;
-using SharpDX;
 using SharpDX.Direct3D11;
 using SharpDX.Direct3D;
 using LegendaryExplorerCore.Unreal;
@@ -19,6 +18,7 @@ using Resource = SharpDX.Direct3D11.Resource;
 using LegendaryExplorerCore.Gammtek;
 using LegendaryExplorerCore.Packages;
 using Texture2D = SharpDX.Direct3D11.Texture2D;
+using System.Numerics;
 
 namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
 {
@@ -26,9 +26,10 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
 
     public enum MouseButtons
     {
+        None,
         Left,
         Middle,
-        Right,
+        Right
     }
 
     public static class RenderContextExtensions
@@ -38,7 +39,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             Texture2DDescription texture2DDescription = GetTextureDescription(width, height, format, false, out int pitch);
             fixed (byte* pixelDataPointer = pixelData)
             {
-                return new Texture2D(renderContext.Device, texture2DDescription, new DataRectangle((IntPtr)pixelDataPointer, pitch));
+                return new Texture2D(renderContext.Device, texture2DDescription, new SharpDX.DataRectangle((IntPtr)pixelDataPointer, pitch));
             }
         }
 
@@ -138,6 +139,38 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             }
             return renderContext.LoadTextureCube(size, format, pixelData);
         }
+
+        public static MeshElement GetMeshFromAggGeom(this RenderContext renderContext, StructProperty aggGeom)
+        {
+            if (aggGeom?.GetProp<ArrayProperty<StructProperty>>("ConvexElems") is ArrayProperty<StructProperty> convexElems)
+            {
+                var vertices = new List<LEVertex>();
+                var triangles = new List<Triangle>();
+                int vertTotal = 0;
+                foreach (StructProperty convexElem in convexElems)
+                {
+                    var faceTriData = convexElem.GetProp<ArrayProperty<IntProperty>>("FaceTriData");
+                    for (int i = 0; i < faceTriData.Count; i += 3)
+                    {
+                        triangles.Add(new Triangle((uint)(faceTriData[i].Value + vertTotal), (uint)(faceTriData[i + 1].Value + vertTotal), (uint)(faceTriData[i + 2].Value + vertTotal)));
+                    }
+
+                    var vertexData = convexElem.GetProp<ArrayProperty<StructProperty>>("VertexData");
+                    foreach (StructProperty vertex in vertexData)
+                    {
+                        float x = vertex.GetProp<FloatProperty>("X").Value;
+                        float y = vertex.GetProp<FloatProperty>("Y").Value;
+                        float z = vertex.GetProp<FloatProperty>("Z").Value;
+                        vertices.Add(new LEVertex(new Vector3(-x, z, y), Vector3.Zero, Vector2.Zero));
+                        ++vertTotal;
+                    }
+                }
+
+                return new MeshElement(renderContext.Device, triangles, vertices);
+            }
+
+            return null;
+        }
     }
 
     public abstract class RenderContext
@@ -236,6 +269,16 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         }
 
         public virtual bool KeyUp(Key key)
+        {
+            return false;
+        }
+
+        public virtual bool LostKeyboardFocus()
+        {
+            return false;
+        }
+
+        public virtual bool LostMouseFocus()
         {
             return false;
         }
@@ -361,6 +404,8 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             PreviewMouseWheel += SceneRenderControlWPF_PreviewMouseWheel;
             KeyDown += OnKeyDown;
             KeyUp += OnKeyUp;
+            LostKeyboardFocus += SceneRenderControl_LostKeyboardFocus;
+            LostMouseCapture += SceneRenderControl_LostMouseCapture;
             SizeChanged += SceneRenderControlWPF_SizeChanged;
         }
 
@@ -373,6 +418,8 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             PreviewMouseWheel -= SceneRenderControlWPF_PreviewMouseWheel;
             KeyUp -= OnKeyUp;
             KeyDown -= OnKeyDown;
+            LostKeyboardFocus -= SceneRenderControl_LostKeyboardFocus;
+            LostMouseCapture -= SceneRenderControl_LostMouseCapture;
             SizeChanged -= SceneRenderControlWPF_SizeChanged;
         }
 
@@ -439,7 +486,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                 }
 
                 // Yikes - from https://github.com/microsoft/WPFDXInterop/blob/master/samples/D3D11Image/D3D11Visualization/D3DVisualization.cpp#L384
-                var res = CppObject.FromPointer<ComObject>(surface);
+                var res = SharpDX.CppObject.FromPointer<SharpDX.ComObject>(surface);
                 var resource = res.QueryInterface<SharpDX.DXGI.Resource>();
                 IntPtr sharedHandle = resource.SharedHandle;
                 resource.Dispose();
@@ -544,6 +591,16 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         public void OnKeyUp(object sender, KeyEventArgs e)
         {
             e.Handled = Context.KeyUp(e.Key);
+        }
+
+        private void SceneRenderControl_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            e.Handled = Context.LostMouseFocus();
+        }
+
+        private void SceneRenderControl_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            e.Handled = Context.LostKeyboardFocus();
         }
         #endregion
 

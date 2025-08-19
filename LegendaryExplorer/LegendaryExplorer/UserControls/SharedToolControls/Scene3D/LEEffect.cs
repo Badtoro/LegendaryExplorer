@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Windows.Documents;
 using SharpDX;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
@@ -54,7 +53,7 @@ public unsafe class LEEffect : IDisposable
         context.PixelShader.SetConstantBuffer(2, PixelShaderConstants);
     }
 
-    public void RenderObject(DeviceContext context, LEVSConstants vsSharedConstants, LEPSConstants psSharedConstants, Mesh mesh, int indexstart, int indexcount)
+    public void RenderObject(DeviceContext context, LEVSConstants vsSharedConstants, LEPSConstants psSharedConstants, MeshElement mesh, int indexstart, int indexcount)
     {
         // Push new data into the shaders' constant buffers
         context.UpdateSubresource(ref vsSharedConstants, VertexShaderConstants);
