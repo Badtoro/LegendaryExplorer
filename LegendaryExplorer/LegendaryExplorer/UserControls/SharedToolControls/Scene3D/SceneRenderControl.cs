@@ -113,7 +113,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         public static Texture2D LoadUnrealTexture(this RenderContext renderContext, ExportEntry texture2DExport)
         {
             var unrealTexture = new LECTexture2D(texture2DExport);
-            return renderContext.LoadUnrealMip(unrealTexture.GetTopMip(), LegendaryExplorerCore.Textures.Image.getPixelFormatType(unrealTexture.Export.GetProperties().GetProp<EnumProperty>("Format").Value.Name));
+            return renderContext.LoadUnrealMip(unrealTexture.GetTopMip(), LegendaryExplorerCore.Textures.Image.getPixelFormatType(unrealTexture.Export.GetProperty<EnumProperty>("Format").Value.Name));
         }
 
         public static Texture2D LoadUnrealTextureCube(this RenderContext renderContext, ExportEntry textureCubeExport, PackageCache packageCache = null)
