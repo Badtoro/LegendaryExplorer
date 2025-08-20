@@ -9,13 +9,13 @@ namespace LegendaryExplorerCore.Unreal.Classes
 {
     public class MaterialInstanceConstant
     {
-        public string InstancedFullPath;
+        public readonly ExportEntry Export;
         public readonly HashSet<IEntry> Textures = [];
 
 
         public MaterialInstanceConstant(ExportEntry export, PackageCache assetCache = null, bool resolveImports = true)
         {
-            InstancedFullPath = export.InstancedFullPath;
+            Export = export;
             ReadMaterial(export, assetCache, resolveImports);
         }
 

@@ -366,15 +366,6 @@ namespace LegendaryExplorerCore.Helpers
 
             public ChunkSpanEnumerator<T> GetEnumerator() => this;
         }
-
-        public static void DisposeAndClear<TDisposable>(this ICollection<TDisposable> disposableCollection) where TDisposable : IDisposable
-        {
-            foreach (var disposable in disposableCollection)
-            {
-                disposable?.Dispose();
-            }
-            disposableCollection.Clear();
-        }
     }
 
     public static class DictionaryExtensions

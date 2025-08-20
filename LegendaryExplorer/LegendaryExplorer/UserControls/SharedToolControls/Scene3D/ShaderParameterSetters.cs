@@ -14,7 +14,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
     internal static class ShaderParameterSetters
     {
         public static void WriteValues<LightMapPolicy, DensityPolicy>(this TBasePassVertexShader<LightMapPolicy, DensityPolicy> shader, 
-            Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat) 
+            Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat) 
             where LightMapPolicy : struct, IVertexParametersType where DensityPolicy : struct, IVertexShaderParametersType
         {
             if (shader.VertexFactoryParameters.Parameters is not FLocalVertexFactoryShaderParameters vertexFactoryParams)
@@ -28,7 +28,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             //TODO: DensityPolicy params
         }
         public static void WriteValues<LightMapPolicy>(this TBasePassPixelShader<LightMapPolicy> shader, 
-            Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat) 
+            Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat) 
             where LightMapPolicy : struct, IPixelParametersType 
         {
             //TODO: LightMapPolicy params
@@ -54,31 +54,31 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             }
         }
 
-        public static void WriteValues(this ref FMaterialShaderParameters p, Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat)
+        public static void WriteValues(this ref FMaterialShaderParameters p, Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat)
         {
             buffer.WriteVal(p.CameraWorldPosition, context.Camera.Position);
-            buffer.WriteVal(p.ObjectWorldPositionAndRadius, new Vector4(mesh.TransformedBounds.Origin, mesh.TransformedBounds.SphereRadius));
+            buffer.WriteVal(p.ObjectWorldPositionAndRadius, new Vector4(mesh.Bounds.Origin, mesh.Bounds.SphereRadius)); //TODO: apply LocalToWorld matrix
             buffer.WriteVal(p.ObjectOrientation, mesh.LocalToWorld.GetAxis(2).Normal());
             buffer.WriteVal(p.WindDirectionAndSpeed, Vector4.Zero);
             buffer.WriteVal(p.FoliageImpulseDirection, Vector3.Zero);
             buffer.WriteVal(p.FoliageNormalizedRotationAxisAndAngle, Vector4.UnitZ);
         }
 
-        public static void WriteValues(this ref FMaterialVertexShaderParameters p, Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat)
+        public static void WriteValues(this ref FMaterialVertexShaderParameters p, Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat)
         {
             p.MaterialShaderParameters.WriteValues(buffer, context, mesh, mat);
 
             (List<Vector4> scalarParamValues, List<Vector4> vectorParamValues) = mat.GetCachedVertexParameters(context);
             foreach (TUniformParameter<FShaderParameter> scalarParam in p.UniformVertexScalarShaderParameters)
             {
-                buffer.WriteVal(scalarParam.Param, scalarParamValues[scalarParam.Index / 4][scalarParam.Index % 4]);
+                buffer.WriteVal(scalarParam.Param, scalarParamValues[scalarParam.Index]);
             }
             foreach (TUniformParameter<FShaderParameter> vectorParam in p.UniformVertexVectorShaderParameters)
             {
                 buffer.WriteVal(vectorParam.Param, vectorParamValues[vectorParam.Index]);
             }
         }
-        public static void WriteValues(this ref FMaterialPixelShaderParameters p, Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat)
+        public static void WriteValues(this ref FMaterialPixelShaderParameters p, Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat)
         {
             p.MaterialShaderParameters.WriteValues(buffer, context, mesh, mat);
 
@@ -89,7 +89,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
 
             foreach (TUniformParameter<FShaderParameter> scalarParam in p.UniformPixelScalarShaderParameters)
             {
-                buffer.WriteVal(scalarParam.Param, scalarParamValues[scalarParam.Index / 4][scalarParam.Index % 4]);
+                buffer.WriteVal(scalarParam.Param, scalarParamValues[scalarParam.Index]);
             }
             foreach (TUniformParameter<FShaderParameter> vectorParam in p.UniformPixelVectorShaderParameters)
             {
@@ -147,7 +147,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             }
         }
 
-        public static void WriteValues(this ref FSceneTextureShaderParameters p, Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat)
+        public static void WriteValues(this ref FSceneTextureShaderParameters p, Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat)
         {
             if (p.SceneColorTexture.IsBound())
             {
@@ -178,7 +178,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             }
         }
 
-        public static void WriteValues(this ref FHeightFogVertexShaderParameters p, Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat)
+        public static void WriteValues(this ref FHeightFogVertexShaderParameters p, Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat)
         {
             //these values disable fog
             buffer.WriteVal(p.FogExtinctionDistance, new Vector4(float.MaxValue));
@@ -194,7 +194,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             buffer.WriteVal(p.FogStartDistance, Vector4.Zero);
         }
 
-        public static void WriteValues(this FLocalVertexFactoryShaderParameters p, Span<byte> buffer, MeshRenderContext context, MeshElement mesh, MaterialRenderProxy mat)
+        public static void WriteValues(this FLocalVertexFactoryShaderParameters p, Span<byte> buffer, MeshRenderContext context, Mesh mesh, MaterialRenderProxy mat)
         {
             buffer.WriteVal(p.LocalToWorld, mesh.LocalToWorld);
             buffer.WriteVal(p.WorldToLocal, mesh.WorldToLocal);
@@ -207,12 +207,12 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             {
                 return;
             }
-            //if (sizeof(T) != param.NumBytes 
-            //    && !(typeof(T) == typeof(SharpDX.Matrix3x3) && param.NumBytes == 44) 
-            //    && Debugger.IsAttached)
-            //{
-            //    Debugger.Break();
-            //}
+            if (sizeof(T) != param.NumBytes 
+                && !(typeof(T) == typeof(SharpDX.Matrix3x3) && param.NumBytes == 44) 
+                && Debugger.IsAttached)
+            {
+                Debugger.Break();
+            }
             int bytesToWrite = Math.Min(sizeof(T), param.NumBytes);
             val.AsBytes()[..bytesToWrite].CopyTo(buff[param.BaseIndex..]);
         }

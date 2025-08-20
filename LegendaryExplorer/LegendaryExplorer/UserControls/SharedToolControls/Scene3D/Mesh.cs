@@ -11,42 +11,30 @@ using Device = SharpDX.Direct3D11.Device;
 
 namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
 {
-    public class MeshElement : IDisposable
+    public class Mesh : IDisposable
     {
         public readonly List<Triangle> Triangles;
         public readonly List<LEVertex> Vertices;
         public SharpDX.Direct3D11.Buffer VertexBuffer { get; private set; }
         public SharpDX.Direct3D11.Buffer IndexBuffer { get; private set; }
 
-        public BoxSphereBounds BaseBounds;
+        public BoxSphereBounds Bounds;
 
-        public BoxSphereBounds TransformedBounds;
+        public Matrix4x4 LocalToWorld = Matrix4x4.Identity;
 
-        private Matrix4x4 localToWorld = Matrix4x4.Identity;
-        public Matrix4x4 LocalToWorld
-        {
-            get => localToWorld;
-            set
-            {
-                localToWorld = value;
-                TransformedBounds = BaseBounds.TransformBy(localToWorld);
-            }
+        public SharpDX.Matrix3x3 WorldToLocal 
+        { 
+            get 
+            { 
+                Matrix4x4.Invert(LocalToWorld, out Matrix4x4 wtl); 
+                return new SharpDX.Matrix3x3(wtl.M11, wtl.M12, wtl.M13, wtl.M21, wtl.M22, wtl.M23, wtl.M31, wtl.M32, wtl.M33); 
+            } 
         }
-
-        public SharpDX.Matrix3x3 WorldToLocal
-        {
-            get
-            {
-                Matrix4x4.Invert(LocalToWorld, out Matrix4x4 wtl);
-                return new SharpDX.Matrix3x3(wtl.M11, wtl.M12, wtl.M13, wtl.M21, wtl.M22, wtl.M23, wtl.M31, wtl.M32, wtl.M33);
-            }
-        }
-
 
         // Creates a new blank mesh.
 
         // Creates a blank mesh with the given data.
-        public MeshElement(Device device, List<Triangle> triangles, List<LEVertex> vertices)
+        public Mesh(Device device, List<Triangle> triangles, List<LEVertex> vertices)
         {
             Triangles = triangles;
             Vertices = vertices;
@@ -68,7 +56,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                 boundingBox.Add(pos);
             }
 
-            TransformedBounds = BaseBounds = new BoxSphereBounds(boundingBox);
+            Bounds = new BoxSphereBounds(boundingBox);
 
             int floatsPerVertex = LEVertex.Stride / 4;
             int numFloats = floatsPerVertex * Vertices.Count;
