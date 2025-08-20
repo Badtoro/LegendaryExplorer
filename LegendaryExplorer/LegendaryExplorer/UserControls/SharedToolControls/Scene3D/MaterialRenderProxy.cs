@@ -67,8 +67,8 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                 foreach (ObjectProperty expressionProp in expressionsProp)
                 {
                     ExportEntry expressionExport = expressionProp.ResolveToExport(mat.FileRef, assetCache);
-                    var expressionProps = expressionExport.GetProperties(packageCache: assetCache);
-                    if (expressionProps.GetProp<NameProperty>("ParameterName") is {} paramNameProp)
+                    var expressionProps = expressionExport?.GetProperties(packageCache: assetCache);
+                    if (expressionProps?.GetProp<NameProperty>("ParameterName") is {} paramNameProp)
                     {
                         //this will run after ReadMaterialInstanceConstant, so we don't want to overwrite any values specified there
                         if (expressionProps.GetProp<FloatProperty>("DefaultValue") is { } defaultfloatProp)
