@@ -237,14 +237,14 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
         }
         #endregion
 
-        private ModelPreview LEXPreview;
-        private ModelPreview GameShaderPreview;
+        private ModelPreview<WorldVertex> LEXPreview;
+        private ModelPreview<LEVertex> GameShaderPreview;
 
         /// <summary>
         /// Value is true after _Loaded is called. False after _Unloaded (which if in tab control, is called when different tab is selected)
         /// </summary>
         private bool ControlIsLoaded;
-        private Mesh STMCollisionMesh;
+        private WorldMesh STMCollisionMesh;
         private Action ViewportLoadAction = null;
 
         private void SceneContext_RenderScene(object sender, EventArgs e)
@@ -255,26 +255,25 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 if (RenderSolid && LEXPreview is not null && CurrentLOD < LEXPreview.LODs.Count)
                 {
                     MeshContext.Wireframe = false;
-                    LEXPreview.Render(renderPass, MeshContext, CurrentLOD);
+                    LEXPreview.Render(renderPass, MeshContext, CurrentLOD, Matrix4x4.Identity);
                 }
                 if (RenderGameShader && GameShaderPreview != null && CurrentLOD < GameShaderPreview.LODs.Count)
                 {
                     MeshContext.Wireframe = false;
-                    GameShaderPreview.Render(renderPass, MeshContext, CurrentLOD);
+                    GameShaderPreview.Render(renderPass, MeshContext, CurrentLOD, Matrix4x4.Identity);
                 }
             }
             if (RenderWireframe && LEXPreview is not null && CurrentLOD < LEXPreview.LODs.Count)
             {
                 MeshContext.Wireframe = true;
-                Mesh mesh = LEXPreview.LODs[CurrentLOD].Mesh;
-                var viewConstants = new MeshRenderContext.WorldConstants(Matrix4x4.Transpose(MeshContext.Camera.ProjectionMatrix), Matrix4x4.Transpose(MeshContext.Camera.ViewMatrix), mesh.LocalToWorld, MeshContext.CurrentTextureViewFlags);
+                var viewConstants = new MeshRenderContext.WorldConstants(Matrix4x4.Transpose(MeshContext.Camera.ProjectionMatrix), Matrix4x4.Transpose(MeshContext.Camera.ViewMatrix), Matrix4x4.Identity, MeshContext.CurrentTextureViewFlags);
                 MeshContext.DefaultEffect.PrepDraw(SceneViewer.Context.ImmediateContext, MeshContext.AlphaBlendState);
-                MeshContext.DefaultEffect.RenderObject(SceneViewer.Context.ImmediateContext, viewConstants, mesh, [null]);
+                MeshContext.DefaultEffect.RenderObject(SceneViewer.Context.ImmediateContext, viewConstants, LEXPreview.LODs[CurrentLOD].Mesh, [null]);
             }
             if (IsStaticMesh && ShowCollisionMesh && STMCollisionMesh != null)
             {
                 MeshContext.Wireframe = true;
-                var viewConstants = new MeshRenderContext.WorldConstants(Matrix4x4.Transpose(MeshContext.Camera.ProjectionMatrix), Matrix4x4.Transpose(MeshContext.Camera.ViewMatrix), STMCollisionMesh.LocalToWorld, MeshContext.CurrentTextureViewFlags);
+                var viewConstants = new MeshRenderContext.WorldConstants(Matrix4x4.Transpose(MeshContext.Camera.ProjectionMatrix), Matrix4x4.Transpose(MeshContext.Camera.ViewMatrix), Matrix4x4.Identity, MeshContext.CurrentTextureViewFlags);
                 MeshContext.DefaultEffect.PrepDraw(SceneViewer.Context.ImmediateContext, MeshContext.AlphaBlendState);
                 MeshContext.DefaultEffect.RenderObject(SceneViewer.Context.ImmediateContext, viewConstants, STMCollisionMesh, [null]);
             }
@@ -287,7 +286,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 if (GameShaderPreview != null && GameShaderPreview.LODs.Count > 0)
                 {
                     var m = GameShaderPreview.LODs[CurrentLOD].Mesh;
-                    MeshContext.Camera.Position = m.Bounds.Origin;
+                    MeshContext.Camera.Position = m.AABBCenter;
                     MeshContext.Camera.Pitch = -MathF.PI / 7.0f;
                     if (MeshContext.Camera.FirstPerson)
                     {
@@ -297,7 +296,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 else if (LEXPreview != null && LEXPreview.LODs.Count > 0)
                 {
                     var m = LEXPreview.LODs[CurrentLOD].Mesh;
-                    MeshContext.Camera.Position = m.Bounds.Origin;
+                    MeshContext.Camera.Position = m.AABBCenter;
                     MeshContext.Camera.Pitch = -MathF.PI / 7.0f;
                     if (MeshContext.Camera.FirstPerson)
                     {
@@ -835,34 +834,34 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                         {
                             case StaticMesh statM:
                                 STMCollisionMesh = GetMeshFromAggGeom(statM.GetCollisionMeshProperty(Pcc));
-                                if (CanUseGameShaders && RenderGameShader) GameShaderPreview = new ModelPreview(MeshContext.Device, statM, CurrentLOD, EShaderType.LE, MeshContext.TextureCache, assetCache, pmd);
-                                LEXPreview = new ModelPreview(MeshContext.Device, statM, CurrentLOD, EShaderType.Default, MeshContext.TextureCache, assetCache, pmd);
+                                if (CanUseGameShaders && RenderGameShader) GameShaderPreview = new ModelPreview<LEVertex>(MeshContext.Device, statM, CurrentLOD, MeshContext.TextureCache, assetCache, pmd);
+                                LEXPreview = new ModelPreview<WorldVertex>(MeshContext.Device, statM, CurrentLOD, MeshContext.TextureCache, assetCache, pmd);
                                 MeshContext.Camera.FocusDepth = statM.Bounds.SphereRadius * 1.2f;
                                 break;
                             case SkeletalMesh skm:
-                                if (CanUseGameShaders && RenderGameShader) GameShaderPreview = new ModelPreview(MeshContext.Device, skm, EShaderType.LE, MeshContext.TextureCache, assetCache, pmd);
-                                LEXPreview = new ModelPreview(MeshContext.Device, skm, EShaderType.Default, MeshContext.TextureCache, assetCache, pmd);
+                                if (CanUseGameShaders && RenderGameShader) GameShaderPreview = new ModelPreview<LEVertex>(MeshContext.Device, skm, MeshContext.TextureCache, assetCache, pmd);
+                                LEXPreview = new ModelPreview<WorldVertex>(MeshContext.Device, skm, MeshContext.TextureCache, assetCache, pmd);
                                 MeshContext.Camera.FocusDepth = skm.Bounds.SphereRadius * 1.2f;
                                 break;
                             case StructProperty structProp: //BrushComponent
-                                LEXPreview = new ModelPreview(MeshContext.Device, GetMeshFromAggGeom(structProp), MeshContext.TextureCache, assetCache, pmd);
-                                MeshContext.Camera.FocusDepth = LEXPreview.LODs[0].Mesh.Bounds.SphereRadius * 1.2f;
+                                LEXPreview = new ModelPreview<WorldVertex>(MeshContext.Device, GetMeshFromAggGeom(structProp), MeshContext.TextureCache, assetCache, pmd);
+                                MeshContext.Camera.FocusDepth = LEXPreview.LODs[0].Mesh.AABBHalfSize.Length() * 1.2f;
                                 break;
                             case ModelComponent mc:
-                                LEXPreview = new ModelPreview(MeshContext.Device, GetMeshFromModelComponent(mc), MeshContext.TextureCache, assetCache, pmd);
-                                //SceneViewer.Context.Camera.FocusDepth = Preview.LODs[0].Mesh.Bounds.SphereRadius * 1.2f;
+                                LEXPreview = new ModelPreview<WorldVertex>(MeshContext.Device, GetMeshFromModelComponent(mc), MeshContext.TextureCache, assetCache, pmd);
+                                //SceneViewer.Context.Camera.FocusDepth = Preview.LODs[0].Mesh.AABBHalfSize.Length() * 1.2f;
                                 break;
                             case Model m:
                                 var sections = new List<ModelPreviewSection>();
-                                Mesh mesh = GetMeshFromModelSubcomponents(m, sections);
+                                Mesh<WorldVertex> mesh = GetMeshFromModelSubcomponents(m, sections);
                                 pmd.sections = sections;
                                 if (mesh.Vertices.Any())
                                 {
                                     MeshContext.Camera.Position = mesh.Vertices[0].Position;
                                 }
 
-                                LEXPreview = new ModelPreview(MeshContext.Device, mesh, MeshContext.TextureCache, assetCache, pmd);
-                                //SceneViewer.Context.Camera.FocusDepth = Preview.LODs[0].Mesh.Bounds.SphereRadius * 1.2f;
+                                LEXPreview = new ModelPreview<WorldVertex>(MeshContext.Device, mesh, MeshContext.TextureCache, assetCache, pmd);
+                                //SceneViewer.Context.Camera.FocusDepth = Preview.LODs[0].Mesh.AABBHalfSize.Length() * 1.2f;
                                 break;
                         }
                         assetCache.Dispose();
@@ -961,11 +960,11 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 );
         }
 
-        private Mesh GetMeshFromAggGeom(StructProperty aggGeom)
+        private WorldMesh GetMeshFromAggGeom(StructProperty aggGeom)
         {
             if (aggGeom?.GetProp<ArrayProperty<StructProperty>>("ConvexElems") is ArrayProperty<StructProperty> convexElems)
             {
-                var vertices = new List<LEVertex>();
+                var vertices = new List<WorldVertex>();
                 var triangles = new List<Triangle>();
                 int vertTotal = 0;
                 foreach (StructProperty convexElem in convexElems)
@@ -982,28 +981,29 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                         float x = vertex.GetProp<FloatProperty>("X").Value;
                         float y = vertex.GetProp<FloatProperty>("Y").Value;
                         float z = vertex.GetProp<FloatProperty>("Z").Value;
-                        vertices.Add(new LEVertex(new Vector3(-x, z, y), Vector3.Zero, Vector2.Zero));
+                        vertices.Add(new WorldVertex(new Vector3(-x, z, y), Vector3.Zero, Vector2.Zero));
                         ++vertTotal;
                     }
                 }
 
-                return new Mesh(SceneViewer.Context.Device, triangles, vertices);
+                return new WorldMesh(SceneViewer.Context.Device, triangles, vertices);
             }
 
             return null;
         }
 
-        private Mesh GetMeshFromModelSubcomponents(Model model, List<ModelPreviewSection> sections)
+        private WorldMesh GetMeshFromModelSubcomponents(Model model, List<ModelPreviewSection> sections)
         {
-            var vertexList = new List<LEVertex>();
+            // LOL this will run terribly i'm sure
+            var vertexList = new List<WorldVertex>();
             var triangles = new List<Triangle>();
 
             foreach (var vertex in model.VertexBuffer)
             {
                 // We don't know the normal vectors yet
-                vertexList.Add(new LEVertex(new Vector3(-vertex.Position.X, vertex.Position.Z, vertex.Position.Y), Vector3.Zero, new Vector2(vertex.TexCoord.X, vertex.TexCoord.Y)));
+                vertexList.Add(new WorldVertex(new Vector3(-vertex.Position.X, vertex.Position.Z, vertex.Position.Y), Vector3.Zero, new Vector2(vertex.TexCoord.X, vertex.TexCoord.Y)));
             }
-            Span<LEVertex> vertsSpan = CollectionsMarshal.AsSpan(vertexList);
+            Span<WorldVertex> vertsSpan = CollectionsMarshal.AsSpan(vertexList);
 
             foreach (var mcExp in model.Export.FileRef.Exports.Where(x => x.ClassName == "ModelComponent" && !x.IsDefaultObject))
             {
@@ -1026,24 +1026,24 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                             Vector3 normal = model.Vectors[model.Surfs[matchingNode.iSurf].vNormal];
                             for (int i = 0; i < matchingNode.NumVertices; i++)
                             {
-                                vertsSpan[matchingNode.iVertexIndex + i].normal = new Vector4(-normal.X, normal.Z, normal.Y, 1);
+                                vertsSpan[matchingNode.iVertexIndex + i].Normal = new Vector3(-normal.X, normal.Z, normal.Y);
                             }
                         }
                     }
                 }
             }
 
-            return new Mesh(SceneViewer.Context.Device, triangles, vertexList);
+            return new WorldMesh(SceneViewer.Context.Device, triangles, vertexList);
         }
 
-        private Mesh GetMeshFromModelComponent(ModelComponent mc)
+        private WorldMesh GetMeshFromModelComponent(ModelComponent mc)
         {
             var parentModel = ObjectBinary.From<Model>(mc.Export.FileRef.GetUExport(mc.Model));
-            var vertices = new List<LEVertex>();
+            var vertices = new List<WorldVertex>();
 
             foreach (var point in parentModel.Points)
             {
-                vertices.Add(new LEVertex(new Vector3(-point.X, point.Z, point.Y), Vector3.Zero, Vector2.Zero));
+                vertices.Add(new WorldVertex(new Vector3(-point.X, point.Z, point.Y), Vector3.Zero, Vector2.Zero));
             }
 
             var triangles = new List<Triangle>();
@@ -1066,7 +1066,7 @@ namespace LegendaryExplorer.UserControls.ExportLoaderControls
                 }
             }
 
-            return new Mesh(SceneViewer.Context.Device, triangles, vertices);
+            return new WorldMesh(SceneViewer.Context.Device, triangles, vertices);
         }
 
         private static void AddMaterialBackgroundThreadTextures(List<PreloadedTextureData> texturePreviewMaterials, ExportEntry entry, PackageCache assetCache)

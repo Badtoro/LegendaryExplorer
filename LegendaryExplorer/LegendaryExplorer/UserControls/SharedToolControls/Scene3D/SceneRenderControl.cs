@@ -86,7 +86,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             return tex;
         }
 
-        public static unsafe Texture2D LoadTextureFromFile(this RenderContext renderContext, string filename)
+        public static unsafe Texture2D LoadFile(this RenderContext renderContext, string filename)
         {
             var pixelFormat = LegendaryExplorerCore.Textures.PixelFormat.ARGB;
             byte[] pixelData = LegendaryExplorerCore.Textures.TexConverter.LoadTexture(filename, out uint width, out uint height, ref pixelFormat); // NEEDS WAY TO HAVE ALPHA AS BLACK!

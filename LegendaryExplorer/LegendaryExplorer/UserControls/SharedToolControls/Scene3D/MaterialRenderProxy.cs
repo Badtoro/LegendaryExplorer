@@ -154,7 +154,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             }
         }
 
-        public void UpdateShaderParams(Span<byte> vertexConstantBuffer, Span<byte> pixelConstantBuffer, MeshRenderContext context, Mesh mesh)
+        public void UpdateShaderParams(Span<byte> vertexConstantBuffer, Span<byte> pixelConstantBuffer, MeshRenderContext context, Mesh<LEVertex> mesh)
         {
             VertexShader?.WriteValues(vertexConstantBuffer, context, mesh, this);
             PixelShader?.WriteValues(pixelConstantBuffer, context, mesh, this);

@@ -1,10 +1,8 @@
-﻿// For convenience, we use the same vertex struct as the games, even though it's more data than we need 
+﻿// This has to match the data in the vertex buffer.
 struct VS_IN {
-    float4 pos : POSITION0;
-    float3 tangent : TANGENT0;
-    float4 normal : NORMAL0;
-    float4 color : COLOR1;
-    float2 uv : TEXCOORD0;
+	float3 pos : POSITION;
+	float3 normal : NORMAL;
+	float2 uv : TEXCOORD0;
 };
 
 struct VS_OUT {
@@ -40,12 +38,12 @@ VS_OUT VSMain(VS_IN input) {
 	VS_OUT result = (VS_OUT)0;
 
 	// Transform the input object-space position into a screen-space position
-	result.pos = mul(float4(input.pos.xyz, 1), model);
+	result.pos = mul(float4(input.pos, 1), model);
 	result.pos = mul(result.pos, view);
 	result.pos = mul(result.pos, projection);
 
 	// Pass through the normal
-    result.normal = input.normal.xyz;
+	result.normal = input.normal;
 
 	// Pass through the uv coordinate
 	result.uv = input.uv;

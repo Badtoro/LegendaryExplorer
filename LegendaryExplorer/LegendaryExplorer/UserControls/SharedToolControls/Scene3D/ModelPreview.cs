@@ -1,17 +1,18 @@
-﻿using LegendaryExplorerCore.Gammtek;
-using LegendaryExplorerCore.Packages;
-using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
-using LegendaryExplorerCore.Unreal;
-using LegendaryExplorerCore.Unreal.BinaryConverters;
-using LegendaryExplorerCore.Unreal.Classes;
-using SharpDX.Direct3D11;
+﻿
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using LegendaryExplorerCore.Packages;
+using LegendaryExplorerCore.Unreal.BinaryConverters;
 using System.Numerics;
-using SkeletalMesh = LegendaryExplorerCore.Unreal.BinaryConverters.SkeletalMesh;
+using LegendaryExplorerCore.Gammtek;
+using SharpDX.Direct3D11;
 using StaticMesh = LegendaryExplorerCore.Unreal.BinaryConverters.StaticMesh;
+using SkeletalMesh = LegendaryExplorerCore.Unreal.BinaryConverters.SkeletalMesh;
+using LegendaryExplorerCore.Packages.CloningImportingAndRelinking;
+using LegendaryExplorerCore.Unreal;
+using LegendaryExplorerCore.Unreal.Classes;
 using Vector3 = System.Numerics.Vector3;
 using Vector4 = System.Numerics.Vector4;
 
@@ -57,12 +58,12 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
     /// <summary>
     /// Stores the geometry and the associated material information for a single level-of-detail in a <see cref="ModelPreview"/>.
     /// </summary>
-    public class ModelPreviewLOD
+    public class ModelPreviewLOD<Vertex> where Vertex : IVertexBase
     {
         /// <summary>
         /// The geometry of this level of detail.
         /// </summary>
-        public Mesh Mesh;
+        public Mesh<Vertex> Mesh;
 
         /// <summary>
         /// A list of which materials are applied to which triangles.
@@ -74,7 +75,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// </summary>
         /// <param name="mesh">The geometry of this level of detail.</param>
         /// <param name="sections">A list of which materials are applied to which triangles.</param>
-        public ModelPreviewLOD(Mesh mesh, List<ModelPreviewSection> sections)
+        public ModelPreviewLOD(Mesh<Vertex> mesh, List<ModelPreviewSection> sections)
         {
             Mesh = mesh;
             Sections = sections;
@@ -90,7 +91,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
     /// <summary>
     /// Classes that inherit from ModelPreviewMaterial are responsible for rendering sections of meshes.
     /// </summary>
-    public abstract class ModelPreviewMaterial : IDisposable
+    public abstract class ModelPreviewMaterial<Vertex> : IDisposable where Vertex : IVertexBase
     {
         public RenderPass Pass;
         /// <summary>
@@ -157,7 +158,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// <param name="s">Which faces to render.</param>
         /// <param name="transform">The model transformation to be applied to the vertices.</param>
         /// <param name="view">The SceneRenderControl that the given LOD should be rendered into.</param>
-        public abstract void RenderSection(ModelPreviewLOD lod, ModelPreviewSection s, MeshRenderContext context);
+        public abstract void RenderSection(ModelPreviewLOD<Vertex> lod, ModelPreviewSection s, Matrix4x4 transform, MeshRenderContext context);
 
         /// <summary>
         /// Disposes any outstanding resources.
@@ -167,7 +168,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         }
     }
 
-    public class TexturedPreviewMaterial : ModelPreviewMaterial
+    public class TexturedPreviewMaterial : ModelPreviewMaterial<WorldVertex>
     {
         /// <summary>
         /// The full name of the diffuse texture property.
@@ -242,14 +243,14 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// <param name="s">Which faces to render.</param>
         /// <param name="transform">The model transformation to be applied to the vertices.</param>
         /// <param name="view">The SceneRenderControl that the given LOD should be rendered into.</param>
-        public override void RenderSection(ModelPreviewLOD lod, ModelPreviewSection s, MeshRenderContext context)
+        public override void RenderSection(ModelPreviewLOD<WorldVertex> lod, ModelPreviewSection s, Matrix4x4 transform, MeshRenderContext context)
         {
             SceneCamera camera = context.Camera;
             context.DefaultEffect.PrepDraw(context.ImmediateContext, context.AlphaBlendState);
             var worldConstants = new MeshRenderContext.WorldConstants(
                 Matrix4x4.Transpose(camera.ProjectionMatrix),
                 Matrix4x4.Transpose(camera.ViewMatrix),
-                Matrix4x4.Transpose(lod.Mesh.LocalToWorld),
+                Matrix4x4.Transpose(transform),
                 context.CurrentTextureViewFlags);
 
             TextureMap.TryGetValue(DiffuseTextureFullName, out PreviewTextureCache.TextureEntry diffTexture);
@@ -268,7 +269,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
     /// <summary>
     /// A material with only a diffuse texture.
     /// </summary>
-    file class LEShaderPreviewMaterial : ModelPreviewMaterial
+    file class LEShaderPreviewMaterial : ModelPreviewMaterial<LEVertex>
     {
         private readonly RenderTargetBlendDescription BlendDescription;
 
@@ -390,9 +391,9 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// <param name="s">Which faces to render.</param>
         /// <param name="transform">The model transformation to be applied to the vertices.</param>
         /// <param name="context"></param>
-        public override void RenderSection(ModelPreviewLOD lod, ModelPreviewSection s, MeshRenderContext context)
+        public override void RenderSection(ModelPreviewLOD<LEVertex> lod, ModelPreviewSection s, Matrix4x4 transform, MeshRenderContext context)
         {
-            Mesh mesh = lod.Mesh;
+            Mesh<LEVertex> mesh = lod.Mesh;
             SceneCamera camera = context.Camera;
             var material = (MaterialRenderProxy)Material;
             LEEffect effect = context.LEEffect;
@@ -427,37 +428,28 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         }
     }
 
-    public enum EShaderType
-    {
-        Default,
-        LE
-    }
-
     /// <summary>
     /// Contains all the necessary resources (minus textures, which are cached in a <see cref="PreviewTextureCache"/>) needed to render a static preview of <see cref="SkeletalMesh"/> or <see cref="StaticMesh"/> instances.  
     /// </summary>
-    public class ModelPreview : IDisposable
+    public class ModelPreview<TVertex> : IDisposable where TVertex : IVertexBase
     {
         /// <summary>
         /// Contains the geometry and section information for each level-of-detail in the model.
         /// </summary>
-        public List<ModelPreviewLOD> LODs { get; } = [];
+        public List<ModelPreviewLOD<TVertex>> LODs { get; } = [];
 
         /// <summary>
         /// Stores materials for this preview, stored by material name.
         /// </summary>
-        public Dictionary<string, ModelPreviewMaterial> Materials { get; } = [];
-
-        EShaderType ShaderType;
+        public Dictionary<string, ModelPreviewMaterial<TVertex>> Materials { get; } = [];
 
         /// <summary>
         /// Creates a preview of a generic untextured mesh
         /// </summary>
         /// <param name="device"></param>
         /// <param name="mesh"></param>
-        public ModelPreview(Device device, Mesh mesh, PreviewTextureCache texcache, PackageCache assetCache, PreloadedModelData preloadedData = null)
+        public ModelPreview(Device device, Mesh<TVertex> mesh, PreviewTextureCache texcache, PackageCache assetCache, PreloadedModelData preloadedData = null)
         {
-            ShaderType = EShaderType.Default;
             //Preloaded
             var sections = new List<ModelPreviewSection>();
             if (preloadedData != null)
@@ -469,7 +461,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                     AddMaterial(mat.ObjectName.Name, texcache, mat, assetCache, preloadedData.texturePreviewMaterials);
                 }
             }
-            LODs.Add(new ModelPreviewLOD(mesh, sections));
+            LODs.Add(new ModelPreviewLOD<TVertex>(mesh, sections));
         }
 
         /// <summary>
@@ -478,16 +470,15 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// <param name="Device">The Direct3D device to use for buffer creation.</param>
         /// <param name="m">The mesh to generate a preview for.</param>
         /// <param name="texcache">The texture cache for loading textures.</param>
-        public ModelPreview(Device Device, StaticMesh m, int selectedLOD, EShaderType shaderType, PreviewTextureCache texcache, PackageCache assetCache, PreloadedModelData preloadedData = null)
+        public ModelPreview(Device Device, StaticMesh m, int selectedLOD, PreviewTextureCache texcache, PackageCache assetCache, PreloadedModelData preloadedData = null)
         {
-            ShaderType = shaderType;
             if (selectedLOD < 0)  //PREVIEW BUG WORKAROUND
                 return;
 
             // STEP 1: MESH
             var lodModel = m.LODModels[selectedLOD];
             var triangles = new List<Triangle>(lodModel.IndexBuffer.Length / 3);
-            var vertices = new List<LEVertex>((int)lodModel.NumVertices);
+            var vertices = new List<TVertex>((int)lodModel.NumVertices);
             // Gather all the vertex data
             // Only one LOD? odd but I guess that's just how it rolls.
 
@@ -511,7 +502,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                         uvs[j] = new Vector4(vertex.HalfPrecisionUVs[j], 0, 0);
                     }
                 }
-                vertices.Add(LEVertex.Create(new Vector3(-position.X, position.Z, position.Y), (Vector3)vertex.TangentX, (Vector4)vertex.TangentZ, uvs));
+                vertices.Add((TVertex)TVertex.Create(new Vector3(-position.X, position.Z, position.Y), (Vector3)vertex.TangentX, (Vector4)vertex.TangentZ, uvs));
             }
 
             //OLD CODE
@@ -578,7 +569,26 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             {
                 package?.Dispose(); //Release
             }
-            LODs.Add(new ModelPreviewLOD(new Mesh(Device, triangles, vertices), sections));
+            LODs.Add(new ModelPreviewLOD<TVertex>(new Mesh<TVertex>(Device, triangles, vertices), sections));
+        }
+
+        /// <summary>
+        /// Adds a <see cref="ModelPreviewMaterial{Vertex}"/> to this model, or adds another reference of any conflicting material.
+        /// </summary>
+        private void AddMaterial(string name, PreviewTextureCache texcache, ExportEntry materialExport, PackageCache assetCache, List<PreloadedTextureData> preloadedTextures = null)
+        {
+            if (!Materials.ContainsKey(name))
+            {
+                switch (Materials)
+                {
+                    case Dictionary<string, ModelPreviewMaterial<WorldVertex>> worldVertMats:
+                        worldVertMats.Add(name, new TexturedPreviewMaterial(texcache, new MaterialInstanceConstant(materialExport, assetCache), assetCache, preloadedTextures));
+                        break;
+                    case Dictionary<string, ModelPreviewMaterial<LEVertex>> leVertMats:
+                        leVertMats.Add(name, new LEShaderPreviewMaterial(texcache, new MaterialRenderProxy(materialExport, assetCache), assetCache, preloadedTextures));
+                        break;
+                }
+            }
         }
 
         /// <summary>
@@ -587,9 +597,8 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// <param name="Device">The Direct3D device to use for buffer creation.</param>
         /// <param name="m">The mesh to generate a preview for.</param>
         /// <param name="texcache">The texture cache for loading textures.</param>
-        public ModelPreview(Device Device, SkeletalMesh m, EShaderType shaderType, PreviewTextureCache texcache, PackageCache assetCache, PreloadedModelData preloadedData = null)
+        public ModelPreview(Device Device, SkeletalMesh m, PreviewTextureCache texcache, PackageCache assetCache, PreloadedModelData preloadedData = null)
         {
-            ShaderType = shaderType;
             // STEP 1: MATERIALS
             if (preloadedData == null)
             {
@@ -632,14 +641,14 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
             foreach (var lodmodel in m.LODModels)
             {
                 // Vertices
-                var vertices = new List<LEVertex>(m.Export.Game == MEGame.ME1 ? lodmodel.ME1VertexBufferGPUSkin.Length : lodmodel.VertexBufferGPUSkin.VertexData.Length);
+                var vertices = new List<TVertex>(m.Export.Game == MEGame.ME1 ? lodmodel.ME1VertexBufferGPUSkin.Length : lodmodel.VertexBufferGPUSkin.VertexData.Length);
                 Fixed4<Vector4> uvs = default;
                 if (m.Export.Game == MEGame.ME1)
                 {
                     foreach (SoftSkinVertex vertex in lodmodel.ME1VertexBufferGPUSkin)
                     {
                         uvs[0] = new Vector4(vertex.UV, 0, 0);
-                        vertices.Add(LEVertex.Create(new Vector3(-vertex.Position.X, vertex.Position.Z, vertex.Position.Y), (Vector3)vertex.TangentX, (Vector4)vertex.TangentZ, uvs));
+                        vertices.Add((TVertex)TVertex.Create(new Vector3(-vertex.Position.X, vertex.Position.Z, vertex.Position.Y), (Vector3)vertex.TangentX, (Vector4)vertex.TangentZ, uvs));
                     }
                 }
                 else
@@ -647,7 +656,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                     foreach (GPUSkinVertex vertex in lodmodel.VertexBufferGPUSkin.VertexData)
                     {
                         uvs[0] = new Vector4(vertex.UV, 0, 0);
-                        vertices.Add(LEVertex.Create(new Vector3(-vertex.Position.X, vertex.Position.Z, vertex.Position.Y), (Vector3)vertex.TangentX, (Vector4)vertex.TangentZ, uvs));
+                        vertices.Add((TVertex)TVertex.Create(new Vector3(-vertex.Position.X, vertex.Position.Z, vertex.Position.Y), (Vector3)vertex.TangentX, (Vector4)vertex.TangentZ, uvs));
                     }
                 }
                 // Triangles
@@ -656,7 +665,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                 {
                     triangles.Add(new Triangle(lodmodel.IndexBuffer[i], lodmodel.IndexBuffer[i + 1], lodmodel.IndexBuffer[i + 2]));
                 }
-                var mesh = new Mesh(Device, triangles, vertices);
+                var mesh = new Mesh<TVertex>(Device, triangles, vertices);
                 // Sections
                 var sections = new List<ModelPreviewSection>();
                 foreach (var section in lodmodel.Sections)
@@ -666,26 +675,7 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
                         sections.Add(new ModelPreviewSection(Materials.Keys.ElementAt(section.MaterialIndex), section.BaseIndex, (uint)section.NumTriangles));
                     }
                 }
-                LODs.Add(new ModelPreviewLOD(mesh, sections));
-            }
-        }
-
-        /// <summary>
-        /// Adds a <see cref="ModelPreviewMaterial{Vertex}"/> to this model, or adds another reference of any conflicting material.
-        /// </summary>
-        private void AddMaterial(string name, PreviewTextureCache texcache, ExportEntry materialExport, PackageCache assetCache, List<PreloadedTextureData> preloadedTextures = null)
-        {
-            if (!Materials.ContainsKey(name))
-            {
-                switch (ShaderType)
-                {
-                    case EShaderType.Default:
-                        Materials.Add(name, new TexturedPreviewMaterial(texcache, new MaterialInstanceConstant(materialExport, assetCache), assetCache, preloadedTextures));
-                        break;
-                    case EShaderType.LE:
-                        Materials.Add(name, new LEShaderPreviewMaterial(texcache, new MaterialRenderProxy(materialExport, assetCache), assetCache, preloadedTextures));
-                        break;
-                }
+                LODs.Add(new ModelPreviewLOD<TVertex>(mesh, sections));
             }
         }
 
@@ -696,14 +686,14 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// <param name="view">The SceneRenderControl to render the preview into.</param>
         /// <param name="lod">Which level of detail to render at. Level 0 is traditionally the most detailed.</param>
         /// <param name="transform">The model transformation to be applied to the vertices.</param>
-        public void Render(RenderPass renderPass, MeshRenderContext view, int lod)
+        public void Render(RenderPass renderPass, MeshRenderContext view, int lod, Matrix4x4 transform)
         {
             foreach (ModelPreviewSection section in LODs[lod].Sections)
             {
-                if (Materials.TryGetValue(section.MaterialName, out ModelPreviewMaterial material)
+                if (Materials.TryGetValue(section.MaterialName, out ModelPreviewMaterial<TVertex> material)
                     && material.Pass == renderPass)
                 {
-                    material.RenderSection(LODs[lod], section, view);
+                    material.RenderSection(LODs[lod], section, transform, view);
                 }
             }
         }
@@ -713,12 +703,12 @@ namespace LegendaryExplorer.UserControls.SharedToolControls.Scene3D
         /// </summary>
         public void Dispose()
         {
-            foreach (ModelPreviewMaterial mat in Materials.Values)
+            foreach (ModelPreviewMaterial<TVertex> mat in Materials.Values)
             {
                 mat.Dispose();
             }
             Materials.Clear();
-            foreach (ModelPreviewLOD lod in LODs)
+            foreach (ModelPreviewLOD<TVertex> lod in LODs)
             {
                 lod.Mesh.Dispose();
             }
