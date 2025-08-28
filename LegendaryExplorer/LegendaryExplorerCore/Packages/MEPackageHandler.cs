@@ -352,16 +352,17 @@ namespace LegendaryExplorerCore.Packages
                 pkg = MEStreamConstructorDelegate(stream, filePath, quickLoad, dataLoadPredicate);
                 MemoryAnalyzer.AddTrackedMemoryItem($"{pkg.Game} MEPackage {Path.GetFileName(filePath)}", new WeakReference(pkg));
             }
-            else if (version is UDKPackage.UDKUnrealVersion2015 or UDKPackage.UDKUnrealVersion2014 or UDKPackage.UDKUnrealVersion2011 or UDKPackage.UDKUnrealVersion2010_09 && licenseVersion == 0)
+            else if (licenseVersion == 0)
             {
-                //UDK
+                // Treat any package with a license version of 0 as a generic UE3/UDK package
+                // so tools can open Gears of War 3 .xxx map files and other UE3 content.
                 stream.Position -= 8; //reset to start
                 pkg = UDKStreamConstructorDelegate(stream, filePath);
                 MemoryAnalyzer.AddTrackedMemoryItem($"UDKPackage {Path.GetFileName(filePath)}", new WeakReference(pkg));
             }
             else
             {
-                throw new FormatException("Not an ME1, ME2, ME3, LE1, LE2, LE3,or UDK (2015) package file.");
+                throw new FormatException("Not an ME1, ME2, ME3, LE1, LE2, LE3, or UE3/UDK package file.");
             }
 
             if (useSharedCache)
